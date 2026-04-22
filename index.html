@@ -1963,7 +1963,13 @@
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
                       <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{t.korean}"</div>
-                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{t.english}</div>
+                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{t.english.split(/(\*\*[^*]+\*\*)/).map(function(part,pi){
+                        if(part.startsWith("**")&&part.endsWith("**")){
+                          var word=part.slice(2,-2);
+                          return React.createElement("span",{key:pi,style:{color:C.accent,background:C.accent+"20",padding:"1px 4px",borderRadius:4,fontWeight:800}},word);
+                        }
+                        return part;
+                      })}</div>
                       {t.verbs_used?.length>0&&(
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {t.verbs_used.map(function(v,j){return(
