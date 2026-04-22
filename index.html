@@ -166,6 +166,20 @@
     }
 
     // ── TTS HELPER ─────────────────────────────────────────────────
+    // **verb** 마크다운을 하이라이트로 변환하는 공용 함수
+    function renderHighlight(text) {
+      if (!text || text.indexOf("**") === -1) return text;
+      return text.split(/(\*\*[^*]+\*\*)/).map(function(part, i) {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          var word = part.slice(2, -2);
+          var isPhrasal = word.indexOf(" ") !== -1;
+          var vc = isPhrasal ? C.accent : C.yellow;
+          return React.createElement("span", {key: i, style: {color: "#08090d", background: vc, padding: "1px 5px", borderRadius: 4, fontWeight: 800}}, word);
+        }
+        return part;
+      });
+    }
+
     function speakEnglish(text) {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
@@ -1652,7 +1666,7 @@
         if (text.length > 800) text = text.slice(0, 800) + "\n...(이하 생략)";
         setIsLoading(true);
         setAltSituations(null);
-        var system='You are an American English coach for Korean speakers. Analyze this Korean conversation/monologue.\n\nRules:\n- Detect how many speakers there are from context (1-4 people)\n- Split into turns if multiple speakers\n- Translate each turn to natural American English using ONLY simple/basic verbs (get, make, take, put, go, have, keep, come, run, look, turn, end up, figure out, hang out, etc.)\n- NEVER use difficult/formal vocabulary. Americans use simple verbs for everything.\n- Highlight which basic verbs were used\n- Pick 3-5 useful nouns from the conversation that are worth learning\n\nReturn ONLY valid JSON:\n{"scenario":"상황 한줄 요약 (한국어)","speakers":1,"turns":[{"speaker":"화자1","korean":"원문","english":"미국식 영어 (쉬운 동사만!)","verbs_used":[{"verb":"get","usage":"받다 의미로 사용"}]}],"key_verbs":[{"verb":"get","meaning":"이 대화에서 쓰인 의미","example":"I got your text"}],"key_nouns":[{"noun":"deadline","meaning_ko":"마감 기한","example":"The deadline is tomorrow."}],"coach_tip":"이 대화의 핵심 포인트, 한국어 2문장. 쉬운 동사로 이렇게 말할 수 있다는 걸 강조"}';
+        var system='You are an American English coach for Korean speakers. Analyze this Korean conversation/monologue.\n\nRules:\n- Detect how many speakers there are from context (1-4 people)\n- Split into turns if multiple speakers\n- Translate each turn to natural American English using ONLY simple/basic verbs (get, make, take, put, go, have, keep, come, run, look, turn, end up, figure out, hang out, etc.)\n- NEVER use difficult/formal vocabulary. Americans use simple verbs for everything.\n- In the english field, wrap each verb/phrasal verb with ** markers like **get**, **give up**\n- Pick 3-5 useful nouns from the conversation that are worth learning\n\nReturn ONLY valid JSON:\n{"scenario":"상황 한줄 요약 (한국어)","speakers":1,"turns":[{"speaker":"화자1","korean":"원문","english":"I **got** your text and **gave up** waiting.","verbs_used":[{"verb":"get","usage":"받다"},{"verb":"give up","usage":"포기하다"}]}],"key_verbs":[{"verb":"get","meaning":"이 대화에서 쓰인 의미","example":"I got your text"}],"key_nouns":[{"noun":"deadline","meaning_ko":"마감 기한","example":"The deadline is tomorrow."}],"coach_tip":"이 대화의 핵심 포인트, 한국어 2문장"}';
         callClaude(system,'한국어 대화/독백:\n"'+text+'"\n\n화자 수를 유추하고, 각 발화를 쉬운 기본동사/구동사만 써서 미국식으로 변환해줘.')
         .then(function(raw){
           // JSON 추출: ```json...``` 또는 {...} 찾기
@@ -1962,40 +1976,8 @@
                       </div>
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
-                      <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{t.korean}"</div>
-                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{(function(){
-                        var eng = t.english||"";
-                        var phrasalVerbs = (t.verbs_used||[]).filter(function(v){return v.verb.indexOf(" ")!==-1;}).map(function(v){return v.verb.toLowerCase();});
-                        var basicVerbs = (t.verbs_used||[]).filter(function(v){return v.verb.indexOf(" ")===-1;}).map(function(v){return v.verb.toLowerCase();});
-                        function getVerbColor(word){
-                          var w = word.toLowerCase();
-                          if(phrasalVerbs.some(function(p){return p.indexOf(w)!==-1||w.indexOf(p)!==-1;})) return C.accent;
-                          return C.yellow;
-                        }
-                        // **verb** 마크다운이 있으면 파싱
-                        if(eng.indexOf("**")!==-1){
-                          return eng.split(/(\*\*[^*]+\*\*)/).map(function(part,pi){
-                            if(part.startsWith("**")&&part.endsWith("**")){
-                              var word=part.slice(2,-2);
-                              var vc=getVerbColor(word);
-                              return React.createElement("span",{key:pi,style:{color:"#08090d",background:vc,padding:"1px 5px",borderRadius:4,fontWeight:800}},word);
-                            }
-                            return part;
-                          });
-                        }
-                        // verbs_used 기반 하이라이트
-                        if(!t.verbs_used||!t.verbs_used.length) return eng;
-                        var allVerbs = t.verbs_used.map(function(v){return v.verb;}).sort(function(a,b){return b.length-a.length;});
-                        var pattern = new RegExp("\\b("+allVerbs.map(function(v){return v.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}).join("|")+")\\b","gi");
-                        return eng.split(pattern).map(function(part,pi){
-                          var matchedVerb = allVerbs.find(function(v){return part.toLowerCase()===v.toLowerCase();});
-                          if(matchedVerb){
-                            var vc=matchedVerb.indexOf(" ")!==-1?C.accent:C.yellow;
-                            return React.createElement("span",{key:pi,style:{color:"#08090d",background:vc,padding:"1px 5px",borderRadius:4,fontWeight:800}},part);
-                          }
-                          return part;
-                        });
-                      })()}</div>
+                      <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{renderHighlight(t.korean)}"</div>
+                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{renderHighlight(t.english)}</div>
                       {t.verbs_used?.length>0&&(
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {t.verbs_used.map(function(v,j){
