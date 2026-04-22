@@ -666,7 +666,7 @@
               <div onClick={onStart} style={{background:C.surface,border:"1px solid "+C.yellow+"40",borderRadius:16,padding:20,marginBottom:10,cursor:"pointer",transition:"transform 0.1s"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                   <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"오늘의 동사 레슨"}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{"~15분"}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{"~10분"}</div>
                 </div>
                 {allVerbTags.length>0&&(
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
@@ -2083,24 +2083,32 @@
                   if(!t.english||!t.korean) return;
                   var eng = (t.english||"").replace(/\*\*/g,"");
                   var kor = t.korean;
-                  var wordCount = eng.split(" ").length;
-                  if(wordCount<=8){
-                    // 짧은 문장: 순서 맞추기 (한국어 보고 영어 단어 배치)
-                    var words = eng.split(" ");
-                    var shuffled = [].concat(words);
-                    for(var si=shuffled.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var tmp=shuffled[si];shuffled[si]=shuffled[sj];shuffled[sj]=tmp;}
-                    allQuestions.push({type:"order",korean:kor,words:shuffled,answer:eng});
-                  } else if(t.verbs_used&&t.verbs_used.length>0){
-                    // 긴 문장: 빈칸 채우기
+                  // 빈칸 채우기
+                  if(t.verbs_used&&t.verbs_used.length>0){
                     var verb = t.verbs_used[0];
                     var blank = eng.replace(new RegExp("\\b"+verb.verb.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i"),"_____");
                     if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
                   }
+                  // 순서 맞추기 (8단어 이하만)
+                  if(eng.split(" ").length<=8){
+                    var words = eng.split(" ");
+                    var shuffled = [].concat(words);
+                    for(var si=shuffled.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var tmp=shuffled[si];shuffled[si]=shuffled[sj];shuffled[sj]=tmp;}
+                    allQuestions.push({type:"order",korean:kor,words:shuffled,answer:eng});
+                  }
                 });
-                // 빈칸 2개 + 순서 2개로 제한, 짧은 문장 우선
-                var fills = allQuestions.filter(function(q){return q.type==="fill";}).slice(0,2);
-                var orders = allQuestions.filter(function(q){return q.type==="order";}).sort(function(a,b){return a.words.length-b.words.length;}).slice(0,2);
-                allQuestions = fills.concat(orders);
+                // 빈칸 2개 + 순서 2개, 최소 4문제 보장
+                var fills = allQuestions.filter(function(q){return q.type==="fill";});
+                var orders = allQuestions.filter(function(q){return q.type==="order";}).sort(function(a,b){return a.words.length-b.words.length;});
+                var picked = [];
+                // 빈칸 최대 2개
+                for(var fi=0;fi<Math.min(2,fills.length);fi++) picked.push(fills[fi]);
+                // 순서 최대 2개
+                for(var oi=0;oi<Math.min(2,orders.length);oi++) picked.push(orders[oi]);
+                // 4문제 미달이면 남은 것에서 채움
+                var remaining = fills.slice(2).concat(orders.slice(2));
+                while(picked.length<4&&remaining.length>0) picked.push(remaining.shift());
+                allQuestions = picked;
                 if(allQuestions.length===0) return null;
                 var q = allQuestions[practiceIdx%allQuestions.length];
                 var isLast = practiceIdx>=allQuestions.length-1;
