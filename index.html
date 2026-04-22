@@ -1794,6 +1794,33 @@
                     </div>
                   )}
 
+                  {!ytTranscript && !ytLoading && (
+                    <div style={{marginTop:16}}>
+                      <div style={{fontSize:11,color:C.red,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🔥 오늘의 추천 영상"}</div>
+                      <div style={{fontSize:11,color:C.muted,marginBottom:10}}>링크가 없어도 OK! 인기 영상으로 바로 시작</div>
+                      {[
+                        {id:"QQugvUh9fpU",title:"Why can't I stop buying STUPID THINGS?",channel:"Hey Tablo",level:"중급",tag:"일상"},
+                        {id:"2bVAoVlFYf0",title:"Learn English with Friends",channel:"English with Lucy",level:"초급",tag:"드라마"},
+                        {id:"juKd26qkNAw",title:"How to Talk Like a Native Speaker",channel:"Speak English With Vanessa",level:"중급",tag:"회화"},
+                        {id:"PHO3-YVFkhk",title:"English Conversation Practice",channel:"Kendra's Language School",level:"초급",tag:"대화"},
+                        {id:"CrGODYaUmMI",title:"Advanced English Conversation",channel:"English Addict",level:"고급",tag:"토론"},
+                      ].map(function(rec,i){
+                        var levelColor = rec.level==="초급"?C.accent:rec.level==="중급"?C.yellow:C.orange;
+                        return(
+                        <div key={i} onClick={function(){setYtUrl("https://youtu.be/"+rec.id);}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>{rec.title}</div>
+                            <div style={{fontSize:11,color:C.muted}}>{rec.channel}</div>
+                          </div>
+                          <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+                            <span style={{fontSize:10,color:levelColor,background:levelColor+"15",padding:"2px 6px",borderRadius:4,fontWeight:700}}>{rec.level}</span>
+                            <span style={{fontSize:10,color:C.muted,background:C.border,padding:"2px 6px",borderRadius:4}}>{rec.tag}</span>
+                          </div>
+                        </div>
+                      );})}
+                    </div>
+                  )}
+
                   {!ytTranscript && !ytLoading && savedYt.length>0 && (
                     <div style={{marginTop:8}}>
                       <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>저장된 영상</div>
