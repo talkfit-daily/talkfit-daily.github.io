@@ -1965,27 +1965,33 @@
                       <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{t.korean}"</div>
                       <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{(function(){
                         var eng = t.english||"";
+                        var phrasalVerbs = (t.verbs_used||[]).filter(function(v){return v.verb.indexOf(" ")!==-1;}).map(function(v){return v.verb.toLowerCase();});
+                        var basicVerbs = (t.verbs_used||[]).filter(function(v){return v.verb.indexOf(" ")===-1;}).map(function(v){return v.verb.toLowerCase();});
+                        function getVerbColor(word){
+                          var w = word.toLowerCase();
+                          if(phrasalVerbs.some(function(p){return p.indexOf(w)!==-1||w.indexOf(p)!==-1;})) return C.accent;
+                          return C.yellow;
+                        }
                         // **verb** 마크다운이 있으면 파싱
                         if(eng.indexOf("**")!==-1){
-                          var phrasals = (t.verbs_used||[]).filter(function(v){return v.verb.indexOf(" ")!==-1;}).map(function(v){return v.verb.toLowerCase();});
                           return eng.split(/(\*\*[^*]+\*\*)/).map(function(part,pi){
                             if(part.startsWith("**")&&part.endsWith("**")){
                               var word=part.slice(2,-2);
-                              var isPhrasal=phrasals.some(function(p){return word.toLowerCase().indexOf(p)!==-1||p.indexOf(word.toLowerCase())!==-1;});
-                              return React.createElement("span",{key:pi,style:{color:"#08090d",background:isPhrasal?C.accent:C.yellow,padding:"1px 5px",borderRadius:4,fontWeight:800}},word);
+                              var vc=getVerbColor(word);
+                              return React.createElement("span",{key:pi,style:{color:"#08090d",background:vc,padding:"1px 5px",borderRadius:4,fontWeight:800}},word);
                             }
                             return part;
                           });
                         }
                         // verbs_used 기반 하이라이트
                         if(!t.verbs_used||!t.verbs_used.length) return eng;
-                        var verbs = t.verbs_used.map(function(v){return v.verb;}).sort(function(a,b){return b.length-a.length;});
-                        var pattern = new RegExp("\\b("+verbs.map(function(v){return v.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}).join("|")+")\\b","gi");
+                        var allVerbs = t.verbs_used.map(function(v){return v.verb;}).sort(function(a,b){return b.length-a.length;});
+                        var pattern = new RegExp("\\b("+allVerbs.map(function(v){return v.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}).join("|")+")\\b","gi");
                         return eng.split(pattern).map(function(part,pi){
-                          var matchedVerb = verbs.find(function(v){return part.toLowerCase()===v.toLowerCase();});
+                          var matchedVerb = allVerbs.find(function(v){return part.toLowerCase()===v.toLowerCase();});
                           if(matchedVerb){
-                            var isPhrasal=matchedVerb.indexOf(" ")!==-1;
-                            return React.createElement("span",{key:pi,style:{color:"#08090d",background:isPhrasal?C.accent:C.yellow,padding:"1px 5px",borderRadius:4,fontWeight:800}},part);
+                            var vc=matchedVerb.indexOf(" ")!==-1?C.accent:C.yellow;
+                            return React.createElement("span",{key:pi,style:{color:"#08090d",background:vc,padding:"1px 5px",borderRadius:4,fontWeight:800}},part);
                           }
                           return part;
                         });
