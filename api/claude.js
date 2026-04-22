@@ -9,8 +9,8 @@ const ALLOWED_ORIGINS = [
 ];
 
 const DAILY_LIMIT = 30;
-const MAX_SYSTEM_LEN = 800;
-const MAX_USER_LEN = 1000;
+const MAX_SYSTEM_LEN = 2000;
+const MAX_USER_LEN = 2000;
 
 export default async function handler(req, res) {
   // ── Origin 검증 ──────────────────────────────────────────────────
