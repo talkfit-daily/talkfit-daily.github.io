@@ -2135,10 +2135,14 @@
                         <div style={{fontSize:14,fontWeight:700,color:practiceCheck.correct?C.accent:C.red,marginBottom:4}}>{practiceCheck.correct?"정답! 🎉":"오답"}</div>
                         {!practiceCheck.correct&&<div style={{fontSize:13,color:C.text}}>정답: <span style={{fontWeight:700}}>{practiceCheck.answer}</span></div>}
                       </div>
-                      <button onClick={function(){
-                        if(isLast){setPracticeMode(false);}
-                        else{setPracticeIdx(practiceIdx+1);setPracticeAnswer("");setPracticeCheck(null);}
-                      }} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>{isLast?"연습 완료! ("+practiceScore.correct+"/"+practiceScore.total+")":"다음 →"}</button>
+                      {practiceCheck.correct?(
+                        <button onClick={function(){
+                          if(isLast){setPracticeMode(false);}
+                          else{setPracticeIdx(practiceIdx+1);setPracticeAnswer("");setPracticeCheck(null);}
+                        }} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>{isLast?"연습 완료! 🎉":"다음 →"}</button>
+                      ):(
+                        <button onClick={function(){setPracticeAnswer("");setPracticeCheck(null);}} style={{width:"100%",background:C.red,color:"white",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>{"다시 풀기 ✏️"}</button>
+                      )}
                     </div>
                   )}
                 </div>);
