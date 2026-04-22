@@ -467,48 +467,21 @@
       );
     }
 
-    // ── SPEAK ───────────────────────────────────────────────────────
+    // ── SPEAK (내 대화 녹음 → AI 분석) ────────────────────────────
     function SpeakScreen(props) {
-      var history=props.history, setHistory=props.setHistory, aiAvailable=props.aiAvailable;
-      var _s1=useState("solo"); var subMode=_s1[0]; var setSubMode=_s1[1];
+      var history=props.history, setHistory=props.setHistory;
       var supported = typeof window!=="undefined"&&("webkitSpeechRecognition" in window||"SpeechRecognition" in window);
 
-
-      if (!supported) return (
-        <div style={{padding:40,textAlign:"center",color:C.muted}}>
-          <div style={{fontSize:32,marginBottom:12}}>{"😢"}</div>
-          <div style={{fontSize:14,lineHeight:1.7}}>이 브라우저는 음성 인식을 지원하지 않아요.<br/>Chrome, Safari, 또는 Edge에서 열어주세요.</div>
-        </div>
-      );
-
-      return (
-        <div style={{padding:"24px 20px"}}>
-          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>SPEAK COACH</div>
-          <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>회화 코치</div>
-          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>
-            {subMode==="conversation"?"친구랑 나눈 한국어 대화 → 미국식 영어로":"한 문장씩 녹음하고 변환"}
-          </div>
-          <div style={{display:"flex",gap:8,marginBottom:20}}>
-            {[{id:"solo",label:"🎙️ 혼자",desc:"한 문장"},{id:"conversation",label:"💬 대화",desc:"두 사람"}].map(function(t){return(
-              <div key={t.id} onClick={function(){setSubMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:"pointer",background:subMode===t.id?C.accent+"20":C.surface,border:"1px solid "+(subMode===t.id?C.accent+"60":C.border)}}>
-                <div style={{fontSize:13,fontWeight:700,color:subMode===t.id?C.accent:C.text}}>{t.label}</div>
-                <div style={{fontSize:10,color:C.muted,marginTop:3}}>{t.desc}</div>
-              </div>
-            );})}
-          </div>
-          {subMode==="solo" ? <SoloMode history={history} setHistory={setHistory}/> : <div style={{textAlign:"center",color:C.muted,padding:20,fontSize:13}}>대화 모드는 준비 중이에요</div>}
-        </div>
-      );
-    }
-
-    function SoloMode(props) {
-      var history=props.history, setHistory=props.setHistory;
       var _s1=useState(false); var recording=_s1[0]; var setRecording=_s1[1];
       var _s2=useState(""); var transcript=_s2[0]; var setTranscript=_s2[1];
       var _s3=useState(""); var interim=_s3[0]; var setInterim=_s3[1];
       var _s4=useState(null); var result=_s4[0]; var setResult=_s4[1];
       var _s5=useState(false); var isLoading=_s5[0]; var setIsLoading=_s5[1];
+      var _s6=useState(""); var textInput=_s6[0]; var setTextInput=_s6[1];
+      var _s7=useState("record"); var mode=_s7[0]; var setMode=_s7[1];
+      var _s8=useState(0); var seconds=_s8[0]; var setSeconds=_s8[1];
       var recRef = useRef(null);
+      var timerRef = useRef(null);
 
       var startRec = function() {
         var SR = window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -523,87 +496,162 @@
           if(fin)setTranscript(function(p){return p+fin;});
           setInterim(inter);
         };
-        rec.onend=function(){setRecording(false);setInterim("");};
+        rec.onend=function(){setRecording(false);clearInterval(timerRef.current);};
         rec.start(); recRef.current=rec;
-        setRecording(true); setTranscript(""); setInterim(""); setResult(null);
+        setRecording(true); setTranscript(""); setInterim(""); setResult(null); setSeconds(0);
+        timerRef.current = setInterval(function(){setSeconds(function(s){return s+1;});},1000);
       };
-      var stopRec=function(){if(recRef.current)recRef.current.stop();setRecording(false);};
-      var reset=function(){setTranscript("");setResult(null);setInterim("");};
+      var stopRec=function(){if(recRef.current)recRef.current.stop();setRecording(false);clearInterval(timerRef.current);};
+      var reset=function(){setTranscript("");setResult(null);setInterim("");setTextInput("");setSeconds(0);};
+      var formatTime=function(s){return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
 
-      var translate = function() {
-        var text = transcript.trim();
+      var analyze = function() {
+        var text = (transcript || textInput).trim();
         if (!text) return;
         setIsLoading(true);
-        var system='You are an American English coach. Return ONLY valid JSON:\n{"korean":"원문","casual":"How an American friend would say this","formal":"Work/school version","key_phrases":[{"phrase":"hang out","meaning":"놀다"}],"tip":"핵심 포인트 한국어 1문장"}';
-        callClaude(system,'한국어: "'+text+'"\n미국식으로 변환해줘.')
+        var system='You are an American English coach for Korean speakers. Analyze this Korean conversation/monologue.\n\nRules:\n- Detect how many speakers there are from context (1-4 people)\n- Split into turns if multiple speakers\n- Translate each turn to natural American English using ONLY simple/basic verbs (get, make, take, put, go, have, keep, come, run, look, turn, end up, figure out, hang out, etc.)\n- NEVER use difficult/formal vocabulary. Americans use simple verbs for everything.\n- Highlight which basic verbs were used\n\nReturn ONLY valid JSON:\n{"scenario":"상황 한줄 요약 (한국어)","speakers":1,"turns":[{"speaker":"화자1","korean":"원문","english":"미국식 영어 (쉬운 동사만!)","verbs_used":[{"verb":"get","usage":"받다 의미로 사용"}]}],"key_verbs":[{"verb":"get","meaning":"이 대화에서 쓰인 의미","example":"I got your text"}],"coach_tip":"이 대화의 핵심 포인트, 한국어 2문장. 쉬운 동사로 이렇게 말할 수 있다는 걸 강조"}';
+        callClaude(system,'한국어 대화/독백:\n"'+text+'"\n\n화자 수를 유추하고, 각 발화를 쉬운 기본동사/구동사만 써서 미국식으로 변환해줘.')
         .then(function(raw){
           var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
           setResult(parsed);
-          var next=[Object.assign({},parsed,{id:Date.now()})].concat(history).slice(0,50);
+          var entry = {id:Date.now(),date:new Date().toISOString().slice(0,10),scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs};
+          var next=[entry].concat(history).slice(0,50);
           setHistory(next); save("speak_history",next);
-        }).catch(function(e){setResult({korean:text,casual:"오류: "+e.message,formal:"",key_phrases:[],tip:""});})
+        }).catch(function(e){setResult({scenario:"분석 실패",speakers:1,turns:[],key_verbs:[],coach_tip:"오류: "+e.message});})
         .finally(function(){setIsLoading(false);});
       };
 
+      if (!supported && mode==="record") setMode("type");
+
       return (
-        <div>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:24}}>
-            <button onClick={recording?stopRec:startRec} style={{width:80,height:80,borderRadius:"50%",border:"none",cursor:"pointer",background:recording?C.red:C.accent,color:"#08090d",fontSize:28,boxShadow:recording?"0 0 32px "+C.red+"60":"0 8px 32px "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {recording?"⏹":"🎙️"}
-            </button>
-            <div style={{marginTop:14,fontSize:13,color:recording?C.red:C.muted,fontWeight:recording?700:400}}>
-              {recording?"● 녹음 중... 말해보세요":"탭해서 한국어로 말하기"}
-            </div>
-          </div>
+        <div style={{padding:"24px 20px"}}>
+          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>MY DAILY ENGLISH</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>내 대화를 영어로</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>녹음하거나 입력하면, 쉬운 동사로 변환해드려요</div>
 
-          {(transcript||interim)&&(
-            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:16}}>
-              <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:8}}>인식된 한국어</div>
-              <div style={{fontSize:15,color:C.text,lineHeight:1.6,minHeight:40}}>
-                {transcript}<span style={{color:C.muted}}>{interim}</span>
+          {!result && (
+            <div>
+              <div style={{display:"flex",gap:8,marginBottom:20}}>
+                {[{id:"record",label:"🎙️ 녹음",desc:"대화 녹음"},{id:"type",label:"⌨️ 입력",desc:"직접 타이핑"}].map(function(t){return(
+                  <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:mode===t.id?C.accent:C.text}}>{t.label}</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:3}}>{t.desc}</div>
+                  </div>
+                );})}
               </div>
-            </div>
-          )}
 
-          {transcript&&!recording&&!result&&(
-            <div style={{display:"flex",gap:10,marginBottom:20}}>
-              <button onClick={reset} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:14,fontSize:14,fontWeight:600,cursor:"pointer"}}>다시 녹음</button>
-              <button onClick={translate} disabled={isLoading} style={{flex:2,background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                {isLoading?"✨ 번역 중...":"미국식으로 변환 →"}
-              </button>
+              {mode==="record" && (
+                <div>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:20}}>
+                    <button onClick={recording?stopRec:startRec} style={{width:88,height:88,borderRadius:"50%",border:"none",cursor:"pointer",background:recording?C.red:C.accent,color:"#08090d",fontSize:30,boxShadow:recording?"0 0 40px "+C.red+"60":"0 8px 32px "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
+                      {recording?"⏹":"🎙️"}
+                    </button>
+                    <div style={{marginTop:12,fontSize:recording?18:13,color:recording?C.red:C.muted,fontWeight:recording?800:400}}>
+                      {recording?formatTime(seconds):"탭해서 녹음 시작"}
+                    </div>
+                    {!recording&&<div style={{fontSize:11,color:C.muted,marginTop:4}}>대화, 전화, 혼잣말 다 OK</div>}
+                  </div>
+
+                  {(transcript||interim)&&(
+                    <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:16}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                        <div style={{fontSize:11,color:C.muted,letterSpacing:2}}>인식된 내용</div>
+                        {recording&&<div style={{fontSize:11,color:C.red,fontWeight:700}}>{"● LIVE"}</div>}
+                      </div>
+                      <div style={{fontSize:15,color:C.text,lineHeight:1.8,minHeight:40}}>
+                        {transcript}<span style={{color:C.muted}}>{interim}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {mode==="type" && (
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>오늘 했던 대화를 적어보세요</div>
+                  <textarea value={textInput} onChange={function(e){setTextInput(e.target.value);}} rows={6} placeholder={"예시:\n야 오늘 점심 뭐 먹을래?\n나 어제 먹은 데 또 가자\n거기 줄 길지 않을까?"} style={{width:"100%",background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                </div>
+              )}
+
+              {((mode==="record"&&transcript&&!recording)||(mode==="type"&&textInput.trim()))&&(
+                <div style={{display:"flex",gap:10,marginBottom:16}}>
+                  <button onClick={reset} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:14,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                    {mode==="record"?"다시 녹음":"지우기"}
+                  </button>
+                  <button onClick={analyze} disabled={isLoading} style={{flex:2,background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                    {isLoading?"✨ 분석 중...":"쉬운 영어로 변환 →"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
           {result&&(
             <div>
-              <div style={{background:C.accentDim,border:"1px solid "+C.accent+"30",borderRadius:14,padding:16,marginBottom:12}}>
-                <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:8}}>{"😊 CASUAL · 친구한테"}</div>
-                <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.6}}>"{result.casual}"</div>
-              </div>
-              {result.formal&&(
-                <div style={{background:C.surface,border:"1px solid "+C.blue+"30",borderRadius:14,padding:16,marginBottom:12}}>
-                  <div style={{fontSize:11,color:C.blue,letterSpacing:2,marginBottom:8}}>{"👔 FORMAL · 학교/직장"}</div>
-                  <div style={{fontSize:15,color:C.text,fontWeight:500,lineHeight:1.6}}>"{result.formal}"</div>
+              {result.scenario&&(
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div>
+                      <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>{"📍 상황"}</div>
+                      <div style={{fontSize:14,color:C.text,fontWeight:600}}>{result.scenario}</div>
+                    </div>
+                    <div style={{background:C.accent+"20",color:C.accent,padding:"4px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>
+                      {result.speakers||1}{"명"}
+                    </div>
+                  </div>
                 </div>
               )}
-              {result.key_phrases?.length>0&&(
-                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:12}}>
-                  <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10}}>{"🔑 KEY EXPRESSIONS"}</div>
-                  {result.key_phrases.map(function(p,i){return(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                      <span style={{background:C.accent+"20",color:C.accent,padding:"3px 10px",borderRadius:99,fontSize:13,fontWeight:700,border:"1px solid "+C.accent+"40"}}>{p.phrase}</span>
-                      <span style={{fontSize:13,color:C.muted}}>{p.meaning}</span>
+
+              {result.turns?.map(function(t,i){
+                var colors = [C.accent,C.blue,C.yellow,C.orange];
+                var color = colors[i % colors.length];
+                return (
+                  <div key={i} style={{marginBottom:14}}>
+                    {result.speakers>1&&(
+                      <div style={{fontSize:11,color:color,fontWeight:800,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{width:6,height:6,borderRadius:"50%",background:color}}/>
+                        {t.speaker}
+                      </div>
+                    )}
+                    <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
+                      <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{t.korean}"</div>
+                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{"💬 "}{t.english}</div>
+                      {t.verbs_used?.length>0&&(
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          {t.verbs_used.map(function(v,j){return(
+                            <span key={j} style={{background:C.accent+"20",color:C.accent,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:700}}>{v.verb}</span>
+                          );})}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {result.key_verbs?.length>0&&(
+                <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,padding:16,marginBottom:14}}>
+                  <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:12}}>{"🔑 이 대화에 쓰인 기본동사"}</div>
+                  {result.key_verbs.map(function(v,i){return(
+                    <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<result.key_verbs.length-1?"1px solid "+C.border:"none"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                        <span style={{background:C.accent,color:"#08090d",padding:"2px 10px",borderRadius:6,fontSize:14,fontWeight:800}}>{v.verb}</span>
+                        <span style={{fontSize:13,color:C.muted}}>{v.meaning}</span>
+                      </div>
+                      {v.example&&<div style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2}}>"{v.example}"</div>}
                     </div>
                   );})}
                 </div>
               )}
-              {result.tip&&(
+
+              {result.coach_tip&&(
                 <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:20}}>
-                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:4}}>{"💡 TIP"}</div>
-                  <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{result.tip}</div>
+                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:6}}>{"💡 COACH'S TIP"}</div>
+                  <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{result.coach_tip}</div>
                 </div>
               )}
-              <button onClick={reset} style={{width:"100%",background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:14,padding:14,fontSize:14,fontWeight:700,cursor:"pointer"}}>{"🎙️ 새 문장"}</button>
+
+              <button onClick={reset} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"🎙️ 새 대화 분석"}</button>
+              <button onClick={function(){reset();}} style={{width:"100%",background:"none",border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:12,fontSize:13,cursor:"pointer"}}>홈으로</button>
             </div>
           )}
         </div>
