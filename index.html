@@ -1504,10 +1504,14 @@
         timerRef.current = setInterval(function(){setSeconds(function(s){return s+1;});},1000);
       };
       var stopRec=function(){if(recRef.current)recRef.current.stop();setRecording(false);clearInterval(timerRef.current);};
-      var reset=function(){setTranscript("");setResult(null);setInterim("");setTextInput("");setSeconds(0);setAudioFile(null);if(audioUrl)URL.revokeObjectURL(audioUrl);setAudioUrl(null);setFileTranscript("");setAltSituations(null);setAltLoading(false);};
+      var reset=function(){setTranscript("");setResult(null);setInterim("");setTextInput("");setSeconds(0);setAudioFile(null);if(audioUrl)URL.revokeObjectURL(audioUrl);setAudioUrl(null);setFileTranscript("");setAltSituations(null);setAltLoading(false);setYtUrl("");setYtTitle("");setYtTranscript("");};
       var formatTime=function(s){return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
 
       var _fileLoading = useState(false); var fileLoading = _fileLoading[0]; var setFileLoading = _fileLoading[1];
+      var _ytUrl = useState(""); var ytUrl = _ytUrl[0]; var setYtUrl = _ytUrl[1];
+      var _ytLoading = useState(false); var ytLoading = _ytLoading[0]; var setYtLoading = _ytLoading[1];
+      var _ytTitle = useState(""); var ytTitle = _ytTitle[0]; var setYtTitle = _ytTitle[1];
+      var _ytTranscript = useState(""); var ytTranscript = _ytTranscript[0]; var setYtTranscript = _ytTranscript[1];
 
       var handleFileUpload = function(e) {
         var file = e.target.files && e.target.files[0];
@@ -1550,7 +1554,7 @@
       };
 
       var analyze = function() {
-        var text = mode === "file" ? fileTranscript.trim() : (transcript || textInput).trim();
+        var text = mode === "youtube" ? ytTranscript.trim() : mode === "file" ? fileTranscript.trim() : (transcript || textInput).trim();
         if (!text) return;
         setIsLoading(true);
         setAltSituations(null);
@@ -1581,7 +1585,7 @@
           {!result && (
             <div>
               <div style={{display:"flex",gap:8,marginBottom:20}}>
-                {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"}].map(function(t){return(
+                {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"▶️ YouTube",desc:"영상 자막"}].map(function(t){return(
                   <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
                     <div style={{fontSize:13,fontWeight:700,color:mode===t.id?C.accent:C.text}}>{t.label}</div>
                     <div style={{fontSize:10,color:C.muted,marginTop:3}}>{t.desc}</div>
@@ -1653,7 +1657,41 @@
                 </div>
               )}
 
-              {((mode==="record"&&transcript&&!recording)||(mode==="type"&&textInput.trim())||(mode==="file"&&fileTranscript.trim()))&&(
+              {mode==="youtube" && (
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>YouTube 링크를 붙여넣으면 자막을 자동으로 가져와요</div>
+                  <div style={{display:"flex",gap:8,marginBottom:12}}>
+                    <input value={ytUrl} onChange={function(e){setYtUrl(e.target.value);}} placeholder="https://youtube.com/watch?v=..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+                    <button disabled={ytLoading||!ytUrl.trim()} onClick={function(){
+                      setYtLoading(true);setYtTitle("");setYtTranscript("");
+                      fetch("/api/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:ytUrl.trim()})})
+                      .then(function(r){return r.json();}).then(function(data){
+                        if(data.transcript){setYtTitle(data.title||"");setYtTranscript(data.transcript);}
+                        else{alert(data.error||"자막을 가져올 수 없어요.");}
+                      }).catch(function(){alert("오류가 발생했어요.");}).finally(function(){setYtLoading(false);});
+                    }} style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
+                      {ytLoading?"가져오는 중...":"자막 가져오기"}
+                    </button>
+                  </div>
+                  {ytTitle && (
+                    <div style={{background:C.surface,border:"1px solid "+C.red+"40",borderRadius:12,padding:14,marginBottom:12}}>
+                      <div style={{fontSize:11,color:C.red,letterSpacing:2,fontWeight:700,marginBottom:6}}>영상 제목</div>
+                      <div style={{fontSize:13,color:C.text,fontWeight:600}}>{ytTitle}</div>
+                    </div>
+                  )}
+                  {ytTranscript && (
+                    <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>추출된 자막</div>
+                        <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
+                      </div>
+                      <textarea value={ytTranscript} onChange={function(e){setYtTranscript(e.target.value);}} rows={6} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:14,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {((mode==="record"&&transcript&&!recording)||(mode==="type"&&textInput.trim())||(mode==="file"&&fileTranscript.trim()&&!fileLoading)||(mode==="youtube"&&ytTranscript.trim()&&!ytLoading))&&(
                 <div style={{display:"flex",gap:10,marginBottom:16}}>
                   <button onClick={reset} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:14,fontSize:14,fontWeight:600,cursor:"pointer"}}>
                     {mode==="record"?"다시 녹음":"지우기"}
