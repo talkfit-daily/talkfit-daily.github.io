@@ -2110,15 +2110,15 @@
                     <div style={{fontSize:11,color:C.muted}}>{practiceIdx+1}/{allQuestions.length}</div>
                   </div>
                   <div style={{fontSize:14,color:C.text,marginBottom:12,lineHeight:1.6}}>
-                    {q.type==="fill"&&<div><div style={{fontSize:12,color:C.muted,marginBottom:4}}>{q.korean}</div><div style={{fontSize:16,fontWeight:600}}>{q.sentence}</div></div>}
+                    {q.type==="fill"&&<div><div style={{fontSize:14,color:C.text,marginBottom:8}}>{q.korean}</div><div style={{fontSize:16,fontWeight:600,color:C.muted}}>{q.sentence}</div></div>}
                     {q.type==="translate"&&<div style={{fontSize:16,fontWeight:600}}>{q.korean}</div>}
-                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:10}}>{q.korean}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
-                      var selected = practiceAnswer.split(" ");
-                      var used = selected.filter(function(s){return s===w;}).length;
-                      var available = q.words.filter(function(ww,wwi){return ww===w&&wwi<=wi;}).length;
-                      var isUsed = used>=available;
-                      return <button key={wi} disabled={isUsed||practiceCheck} onClick={function(){setPracticeAnswer(function(a){return a?a+" "+w:w;});}} style={{background:isUsed?C.border:C.accent+"20",color:isUsed?C.muted:C.accent,border:"1px solid "+(isUsed?C.border:C.accent+"40"),borderRadius:8,padding:"6px 12px",fontSize:13,fontWeight:600,cursor:isUsed?"not-allowed":"pointer"}}>{w}</button>;
-                    })}</div>{practiceAnswer&&<div style={{marginTop:10,fontSize:14,color:C.text,background:C.bg,borderRadius:8,padding:10}}>{practiceAnswer}</div>}</div>}
+                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:12}}>{q.korean}</div>{practiceAnswer&&<div style={{marginBottom:10,fontSize:15,color:C.text,background:C.bg,borderRadius:10,padding:"12px 14px",minHeight:20,lineHeight:1.6}}>{practiceAnswer}<span style={{cursor:"pointer",marginLeft:8,color:C.red,fontSize:12}} onClick={function(){var words=practiceAnswer.trim().split(" ");words.pop();setPracticeAnswer(words.join(" "));}}>{"← 지우기"}</span></div>}<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
+                      var selected = (practiceAnswer||"").split(" ").filter(function(s){return s;});
+                      var usedCount = selected.filter(function(s){return s===w;}).length;
+                      var totalCount = q.words.slice(0,wi+1).filter(function(ww){return ww===w;}).length;
+                      var isUsed = usedCount>=totalCount;
+                      return <button key={wi} disabled={isUsed||!!practiceCheck} onClick={function(){setPracticeAnswer(function(a){return a?a+" "+w:w;});}} style={{background:isUsed?C.border:C.orange+"20",color:isUsed?C.muted:C.orange,border:"1px solid "+(isUsed?C.border:C.orange+"40"),borderRadius:8,padding:"8px 14px",fontSize:14,fontWeight:600,cursor:isUsed?"not-allowed":"pointer"}}>{w}</button>;
+                    })}</div></div>}
                   </div>
                   {q.type!=="order"&&!practiceCheck&&(
                     <input value={practiceAnswer} onChange={function(e){setPracticeAnswer(e.target.value);}} placeholder={q.type==="fill"?"동사를 입력하세요":"영어로 써보세요"} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:10}}/>
