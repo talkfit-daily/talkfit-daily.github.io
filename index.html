@@ -6,49 +6,44 @@
   <title>TalkFit — 매일 15분 미국식 영어</title>
   <meta name="description" content="매일 15분, 미국인이 실제 쓰는 영어 표현 트레이닝"/>
   <meta name="theme-color" content="#08090d"/>
-  <link rel="manifest" href="manifest.json"/>
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#08090d; color:#e8eaf0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; max-width:480px; margin:0 auto; min-height:100vh; -webkit-font-smoothing:antialiased; }
-    input,textarea,button { font-family:inherit; }
-    a { color:inherit; }
-    @keyframes dot { from{opacity:0.3;transform:scale(0.8)} to{opacity:1;transform:scale(1.2)} }
-    @keyframes pulse1 { from{transform:scale(1);opacity:0.5} to{transform:scale(1.4);opacity:0} }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-    .screen-enter { animation: fadeIn 0.3s ease-out; }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:#08090d;color:#e8eaf0;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;}
+    input,textarea,button{font-family:inherit;}
+    a{color:inherit;}
+    textarea::placeholder{color:#2a2f45;}
+    @keyframes pulse1{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.8);opacity:0}}
+    @keyframes dot{from{opacity:0.2}to{opacity:1}}
+    ::-webkit-scrollbar{width:0}
   </style>
 </head>
 <body>
   <div id="root"></div>
-
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, Fragment } = React;
 
-  <script type="text/babel" data-type="module">
-    const { useState, useEffect, useRef } = React;
-
-    // ── CONFIG ──────────────────────────────────────────────────────
     const ADMIN_KEY = "ys2026";
-    const FEEDBACK_FORM_URL = "https://forms.gle/REPLACE_WITH_YOUR_FORM";
     const CREATOR_NAME = "by yoonsoo";
 
-    // ── STORAGE (localStorage wrapper) ──────────────────────────────
+    // ── STORAGE ─────────────────────────────────────────────────────
     function load(key) {
-      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; }
+      try { const v = localStorage.getItem("tf_"+key); return v ? JSON.parse(v) : null; } catch { return null; }
     }
     function save(key, val) {
-      try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+      try { localStorage.setItem("tf_"+key, JSON.stringify(val)); } catch {}
     }
 
-    // ── API KEY MANAGEMENT ──────────────────────────────────────────
-    function getApiKey() { return localStorage.getItem("claude_api_key") || ""; }
-    function setApiKey(k) { localStorage.setItem("claude_api_key", k); }
-    function clearApiKey() { localStorage.removeItem("claude_api_key"); }
+    // ── API KEY ─────────────────────────────────────────────────────
+    function getApiKey() { return localStorage.getItem("tf_api_key") || ""; }
+    function setApiKey(k) { localStorage.setItem("tf_api_key", k); }
+    function clearApiKey() { localStorage.removeItem("tf_api_key"); }
 
     async function callClaude(system, user) {
       const key = getApiKey();
-      if (!key) throw new Error("No API key");
+      if (!key) throw new Error("API 키가 없습니다");
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -65,346 +60,339 @@
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `API error ${res.status}`);
+        const err = await res.json().catch(function(){return {};});
+        throw new Error(err.error?.message || "API error " + res.status);
       }
       const data = await res.json();
       return data.content?.[0]?.text || "";
     }
 
-    // ── ANALYTICS (localStorage) ────────────────────────────────────
+    // ── ANALYTICS ───────────────────────────────────────────────────
     function track(event) {
-      const today = new Date().toISOString().slice(0, 10);
-      const key = `stat:${today}:${event}`;
-      const count = (load(key) || 0) + 1;
+      var today = new Date().toISOString().slice(0, 10);
+      var key = "stat:" + today + ":" + event;
+      var count = (load(key) || 0) + 1;
       save(key, count);
     }
 
     function fetchStats() {
-      const days = [];
-      for (let i = 0; i < 14; i++) {
-        const d = new Date(); d.setDate(d.getDate() - i);
+      var days = [];
+      for (var i = 0; i < 14; i++) {
+        var d = new Date(); d.setDate(d.getDate() - i);
         days.push(d.toISOString().slice(0, 10));
       }
-      const events = ["visit","lesson_start","lesson_done","reaction_good","reaction_mid","reaction_bad","feedback_click","login_attempt"];
-      const result = {};
-      for (const day of days) {
+      var events = ["visit","lesson_start","lesson_done","reaction_good","reaction_mid","reaction_bad","feedback_click","login_attempt"];
+      var result = {};
+      for (var di = 0; di < days.length; di++) {
+        var day = days[di];
         result[day] = {};
-        for (const e of events) result[day][e] = load(`stat:${day}:${e}`) || 0;
+        for (var ei = 0; ei < events.length; ei++) {
+          result[day][events[ei]] = load("stat:" + day + ":" + events[ei]) || 0;
+        }
       }
       return result;
     }
 
-    // ── HARDCODED LESSON POOL ───────────────────────────────────────
-    const LESSON_POOL = [
+    // ── LESSON POOL ─────────────────────────────────────────────────
+    var LESSON_POOL = [
       {
-        basic: { verb: "get", meaning_ko: "얻다, 되다, 이해하다", meaning_en: "one of the most versatile verbs",
-          meanings: [{meaning:"얻다/받다",example:"I got your message."},{meaning:"되다",example:"It's getting cold."},{meaning:"이해하다",example:"I don't get it."}],
-          examples: [{situation:"일상",english:"Did you get my text?",korean:"내 문자 받았어?"},{situation:"이해",english:"I totally get how you feel.",korean:"네 기분 완전 이해해."},{situation:"변화",english:"It's getting harder to focus.",korean:"집중하기 점점 힘드네."}],
-          bad_example:"I get hungry. Go eat.",good_example:"I was getting really tired so I left early.",practice_hint:"'오늘 받은 것' 또는 '~하게 되어가는 상황'으로 써보세요." },
-        phrasal: { verb: "figure out", meaning_ko: "알아내다, 해결하다", meaning_en: "find the answer through thinking",
-          meanings: [],
+        basic:{verb:"get",meaning_ko:"얻다, 되다, 이해하다",meaning_en:"one of the most versatile verbs",
+          meanings:[{meaning:"얻다/받다",example:"I got your message."},{meaning:"되다",example:"It's getting cold."},{meaning:"이해하다",example:"I don't get it."}],
+          examples:[{situation:"일상",english:"Did you get my text?",korean:"내 문자 받았어?"},{situation:"이해",english:"I totally get how you feel.",korean:"네 기분 완전 이해해."},{situation:"변화",english:"It's getting harder to focus.",korean:"집중하기 점점 힘드네."}],
+          bad_example:"I get hungry. Go eat.",good_example:"I was getting really tired so I left early.",practice_hint:"'오늘 받은 것' 또는 '~하게 되어가는 상황'으로 써보세요."},
+        phrasal:{verb:"figure out",meaning_ko:"알아내다, 해결하다",meaning_en:"find the answer through thinking",meanings:[],
           examples:[{situation:"문제해결",english:"I finally figured out why my code wasn't working.",korean:"드디어 코드 오류 이유 알아냈어."},{situation:"결정",english:"We need to figure out what to eat.",korean:"뭐 먹을지 정해야 해."},{situation:"미래",english:"She's still figuring out what she wants.",korean:"아직 뭘 하고 싶은지 알아내려 해."}],
-          bad_example:"I figure out problem.",good_example:"I couldn't figure out the assignment so I asked my professor.",practice_hint:"'몰랐다가 알게 된 것' 또는 '아직 해결 못 한 것'으로 써보세요." }
+          bad_example:"I figure out problem.",good_example:"I couldn't figure out the assignment so I asked my professor.",practice_hint:"'몰랐다가 알게 된 것' 또는 '아직 해결 못 한 것'으로 써보세요."}
       },
       {
-        basic: { verb: "make", meaning_ko: "만들다, ~하게 하다, 해내다", meaning_en: "to create, cause, or achieve",
+        basic:{verb:"make",meaning_ko:"만들다, ~하게 하다, 해내다",meaning_en:"to create, cause, or achieve",
           meanings:[{meaning:"만들다",example:"Can you make some coffee?"},{meaning:"~하게 하다",example:"That made me laugh."},{meaning:"해내다",example:"We made it on time."}],
           examples:[{situation:"부탁",english:"Can you make me a copy?",korean:"복사 좀 해줄래?"},{situation:"감정",english:"That honestly made my day.",korean:"그거 덕에 하루가 좋아졌어."},{situation:"성취",english:"We finally made it to the end.",korean:"드디어 끝까지 해냈다."}],
-          bad_example:"Make food. Eat together.",good_example:"Let's make a reservation before it gets crowded.",practice_hint:"오늘 만든 것 또는 ~하게 만든 상황으로 써보세요." },
-        phrasal: { verb: "end up", meaning_ko: "결국 ~하게 되다", meaning_en: "to finally be somewhere you didn't plan",
-          meanings:[],
+          bad_example:"Make food. Eat together.",good_example:"Let's make a reservation before it gets crowded.",practice_hint:"오늘 만든 것 또는 ~하게 만든 상황으로 써보세요."},
+        phrasal:{verb:"end up",meaning_ko:"결국 ~하게 되다",meaning_en:"to finally be somewhere you didn't plan",meanings:[],
           examples:[{situation:"계획변경",english:"I ended up staying late at the office.",korean:"결국 사무실에 늦게까지 있었어."},{situation:"예상 밖",english:"We were gonna study but ended up watching Netflix.",korean:"공부하려 했는데 결국 넷플릭스 봤어."},{situation:"조언",english:"If you skip breakfast you'll end up crashing by noon.",korean:"아침 거르면 점심쯤 방전될 거야."}],
-          bad_example:"I end up tired always.",good_example:"I ended up pulling an all-nighter because I kept putting off the assignment.",practice_hint:"원래 계획과 달랐던 상황으로 써보세요." }
+          bad_example:"I end up tired always.",good_example:"I ended up pulling an all-nighter because I kept putting off the assignment.",practice_hint:"원래 계획과 달랐던 상황으로 써보세요."}
       },
       {
-        basic: { verb: "take", meaning_ko: "가져가다, 걸리다, 받아들이다", meaning_en: "to carry, require, or accept",
+        basic:{verb:"take",meaning_ko:"가져가다, 걸리다, 받아들이다",meaning_en:"to carry, require, or accept",
           meanings:[{meaning:"가져가다",example:"Take an umbrella."},{meaning:"시간 걸리다",example:"It takes 10 minutes."},{meaning:"받아들이다",example:"Take it easy."}],
           examples:[{situation:"권유",english:"You should take a break.",korean:"좀 쉬어야겠다."},{situation:"시간",english:"It took me forever to finish.",korean:"끝내는데 영겁의 시간이 걸렸어."},{situation:"받기",english:"I'll take that as a yes.",korean:"그건 yes로 받아들일게."}],
-          bad_example:"Take rest. Feel better.",good_example:"I need to take a day off — I'm completely burnt out.",practice_hint:"시간이 걸린 일이나 휴식이 필요한 상황으로 써보세요." },
-        phrasal: { verb: "come up", meaning_ko: "생기다, 다가오다, 언급되다", meaning_en: "to arise or be mentioned",
-          meanings:[],
+          bad_example:"Take rest. Feel better.",good_example:"I need to take a day off — I'm completely burnt out.",practice_hint:"시간이 걸린 일이나 휴식이 필요한 상황으로 써보세요."},
+        phrasal:{verb:"come up",meaning_ko:"생기다, 다가오다, 언급되다",meaning_en:"to arise or be mentioned",meanings:[],
           examples:[{situation:"갑작스런일",english:"Sorry, something came up.",korean:"미안, 일이 좀 생겼어."},{situation:"이벤트",english:"My birthday's coming up next week.",korean:"다음 주에 생일이야."},{situation:"대화",english:"Your name came up in the meeting.",korean:"회의에서 네 이름이 나왔어."}],
-          bad_example:"Problem come up. I busy.",good_example:"Something came up at work so I had to cancel dinner.",practice_hint:"갑자기 생긴 일이나 다가오는 일정으로 써보세요." }
+          bad_example:"Problem come up. I busy.",good_example:"Something came up at work so I had to cancel dinner.",practice_hint:"갑자기 생긴 일이나 다가오는 일정으로 써보세요."}
       },
       {
-        basic: { verb: "have", meaning_ko: "가지다, 먹다, 겪다", meaning_en: "to possess, experience, or consume",
+        basic:{verb:"have",meaning_ko:"가지다, 먹다, 겪다",meaning_en:"to possess, experience, or consume",
           meanings:[{meaning:"가지다",example:"I have a question."},{meaning:"먹다/마시다",example:"Let's have dinner."},{meaning:"겪다",example:"Have a great day!"}],
           examples:[{situation:"제안",english:"Let's have a chat later.",korean:"나중에 얘기 좀 하자."},{situation:"경험",english:"I had a rough day.",korean:"힘든 하루였어."},{situation:"식사",english:"I haven't had lunch yet.",korean:"아직 점심 안 먹었어."}],
-          bad_example:"I have happy day.",good_example:"I've been having trouble sleeping lately.",practice_hint:"최근 겪은 경험이나 먹은 것으로 써보세요." },
-        phrasal: { verb: "hang out", meaning_ko: "시간을 보내다, 놀다", meaning_en: "to spend time casually",
-          meanings:[],
+          bad_example:"I have happy day.",good_example:"I've been having trouble sleeping lately.",practice_hint:"최근 겪은 경험이나 먹은 것으로 써보세요."},
+        phrasal:{verb:"hang out",meaning_ko:"시간을 보내다, 놀다",meaning_en:"to spend time casually",meanings:[],
           examples:[{situation:"초대",english:"Wanna hang out this weekend?",korean:"이번 주말에 놀래?"},{situation:"장소",english:"We usually hang out at that café.",korean:"우리 보통 그 카페에서 놀아."},{situation:"회상",english:"We used to hang out all the time.",korean:"우리 맨날 같이 놀았잖아."}],
-          bad_example:"Let's hang out together play.",good_example:"I just wanna hang out at home tonight, I'm exhausted.",practice_hint:"친구랑 놀았던 상황으로 써보세요." }
+          bad_example:"Let's hang out together play.",good_example:"I just wanna hang out at home tonight, I'm exhausted.",practice_hint:"친구랑 놀았던 상황으로 써보세요."}
       },
       {
-        basic: { verb: "go", meaning_ko: "가다, ~되다, 진행되다", meaning_en: "to move, become, or progress",
+        basic:{verb:"go",meaning_ko:"가다, ~되다, 진행되다",meaning_en:"to move, become, or progress",
           meanings:[{meaning:"가다",example:"Let's go."},{meaning:"진행되다",example:"How's it going?"},{meaning:"~되다",example:"My phone went dead."}],
           examples:[{situation:"안부",english:"How's everything going?",korean:"다 잘 되고 있어?"},{situation:"결과",english:"The interview went really well.",korean:"면접 잘 봤어."},{situation:"상태변화",english:"My laptop just went black.",korean:"노트북이 갑자기 꺼졌어."}],
-          bad_example:"I go school every day.",good_example:"Things have been going pretty well at work lately.",practice_hint:"요즘 어떻게 지내는지, 뭐가 어떻게 됐는지로 써보세요." },
-        phrasal: { verb: "look up", meaning_ko: "찾아보다, 검색하다", meaning_en: "to search for information",
-          meanings:[],
+          bad_example:"I go school every day.",good_example:"Things have been going pretty well at work lately.",practice_hint:"요즘 어떻게 지내는지, 뭐가 어떻게 됐는지로 써보세요."},
+        phrasal:{verb:"look up",meaning_ko:"찾아보다, 검색하다",meaning_en:"to search for information",meanings:[],
           examples:[{situation:"검색",english:"Let me look that up.",korean:"내가 찾아볼게."},{situation:"단어",english:"I had to look up that word.",korean:"그 단어 찾아봐야 했어."},{situation:"정보",english:"You can look up the address online.",korean:"주소는 온라인으로 찾으면 돼."}],
-          bad_example:"I look up word dictionary.",good_example:"I looked up the restaurant reviews before booking.",practice_hint:"최근에 검색해본 것으로 써보세요." }
+          bad_example:"I look up word dictionary.",good_example:"I looked up the restaurant reviews before booking.",practice_hint:"최근에 검색해본 것으로 써보세요."}
       },
       {
-        basic: { verb: "put", meaning_ko: "놓다, 넣다, 표현하다", meaning_en: "to place, insert, or express",
+        basic:{verb:"put",meaning_ko:"놓다, 넣다, 표현하다",meaning_en:"to place, insert, or express",
           meanings:[{meaning:"놓다",example:"Put it there."},{meaning:"넣다",example:"Put sugar in it."},{meaning:"표현하다",example:"How do I put this?"}],
           examples:[{situation:"위치",english:"Where did I put my keys?",korean:"열쇠 어디다 뒀지?"},{situation:"압박",english:"Don't put too much pressure on yourself.",korean:"너무 부담 갖지 마."},{situation:"표현",english:"Let me put it this way.",korean:"이렇게 말할게."}],
-          bad_example:"Put thing on table.",good_example:"I don't know how to put this, but I think we need to talk.",practice_hint:"뭔가를 놓거나, 표현하기 어려운 상황으로 써보세요." },
-        phrasal: { verb: "turn out", meaning_ko: "결과가 ~이다, 드러나다", meaning_en: "to result or be revealed",
-          meanings:[],
+          bad_example:"Put thing on table.",good_example:"I don't know how to put this, but I think we need to talk.",practice_hint:"뭔가를 놓거나, 표현하기 어려운 상황으로 써보세요."},
+        phrasal:{verb:"turn out",meaning_ko:"결과가 ~이다, 드러나다",meaning_en:"to result or be revealed",meanings:[],
           examples:[{situation:"결과",english:"It turned out better than I expected.",korean:"생각보다 잘 됐어."},{situation:"사실",english:"Turns out she was right all along.",korean:"알고 보니 걔가 계속 맞았어."},{situation:"걱정후",english:"Everything turned out fine.",korean:"다 잘 해결됐어."}],
-          bad_example:"Result turn out good.",good_example:"I was nervous but the presentation turned out great.",practice_hint:"걱정했는데 의외의 결과가 나온 상황으로 써보세요." }
+          bad_example:"Result turn out good.",good_example:"I was nervous but the presentation turned out great.",practice_hint:"걱정했는데 의외의 결과가 나온 상황으로 써보세요."}
       },
       {
-        basic: { verb: "keep", meaning_ko: "유지하다, 계속하다, 보관하다", meaning_en: "to maintain, continue, or hold",
+        basic:{verb:"keep",meaning_ko:"유지하다, 계속하다, 보관하다",meaning_en:"to maintain, continue, or hold",
           meanings:[{meaning:"계속하다",example:"Keep going."},{meaning:"유지하다",example:"Keep it quiet."},{meaning:"보관하다",example:"I'll keep this."}],
           examples:[{situation:"격려",english:"Keep up the good work!",korean:"계속 잘 해!"},{situation:"약속",english:"I'll keep it short.",korean:"짧게 할게."},{situation:"반복",english:"I keep forgetting her name.",korean:"자꾸 그녀 이름을 까먹어."}],
-          bad_example:"I keep study hard.",good_example:"I keep telling myself I'll start tomorrow, but I never do.",practice_hint:"계속 반복하는 습관이나 유지하고 싶은 것으로 써보세요." },
-        phrasal: { verb: "run into", meaning_ko: "우연히 마주치다, 부딪히다", meaning_en: "to meet by chance",
-          meanings:[],
+          bad_example:"I keep study hard.",good_example:"I keep telling myself I'll start tomorrow, but I never do.",practice_hint:"계속 반복하는 습관이나 유지하고 싶은 것으로 써보세요."},
+        phrasal:{verb:"run into",meaning_ko:"우연히 마주치다, 부딪히다",meaning_en:"to meet by chance",meanings:[],
           examples:[{situation:"우연",english:"I ran into an old friend at the store.",korean:"가게에서 옛 친구 만났어."},{situation:"문제",english:"We ran into some issues with the code.",korean:"코드에서 문제가 좀 생겼어."},{situation:"반복",english:"I keep running into her lately.",korean:"요즘 자꾸 그녀랑 마주쳐."}],
-          bad_example:"I run into my friend yesterday.",good_example:"I ran into my professor at the coffee shop — so awkward.",practice_hint:"예상치 못한 사람이나 문제를 마주쳤던 상황으로 써보세요." }
-      },
+          bad_example:"I run into my friend yesterday.",good_example:"I ran into my professor at the coffee shop — so awkward.",practice_hint:"예상치 못한 사람이나 문제를 마주쳤던 상황으로 써보세요."}
+      }
     ];
 
     function getTodayLesson() {
-      const dayIndex = Math.floor(Date.now() / 86400000) % LESSON_POOL.length;
+      var dayIndex = Math.floor(Date.now() / 86400000) % LESSON_POOL.length;
       return LESSON_POOL[dayIndex];
     }
 
-    const C = {
-      bg:"#08090d", surface:"#10121a", border:"#1e2130",
-      accent:"#7ee8a2", accentDim:"#7ee8a215",
-      blue:"#60a5fa", blueDim:"#60a5fa15",
-      yellow:"#fbbf24", yellowDim:"#fbbf2415",
-      orange:"#fb923c", red:"#f87171",
-      text:"#e8eaf0", muted:"#4a5068",
+    var C = {
+      bg:"#08090d",surface:"#10121a",border:"#1e2130",
+      accent:"#7ee8a2",accentDim:"#7ee8a215",
+      blue:"#60a5fa",blueDim:"#60a5fa15",
+      yellow:"#fbbf24",yellowDim:"#fbbf2415",
+      orange:"#fb923c",red:"#f87171",
+      text:"#e8eaf0",muted:"#4a5068",
     };
 
     // ── API KEY SCREEN ──────────────────────────────────────────────
-    function ApiKeyScreen({ onSave, onSkip }) {
-      const [key, setKey] = useState("");
-      const [testing, setTesting] = useState(false);
-      const [error, setError] = useState("");
+    function ApiKeyScreen(props) {
+      var onSave = props.onSave, onSkip = props.onSkip;
+      var _s1 = useState(""); var key = _s1[0]; var setKey = _s1[1];
+      var _s2 = useState(false); var testing = _s2[0]; var setTesting = _s2[1];
+      var _s3 = useState(""); var error = _s3[0]; var setError = _s3[1];
 
-      const testAndSave = async () => {
+      var testAndSave = function() {
         if (!key.trim()) return;
         setTesting(true); setError("");
-        try {
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": key.trim(),
-              "anthropic-version": "2023-06-01",
-              "anthropic-dangerous-direct-browser-access": "true",
-            },
-            body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:10, messages:[{role:"user",content:"hi"}] }),
-          });
-          if (res.ok) { setApiKey(key.trim()); onSave(); }
-          else { const d = await res.json().catch(()=>({})); setError(d.error?.message || "API 키가 유효하지 않아요."); }
-        } catch(e) { setError("연결 실패: " + e.message); }
-        setTesting(false);
+        fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": key.trim(),
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:10,messages:[{role:"user",content:"hi"}]}),
+        }).then(function(res) {
+          if (res.ok) { setApiKey(key.trim()); setTesting(false); onSave(); }
+          else { return res.json().then(function(d){setError(d.error?.message||"API 키가 유효하지 않아요.");setTesting(false);}).catch(function(){setError("API 키가 유효하지 않아요.");setTesting(false);}); }
+        }).catch(function(e) { setError("연결 실패: "+e.message); setTesting(false); });
       };
 
-      return (
-        <div className="screen-enter" style={{ padding:"40px 20px", textAlign:"center" }}>
-          <div style={{ fontSize:48, marginBottom:16 }}>🔑</div>
-          <div style={{ fontSize:22, fontWeight:800, marginBottom:8 }}>AI 기능 연결</div>
-          <div style={{ fontSize:13, color:C.muted, lineHeight:1.7, marginBottom:24 }}>
-            문장 교정, 회화 코치 기능을 쓰려면<br/>본인의 Claude API 키가 필요해요.
-          </div>
-          <div style={{ textAlign:"left", marginBottom:20 }}>
-            <div style={{ fontSize:12, color:C.muted, marginBottom:6 }}>Claude API Key</div>
-            <input
-              type="password" value={key} onChange={e=>setKey(e.target.value)}
-              placeholder="sk-ant-api03-..."
-              style={{ width:"100%", background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:"14px 16px", color:C.text, fontSize:14, outline:"none" }}
-              onKeyDown={e=>e.key==="Enter"&&testAndSave()}
-            />
-            {error && <div style={{ fontSize:12, color:C.red, marginTop:8 }}>{error}</div>}
-          </div>
-          <button onClick={testAndSave} disabled={testing||!key.trim()} style={{ width:"100%", background:C.accent, color:"#08090d", border:"none", borderRadius:14, padding:16, fontSize:15, fontWeight:800, cursor:"pointer", opacity:testing?0.6:1, marginBottom:12 }}>
-            {testing ? "연결 확인 중..." : "연결하기"}
-          </button>
-          <button onClick={onSkip} style={{ background:"none", border:"none", color:C.muted, fontSize:13, cursor:"pointer", textDecoration:"underline" }}>
-            체험 모드로 먼저 볼게요
-          </button>
-          <div style={{ marginTop:24, background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:16, textAlign:"left" }}>
-            <div style={{ fontSize:12, color:C.accent, fontWeight:700, marginBottom:8 }}>API 키 받는 법</div>
-            <ol style={{ fontSize:12, color:C.muted, lineHeight:1.8, paddingLeft:16 }}>
-              <li>console.anthropic.com 가입</li>
-              <li>Settings &gt; API Keys 에서 키 생성</li>
-              <li>위에 붙여넣기</li>
-            </ol>
-            <div style={{ fontSize:11, color:C.muted, marginTop:8, opacity:0.7 }}>
-              키는 이 기기의 브라우저에만 저장돼요. 서버로 전송되지 않습니다.
-            </div>
-          </div>
-        </div>
+      return React.createElement("div", {style:{padding:"40px 20px",textAlign:"center"}},
+        React.createElement("div", {style:{fontSize:48,marginBottom:16}}, "\uD83D\uDD11"),
+        React.createElement("div", {style:{fontSize:22,fontWeight:800,marginBottom:8}}, "AI 기능 연결"),
+        React.createElement("div", {style:{fontSize:13,color:C.muted,lineHeight:1.7,marginBottom:24}},
+          "문장 교정, 회화 코치 기능을 쓰려면", React.createElement("br"), "본인의 Claude API 키가 필요해요."),
+        React.createElement("div", {style:{textAlign:"left",marginBottom:20}},
+          React.createElement("div", {style:{fontSize:12,color:C.muted,marginBottom:6}}, "Claude API Key"),
+          React.createElement("input", {
+            type:"password", value:key, onChange:function(e){setKey(e.target.value);},
+            placeholder:"sk-ant-api03-...",
+            onKeyDown:function(e){if(e.key==="Enter")testAndSave();},
+            style:{width:"100%",background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:14,outline:"none"}
+          }),
+          error ? React.createElement("div", {style:{fontSize:12,color:C.red,marginTop:8}}, error) : null
+        ),
+        React.createElement("button", {
+          onClick:testAndSave, disabled:testing||!key.trim(),
+          style:{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",opacity:testing?0.6:1,marginBottom:12}
+        }, testing ? "연결 확인 중..." : "연결하기"),
+        React.createElement("button", {
+          onClick:onSkip,
+          style:{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",textDecoration:"underline"}
+        }, "체험 모드로 먼저 볼게요"),
+        React.createElement("div", {style:{marginTop:24,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,textAlign:"left"}},
+          React.createElement("div", {style:{fontSize:12,color:C.accent,fontWeight:700,marginBottom:8}}, "API 키 받는 법"),
+          React.createElement("ol", {style:{fontSize:12,color:C.muted,lineHeight:1.8,paddingLeft:16}},
+            React.createElement("li", null, "console.anthropic.com 가입"),
+            React.createElement("li", null, "Settings > API Keys 에서 키 생성"),
+            React.createElement("li", null, "위에 붙여넣기")
+          ),
+          React.createElement("div", {style:{fontSize:11,color:C.muted,marginTop:8,opacity:0.7}},
+            "키는 이 기기의 브라우저에만 저장돼요. 서버로 전송되지 않습니다.")
+        )
       );
     }
 
     // ── HOME ────────────────────────────────────────────────────────
-    function HomeScreen({ streak, todayDone, lesson, onStart, aiAvailable, onEnableAI }) {
-      const days = ["S","M","T","W","T","F","S"];
-      const today = new Date().getDay();
-      const hour = new Date().getHours();
-      const greeting = hour < 5 ? { t:"Still up? \u{1F319}", s:"자기 전 영어 한 입 어때요" }
-        : hour < 12 ? { t:"Good morning \u{1F44B}", s:"매일 15분, 미국식 영어 트레이닝 \u{1F4AA}" }
-        : hour < 18 ? { t:"Good afternoon \u{2600}\u{FE0F}", s:"점심 쉬는 틈에 영어 한 입 \u{1F96A}" }
-        : hour < 22 ? { t:"Good evening \u{1F306}", s:"오늘 하루 마무리 15분 \u{1F4AA}" }
-        : { t:"Late night study \u{1F319}", s:"집중 잘 되는 시간이죠" };
+    function HomeScreen(props) {
+      var streak=props.streak, todayDone=props.todayDone, lesson=props.lesson, onStart=props.onStart, aiAvailable=props.aiAvailable, onEnableAI=props.onEnableAI;
+      var days = ["S","M","T","W","T","F","S"];
+      var today = new Date().getDay();
+      var hour = new Date().getHours();
+      var greeting = hour<5?{t:"Still up? 🌙",s:"자기 전 영어 한 입 어때요"}
+        :hour<12?{t:"Good morning 👋",s:"매일 15분, 미국식 영어 트레이닝 💪"}
+        :hour<18?{t:"Good afternoon ☀️",s:"점심 쉬는 틈에 영어 한 입 🥪"}
+        :hour<22?{t:"Good evening 🌆",s:"오늘 하루 마무리 15분 💪"}
+        :{t:"Late night study 🌙",s:"집중 잘 되는 시간이죠"};
+
       return (
-        <div className="screen-enter" style={{ padding:"32px 20px 24px" }}>
-          <div style={{ fontSize:12,color:C.muted,letterSpacing:3,marginBottom:6 }}>
+        <div style={{padding:"32px 20px 24px"}}>
+          <div style={{fontSize:12,color:C.muted,letterSpacing:3,marginBottom:6}}>
             {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}).toUpperCase()}
           </div>
-          <div style={{ fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4 }}>{greeting.t}</div>
-          <div style={{ fontSize:14,color:C.muted,marginBottom:20 }}>{greeting.s}</div>
+          <div style={{fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4}}>{greeting.t}</div>
+          <div style={{fontSize:14,color:C.muted,marginBottom:20}}>{greeting.s}</div>
 
           {!aiAvailable && (
-            <div style={{ background:C.blueDim, border:`1px solid ${C.blue}40`, borderRadius:12, padding:"14px 16px", marginBottom:20 }}>
-              <div style={{ fontSize:12, color:C.blue, lineHeight:1.6, marginBottom:12 }}>
-                \u{1F440} <b>체험 모드</b>예요. 샘플 레슨부터 둘러보시고, AI 피드백 기능을 쓰시려면 API 키를 연결해주세요.
+            <div style={{background:C.blueDim,border:"1px solid "+C.blue+"40",borderRadius:12,padding:"14px 16px",marginBottom:20}}>
+              <div style={{fontSize:12,color:C.blue,lineHeight:1.6,marginBottom:12}}>
+                {"👀 "}<b>체험 모드</b>{"예요. 샘플 레슨부터 둘러보시고, AI 피드백 기능을 쓰시려면 API 키를 연결해주세요."}
               </div>
-              <button onClick={onEnableAI} style={{ width:"100%", background:C.blue, color:"#08090d", border:"none", borderRadius:10, padding:"10px 14px", fontSize:13, fontWeight:800, cursor:"pointer" }}>
-                \u{1F511} API 키 연결하기
+              <button onClick={onEnableAI} style={{width:"100%",background:C.blue,color:"#08090d",border:"none",borderRadius:10,padding:"10px 14px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
+                {"🔑 API 키 연결하기"}
               </button>
             </div>
           )}
 
-          <div style={{ background:`linear-gradient(135deg,${C.accent}18,${C.blue}10)`,border:`1px solid ${C.accent}30`,borderRadius:16,padding:20,marginBottom:16 }}>
-            <div style={{ fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6 }}>STREAK</div>
-            <div style={{ fontSize:48,fontWeight:900,color:C.accent,lineHeight:1 }}>{streak}<span style={{ fontSize:20,marginLeft:4 }}>\u{1F525}</span></div>
-            <div style={{ fontSize:12,color:C.muted,marginTop:4 }}>연속 학습일</div>
-            <div style={{ display:"flex",gap:6,marginTop:16 }}>
-              {days.map((d,i)=>(
-                <div key={i} style={{ textAlign:"center" }}>
-                  <div style={{ width:28,height:28,borderRadius:8,background:i===today?(todayDone?C.accent:C.accentDim):(i<today?C.accent+"60":C.border),border:i===today?`2px solid ${C.accent}`:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:i<=today?C.accent:C.muted,fontWeight:700 }}>
+          <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"30",borderRadius:16,padding:20,marginBottom:16}}>
+            <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6}}>STREAK</div>
+            <div style={{fontSize:48,fontWeight:900,color:C.accent,lineHeight:1}}>{streak}<span style={{fontSize:20,marginLeft:4}}>🔥</span></div>
+            <div style={{fontSize:12,color:C.muted,marginTop:4}}>연속 학습일</div>
+            <div style={{display:"flex",gap:6,marginTop:16}}>
+              {days.map(function(d,i){return(
+                <div key={i} style={{textAlign:"center"}}>
+                  <div style={{width:28,height:28,borderRadius:8,background:i===today?(todayDone?C.accent:C.accentDim):(i<today?C.accent+"60":C.border),border:i===today?"2px solid "+C.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:i<=today?C.accent:C.muted,fontWeight:700}}>
                     {i<today?"\u2713":i===today&&todayDone?"\u2713":""}
                   </div>
-                  <div style={{ fontSize:9,color:C.muted,marginTop:3 }}>{d}</div>
+                  <div style={{fontSize:9,color:C.muted,marginTop:3}}>{d}</div>
                 </div>
-              ))}
+              );})}
             </div>
           </div>
 
           {lesson&&(
-            <div style={{ display:"flex",gap:8,marginBottom:14 }}>
-              <div style={{ flex:1,background:C.surface,border:`1px solid ${C.yellow}40`,borderRadius:12,padding:"10px 14px" }}>
-                <div style={{ fontSize:10,color:C.yellow,letterSpacing:2,marginBottom:4 }}>기본동사</div>
-                <div style={{ fontSize:16,fontWeight:800,color:C.yellow }}>{lesson.basic?.verb}</div>
-                <div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{lesson.basic?.meaning_ko?.split(",")[0]}</div>
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              <div style={{flex:1,background:C.surface,border:"1px solid "+C.yellow+"40",borderRadius:12,padding:"10px 14px"}}>
+                <div style={{fontSize:10,color:C.yellow,letterSpacing:2,marginBottom:4}}>기본동사</div>
+                <div style={{fontSize:16,fontWeight:800,color:C.yellow}}>{lesson.basic?.verb}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{lesson.basic?.meaning_ko?.split(",")[0]}</div>
               </div>
-              <div style={{ flex:1,background:C.surface,border:`1px solid ${C.accent}40`,borderRadius:12,padding:"10px 14px" }}>
-                <div style={{ fontSize:10,color:C.accent,letterSpacing:2,marginBottom:4 }}>구동사</div>
-                <div style={{ fontSize:16,fontWeight:800,color:C.accent }}>{lesson.phrasal?.verb}</div>
-                <div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{lesson.phrasal?.meaning_ko?.split(",")[0]}</div>
+              <div style={{flex:1,background:C.surface,border:"1px solid "+C.accent+"40",borderRadius:12,padding:"10px 14px"}}>
+                <div style={{fontSize:10,color:C.accent,letterSpacing:2,marginBottom:4}}>구동사</div>
+                <div style={{fontSize:16,fontWeight:800,color:C.accent}}>{lesson.phrasal?.verb}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{lesson.phrasal?.meaning_ko?.split(",")[0]}</div>
               </div>
             </div>
           )}
 
           {todayDone?(
-            <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:16,padding:20,textAlign:"center" }}>
-              <div style={{ fontSize:24,marginBottom:8 }}>\u2705</div>
-              <div style={{ fontWeight:700,marginBottom:4 }}>오늘 완료!</div>
-              <div style={{ fontSize:12,color:C.muted }}>내일 또 만나요 \u{1F305}</div>
+            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:20,textAlign:"center"}}>
+              <div style={{fontSize:24,marginBottom:8}}>{"✅"}</div>
+              <div style={{fontWeight:700,marginBottom:4}}>오늘 완료!</div>
+              <div style={{fontSize:12,color:C.muted}}>내일 또 만나요 🌅</div>
             </div>
           ):(
-            <button onClick={onStart} style={{ width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:16,padding:18,fontSize:16,fontWeight:800,cursor:"pointer",boxShadow:`0 8px 32px ${C.accent}40` }}>
-              {lesson?"\u{1F4D6} 오늘 학습 시작":"\u2728 오늘의 레슨 받기"}
+            <button onClick={onStart} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:16,padding:18,fontSize:16,fontWeight:800,cursor:"pointer",boxShadow:"0 8px 32px "+C.accent+"40"}}>
+              {lesson?"📖 오늘 학습 시작":"✨ 오늘의 레슨 받기"}
             </button>
           )}
 
-          <div style={{ display:"flex",gap:10,marginTop:14 }}>
-            {[{label:"학습한 날",value:`${streak}일`},{label:"오늘 학습",value:"2가지"}].map((s,i)=>(
-              <div key={i} style={{ flex:1,background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 14px" }}>
-                <div style={{ fontSize:18,fontWeight:800 }}>{s.value}</div>
-                <div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{s.label}</div>
+          <div style={{display:"flex",gap:10,marginTop:14}}>
+            {[{label:"학습한 날",value:streak+"일"},{label:"오늘 학습",value:"2가지"}].map(function(s,i){return(
+              <div key={i} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px"}}>
+                <div style={{fontSize:18,fontWeight:800}}>{s.value}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
               </div>
-            ))}
+            );})}
           </div>
 
           {aiAvailable && (
-            <button onClick={()=>{clearApiKey(); location.reload();}} style={{ marginTop:16, background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", opacity:0.5 }}>
+            <button onClick={function(){clearApiKey();location.reload();}} style={{marginTop:16,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer",opacity:0.5}}>
               API 키 초기화
             </button>
           )}
 
-          <div style={{ marginTop:28, paddingTop:20, borderTop:`1px solid ${C.border}`, textAlign:"center" }}>
-            <div style={{ fontSize:10, color:C.muted, opacity:0.6 }}>{CREATOR_NAME} · beta v0.1</div>
+          <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid "+C.border,textAlign:"center"}}>
+            <div style={{fontSize:10,color:C.muted,opacity:0.6}}>{CREATOR_NAME} · beta v0.1</div>
           </div>
         </div>
       );
     }
 
     // ── LEARN ───────────────────────────────────────────────────────
-    function LearnScreen({ lesson, loading, onNext, aiAvailable }) {
-      const [phase, setPhase] = useState("basic");
-      const [step, setStep] = useState(0);
+    function LearnScreen(props) {
+      var lesson=props.lesson, loading=props.loading, onNext=props.onNext, aiAvailable=props.aiAvailable;
+      var _s1=useState("basic"); var phase=_s1[0]; var setPhase=_s1[1];
+      var _s2=useState(0); var step=_s2[0]; var setStep=_s2[1];
 
       if (loading) return (
-        <div style={{ display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16 }}>
-          <div style={{ fontSize:36 }}>\u2728</div>
-          <div style={{ color:C.muted,fontSize:14 }}>오늘의 레슨 준비 중...</div>
-          <div style={{ display:"flex",gap:6 }}>
-            {[0,1,2].map(i=><div key={i} style={{ width:8,height:8,borderRadius:"50%",background:C.accent,animation:`dot ${0.6+i*0.2}s ease-in-out infinite alternate` }}/>)}
-          </div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
+          <div style={{fontSize:36}}>{"✨"}</div>
+          <div style={{color:C.muted,fontSize:14}}>오늘의 레슨 준비 중...</div>
         </div>
       );
       if (!lesson) return null;
 
-      const current = phase==="basic" ? lesson.basic : lesson.phrasal;
-      const color = phase==="basic" ? C.yellow : C.accent;
+      var current = phase==="basic" ? lesson.basic : lesson.phrasal;
+      var color = phase==="basic" ? C.yellow : C.accent;
 
-      const goNext = () => {
-        if (step<2) { setStep(s=>s+1); return; }
+      var goNext = function() {
+        if (step<2) { setStep(function(s){return s+1;}); return; }
         if (phase==="basic") { setPhase("phrasal"); setStep(0); return; }
         onNext();
       };
 
-      const btnLabel = step<2 ? "다음 \u2192" : phase==="basic" ? "구동사 학습하기 \u2192" : (aiAvailable ? "\u270D\u{FE0F} 내 문장 쓰러 가기" : "\u{1F389} 오늘 학습 완료");
+      var btnLabel = step<2 ? "다음 →" : phase==="basic" ? "구동사 학습하기 →" : (aiAvailable ? "✍️ 내 문장 쓰러 가기" : "🎉 오늘 학습 완료");
 
       return (
-        <div className="screen-enter" style={{ padding:"24px 20px" }}>
-          <div style={{ display:"flex",gap:8,marginBottom:20 }}>
-            {[{id:"basic",label:"\u{1F4D2} 기본동사",color:C.yellow},{id:"phrasal",label:"\u{1F4D7} 구동사",color:C.accent}].map(t=>(
-              <div key={t.id} style={{ flex:1,padding:"9px 0",borderRadius:10,textAlign:"center",background:phase===t.id?t.color+"20":C.surface,border:`1px solid ${phase===t.id?t.color+"60":C.border}`,fontSize:12,fontWeight:700,color:phase===t.id?t.color:C.muted,cursor:"pointer" }}
-                onClick={()=>{ if(t.id==="basic"){setPhase("basic");setStep(0);} }}>
-                {phase==="phrasal"&&t.id==="basic"?"\u2713 완료":t.label}
+        <div style={{padding:"24px 20px"}}>
+          <div style={{display:"flex",gap:8,marginBottom:20}}>
+            {[{id:"basic",label:"📒 기본동사",color:C.yellow},{id:"phrasal",label:"📗 구동사",color:C.accent}].map(function(t){return(
+              <div key={t.id} style={{flex:1,padding:"9px 0",borderRadius:10,textAlign:"center",background:phase===t.id?t.color+"20":C.surface,border:"1px solid "+(phase===t.id?t.color+"60":C.border),fontSize:12,fontWeight:700,color:phase===t.id?t.color:C.muted,cursor:"pointer"}}
+                onClick={function(){if(t.id==="basic"){setPhase("basic");setStep(0);}}}>
+                {phase==="phrasal"&&t.id==="basic"?"✓ 완료":t.label}
               </div>
-            ))}
+            );})}
           </div>
 
-          <div style={{ display:"flex",gap:5,marginBottom:24 }}>
-            {["뜻","예문","패턴"].map((s,i)=>(
-              <div key={i} style={{ flex:1,height:3,borderRadius:99,background:i<=step?color:C.border,transition:"background 0.3s" }}/>
-            ))}
+          <div style={{display:"flex",gap:5,marginBottom:24}}>
+            {["뜻","예문","패턴"].map(function(s,i){return(
+              <div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=step?color:C.border,transition:"background 0.3s"}}/>
+            );})}
           </div>
 
           {step===0&&(
             <div>
-              <div style={{ display:"inline-block",padding:"3px 12px",borderRadius:99,background:color+"20",color,fontSize:11,fontWeight:700,letterSpacing:2,border:`1px solid ${color}40`,marginBottom:16 }}>
+              <div style={{display:"inline-block",padding:"3px 12px",borderRadius:99,background:color+"20",color:color,fontSize:11,fontWeight:700,letterSpacing:2,border:"1px solid "+color+"40",marginBottom:16}}>
                 {phase==="basic"?"기본동사":"구동사"}
               </div>
-              <div style={{ fontSize:44,fontWeight:900,color,marginBottom:8,letterSpacing:-1 }}>{current.verb}</div>
-              <div style={{ fontSize:18,color:C.text,marginBottom:6,fontWeight:600 }}>{current.meaning_ko}</div>
-              <div style={{ fontSize:14,color:C.muted,marginBottom:24,lineHeight:1.6 }}>{current.meaning_en}</div>
+              <div style={{fontSize:44,fontWeight:900,color:color,marginBottom:8,letterSpacing:-1}}>{current.verb}</div>
+              <div style={{fontSize:18,color:C.text,marginBottom:6,fontWeight:600}}>{current.meaning_ko}</div>
+              <div style={{fontSize:14,color:C.muted,marginBottom:24,lineHeight:1.6}}>{current.meaning_en}</div>
               {current.meanings?.length>0&&(
-                <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:16,marginBottom:20 }}>
-                  <div style={{ fontSize:11,color:C.muted,letterSpacing:2,marginBottom:12 }}>주요 의미 {current.meanings.length}가지</div>
-                  {current.meanings.map((m,i)=>(
-                    <div key={i} style={{ display:"flex",gap:10,marginBottom:10,alignItems:"flex-start" }}>
-                      <span style={{ background:color+"20",color,borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700,flexShrink:0,marginTop:2 }}>{i+1}</span>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:20}}>
+                  <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:12}}>주요 의미 {current.meanings.length}가지</div>
+                  {current.meanings.map(function(m,i){return(
+                    <div key={i} style={{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}}>
+                      <span style={{background:color+"20",color:color,borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700,flexShrink:0,marginTop:2}}>{i+1}</span>
                       <div>
-                        <div style={{ fontSize:13,color:C.text,fontWeight:600 }}>{m.meaning}</div>
-                        <div style={{ fontSize:12,color:C.muted,marginTop:2,fontStyle:"italic" }}>"{m.example}"</div>
+                        <div style={{fontSize:13,color:C.text,fontWeight:600}}>{m.meaning}</div>
+                        <div style={{fontSize:12,color:C.muted,marginTop:2,fontStyle:"italic"}}>"{m.example}"</div>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </div>
@@ -412,42 +400,37 @@
 
           {step===1&&(
             <div>
-              <div style={{ fontSize:11,color:C.muted,letterSpacing:3,marginBottom:12 }}>REAL EXAMPLES</div>
-              <div style={{ fontSize:20,fontWeight:800,marginBottom:16 }}>미국인이 실제로 쓰는 문장</div>
-              {current.examples?.map((ex,i)=>(
-                <div key={i} style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:16,marginBottom:12 }}>
-                  <div style={{ fontSize:11,color:C.muted,marginBottom:8 }}>상황 {i+1}: {ex.situation}</div>
-                  <div style={{ fontSize:15,color:C.text,fontWeight:600,marginBottom:6,lineHeight:1.5 }}>
-                    {ex.english.split(new RegExp(`(${current.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, "i")).map((p,j)=>
-                      p.toLowerCase()===current.verb.toLowerCase()
-                        ?<span key={j} style={{ color,textDecoration:"underline" }}>{p}</span>:p
-                    )}
-                  </div>
-                  <div style={{ fontSize:13,color:C.muted }}>{ex.korean}</div>
+              <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:12}}>REAL EXAMPLES</div>
+              <div style={{fontSize:20,fontWeight:800,marginBottom:16}}>미국인이 실제로 쓰는 문장</div>
+              {current.examples?.map(function(ex,i){return(
+                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+                  <div style={{fontSize:11,color:C.muted,marginBottom:8}}>상황 {i+1}: {ex.situation}</div>
+                  <div style={{fontSize:15,color:C.text,fontWeight:600,marginBottom:6,lineHeight:1.5}}>{ex.english}</div>
+                  <div style={{fontSize:13,color:C.muted}}>{ex.korean}</div>
                 </div>
-              ))}
+              );})}
             </div>
           )}
 
           {step===2&&(
             <div>
-              <div style={{ fontSize:11,color:C.muted,letterSpacing:3,marginBottom:12 }}>SENTENCE PATTERN</div>
-              <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:16,marginBottom:12 }}>
-                <div style={{ fontSize:12,color:C.red,marginBottom:8 }}>\u274C 어색해요</div>
-                <div style={{ fontSize:14,color:C.red,padding:"10px 12px",background:C.red+"10",borderRadius:8,fontStyle:"italic" }}>"{current.bad_example}"</div>
+              <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:12}}>SENTENCE PATTERN</div>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+                <div style={{fontSize:12,color:C.red,marginBottom:8}}>{"❌ 어색해요"}</div>
+                <div style={{fontSize:14,color:C.red,padding:"10px 12px",background:C.red+"10",borderRadius:8,fontStyle:"italic"}}>"{current.bad_example}"</div>
               </div>
-              <div style={{ background:C.surface,border:`1px solid ${color}40`,borderRadius:12,padding:16,marginBottom:16 }}>
-                <div style={{ fontSize:12,color,marginBottom:8 }}>\u2705 자연스러워요</div>
-                <div style={{ fontSize:14,color:C.text,padding:"10px 12px",background:color+"10",borderRadius:8,lineHeight:1.6 }}>"{current.good_example}"</div>
+              <div style={{background:C.surface,border:"1px solid "+color+"40",borderRadius:12,padding:16,marginBottom:16}}>
+                <div style={{fontSize:12,color:color,marginBottom:8}}>{"✅ 자연스러워요"}</div>
+                <div style={{fontSize:14,color:C.text,padding:"10px 12px",background:color+"10",borderRadius:8,lineHeight:1.6}}>"{current.good_example}"</div>
               </div>
-              <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:14,marginBottom:20 }}>
-                <div style={{ fontSize:11,color:C.muted,marginBottom:6,letterSpacing:2 }}>PRACTICE HINT</div>
-                <div style={{ fontSize:13,color:C.text,lineHeight:1.7 }}>{current.practice_hint}</div>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:20}}>
+                <div style={{fontSize:11,color:C.muted,marginBottom:6,letterSpacing:2}}>PRACTICE HINT</div>
+                <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{current.practice_hint}</div>
               </div>
             </div>
           )}
 
-          <button onClick={goNext} style={{ width:"100%",background:color,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer" }}>
+          <button onClick={goNext} style={{width:"100%",background:color,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
             {btnLabel}
           </button>
         </div>
@@ -455,126 +438,130 @@
     }
 
     // ── PRACTICE ────────────────────────────────────────────────────
-    function PracticeScreen({ lesson, onComplete, aiAvailable }) {
-      const [activeVerb, setActiveVerb] = useState("basic");
-      const [sentences, setSentences] = useState({ basic:["",""], phrasal:["",""] });
-      const [feedback, setFeedback] = useState({ basic:null, phrasal:null });
-      const [loading, setLoading] = useState({ basic:false, phrasal:false });
-      const [done, setDone] = useState(false);
+    function PracticeScreen(props) {
+      var lesson=props.lesson, onComplete=props.onComplete, aiAvailable=props.aiAvailable;
+      var _s1=useState("basic"); var activeVerb=_s1[0]; var setActiveVerb=_s1[1];
+      var _s2=useState({basic:["",""],phrasal:["",""]}); var sentences=_s2[0]; var setSentences=_s2[1];
+      var _s3=useState({basic:null,phrasal:null}); var feedback=_s3[0]; var setFeedback=_s3[1];
+      var _s4=useState({basic:false,phrasal:false}); var isLoading=_s4[0]; var setIsLoading=_s4[1];
+      var _s5=useState(false); var done=_s5[0]; var setDone=_s5[1];
 
       if (!aiAvailable) {
         return (
-          <div className="screen-enter" style={{ padding:"40px 20px", textAlign:"center" }}>
-            <div style={{ fontSize:48, marginBottom:16 }}>\u{1F512}</div>
-            <div style={{ fontSize:20, fontWeight:800, marginBottom:8 }}>문장 피드백은 API 키 연결 후</div>
-            <div style={{ fontSize:13, color:C.muted, lineHeight:1.7, marginBottom:24 }}>
+          <div style={{padding:"40px 20px",textAlign:"center"}}>
+            <div style={{fontSize:48,marginBottom:16}}>{"🔒"}</div>
+            <div style={{fontSize:20,fontWeight:800,marginBottom:8}}>문장 피드백은 API 키 연결 후</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.7,marginBottom:24}}>
               직접 쓴 문장을 미국인이 쓰는 자연스러운 표현으로<br/>AI가 실시간 교정해줘요.
             </div>
-            <button onClick={onComplete} style={{ background:"none", border:"none", color:C.muted, fontSize:13, marginTop:16, cursor:"pointer", textDecoration:"underline" }}>
-              오늘은 여기까지, 내일 봐요 \u2192
+            <button onClick={onComplete} style={{background:"none",border:"none",color:C.muted,fontSize:13,marginTop:16,cursor:"pointer",textDecoration:"underline"}}>
+              오늘은 여기까지, 내일 봐요 →
             </button>
           </div>
         );
       }
 
-      const color = activeVerb==="basic" ? C.yellow : C.accent;
-      const current = activeVerb==="basic" ? lesson.basic : lesson.phrasal;
-      const fb = feedback[activeVerb];
-      const sent = sentences[activeVerb];
-      const bothDone = feedback.basic && feedback.phrasal;
+      var color = activeVerb==="basic"?C.yellow:C.accent;
+      var current = activeVerb==="basic"?lesson.basic:lesson.phrasal;
+      var fb = feedback[activeVerb];
+      var sent = sentences[activeVerb];
+      var bothDone = feedback.basic && feedback.phrasal;
 
-      const handleSubmit = async (type) => {
-        const filled = sentences[type].filter(s=>s.trim().length>4);
+      var handleSubmit = function(type) {
+        var filled = sentences[type].filter(function(s){return s.trim().length>4;});
         if (!filled.length) return;
-        setLoading(l=>({...l,[type]:true}));
-        const v = type==="basic" ? lesson.basic : lesson.phrasal;
-        const system = `You are an American English tutor. Return ONLY valid JSON:
-{"overall":"전체 피드백(한국어,2문장)","corrections":[{"original":"...","corrected":"...","explanation":"왜(한국어)","more_natural":"더 자연스럽게(optional)"}],"bonus":"미국인이 쓸 법한 추가 문장(영어)"}`;
-        try {
-          const raw = await callClaude(system, `Verb: "${v.verb}" (${v.meaning_ko})\nSentences:\n${filled.map((s,i)=>`${i+1}. ${s}`).join("\n")}`);
-          setFeedback(f=>({...f,[type]:JSON.parse(raw.replace(/```json|```/g,"").trim())}));
-        } catch(e) { setFeedback(f=>({...f,[type]:{overall:"오류: " + e.message,corrections:[],bonus:""}})); }
-        setLoading(l=>({...l,[type]:false}));
+        setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[type]=true; return n;});
+        var v = type==="basic"?lesson.basic:lesson.phrasal;
+        var system = 'You are an American English tutor. Return ONLY valid JSON:\n{"overall":"전체 피드백(한국어,2문장)","corrections":[{"original":"...","corrected":"...","explanation":"왜(한국어)","more_natural":"더 자연스럽게(optional)"}],"bonus":"미국인이 쓸 법한 추가 문장(영어)"}';
+        callClaude(system, 'Verb: "'+v.verb+'" ('+v.meaning_ko+')\nSentences:\n'+filled.map(function(s,i){return (i+1)+". "+s;}).join("\n"))
+        .then(function(raw){
+          var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
+          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[type]=parsed; return n;});
+        }).catch(function(e){
+          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[type]={overall:"오류: "+e.message,corrections:[],bonus:""}; return n;});
+        }).finally(function(){
+          setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[type]=false; return n;});
+        });
       };
 
       if (done) return (
-        <div className="screen-enter" style={{ display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"70vh",padding:24,textAlign:"center" }}>
-          <div style={{ fontSize:64,marginBottom:16 }}>\u{1F389}</div>
-          <div style={{ fontSize:26,fontWeight:900,marginBottom:8 }}>오늘 완료!</div>
-          <div style={{ fontSize:14,color:C.muted,marginBottom:16,lineHeight:1.8 }}>
-            <span style={{ color:C.yellow,fontWeight:700 }}>"{lesson.basic.verb}"</span> + <span style={{ color:C.accent,fontWeight:700 }}>"{lesson.phrasal.verb}"</span><br/>둘 다 마스터! \u{1F525}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"70vh",padding:24,textAlign:"center"}}>
+          <div style={{fontSize:64,marginBottom:16}}>{"🎉"}</div>
+          <div style={{fontSize:26,fontWeight:900,marginBottom:8}}>오늘 완료!</div>
+          <div style={{fontSize:14,color:C.muted,marginBottom:16,lineHeight:1.8}}>
+            <span style={{color:C.yellow,fontWeight:700}}>"{lesson.basic.verb}"</span>{" + "}<span style={{color:C.accent,fontWeight:700}}>"{lesson.phrasal.verb}"</span><br/>{"둘 다 마스터! 🔥"}
           </div>
-          <div style={{ display:"flex", gap:10, marginBottom:20 }}>
-            {[{e:"\u{1F603}",k:"reaction_good",l:"좋았어요"},{e:"\u{1F610}",k:"reaction_mid",l:"그냥그래요"},{e:"\u{1F61E}",k:"reaction_bad",l:"별로였어요"}].map(r=>(
-              <button key={r.k} onClick={()=>{track(r.k); onComplete();}} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", display:"flex", flexDirection:"column", gap:4, alignItems:"center", minWidth:72 }}>
-                <span style={{ fontSize:24 }}>{r.e}</span>
-                <span style={{ fontSize:10, color:C.muted }}>{r.l}</span>
+          <div style={{display:"flex",gap:10,marginBottom:20}}>
+            {[{e:"😃",k:"reaction_good",l:"좋았어요"},{e:"😐",k:"reaction_mid",l:"그냥그래요"},{e:"😞",k:"reaction_bad",l:"별로였어요"}].map(function(r){return(
+              <button key={r.k} onClick={function(){track(r.k);onComplete();}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"14px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:4,alignItems:"center",minWidth:72}}>
+                <span style={{fontSize:24}}>{r.e}</span>
+                <span style={{fontSize:10,color:C.muted}}>{r.l}</span>
               </button>
-            ))}
+            );})}
           </div>
-          <button onClick={onComplete} style={{ background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:"16px 40px",fontSize:15,fontWeight:800,cursor:"pointer" }}>홈으로</button>
+          <button onClick={onComplete} style={{background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:"16px 40px",fontSize:15,fontWeight:800,cursor:"pointer"}}>홈으로</button>
         </div>
       );
 
       return (
-        <div className="screen-enter" style={{ padding:"24px 20px" }}>
-          <div style={{ display:"flex",gap:8,marginBottom:20 }}>
-            {[{id:"basic",label:"기본동사",color:C.yellow,verb:lesson.basic.verb},{id:"phrasal",label:"구동사",color:C.accent,verb:lesson.phrasal.verb}].map(t=>(
-              <div key={t.id} onClick={()=>setActiveVerb(t.id)} style={{ flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:"pointer",background:activeVerb===t.id?t.color+"20":C.surface,border:`1px solid ${activeVerb===t.id?t.color+"60":C.border}` }}>
-                <div style={{ fontSize:10,color:activeVerb===t.id?t.color:C.muted,letterSpacing:2,marginBottom:3 }}>{t.label}</div>
-                <div style={{ fontSize:14,fontWeight:800,color:activeVerb===t.id?t.color:C.muted }}>{t.verb}</div>
-                {feedback[t.id]&&<div style={{ fontSize:10,color:t.color,marginTop:3 }}>\u2713 완료</div>}
+        <div style={{padding:"24px 20px"}}>
+          <div style={{display:"flex",gap:8,marginBottom:20}}>
+            {[{id:"basic",label:"기본동사",c:C.yellow,verb:lesson.basic.verb},{id:"phrasal",label:"구동사",c:C.accent,verb:lesson.phrasal.verb}].map(function(t){return(
+              <div key={t.id} onClick={function(){setActiveVerb(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:"pointer",background:activeVerb===t.id?t.c+"20":C.surface,border:"1px solid "+(activeVerb===t.id?t.c+"60":C.border)}}>
+                <div style={{fontSize:10,color:activeVerb===t.id?t.c:C.muted,letterSpacing:2,marginBottom:3}}>{t.label}</div>
+                <div style={{fontSize:14,fontWeight:800,color:activeVerb===t.id?t.c:C.muted}}>{t.verb}</div>
+                {feedback[t.id]&&<div style={{fontSize:10,color:t.c,marginTop:3}}>{"✓ 완료"}</div>}
               </div>
-            ))}
+            );})}
           </div>
 
-          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:14,marginBottom:16 }}>
-            <div style={{ fontSize:11,color:C.muted,marginBottom:4,letterSpacing:2 }}>HINT</div>
-            <div style={{ fontSize:13,color:C.text,lineHeight:1.6 }}>{current.practice_hint}</div>
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
+            <div style={{fontSize:11,color:C.muted,marginBottom:4,letterSpacing:2}}>HINT</div>
+            <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{current.practice_hint}</div>
           </div>
 
-          {sent.map((s,i)=>(
-            <div key={i} style={{ marginBottom:12 }}>
-              <div style={{ fontSize:12,color:C.muted,marginBottom:6 }}>문장 {i+1}</div>
-              <textarea value={s} onChange={e=>{if(fb)return;const n={...sentences,[activeVerb]:[...sentences[activeVerb]]};n[activeVerb][i]=e.target.value;setSentences(n);}}
-                rows={3} style={{ width:"100%",background:C.surface,border:`1px solid ${s.trim()?color+"60":C.border}`,borderRadius:12,padding:14,color:C.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box",opacity:fb?0.6:1 }}
+          {sent.map(function(s,i){return(
+            <div key={i} style={{marginBottom:12}}>
+              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>문장 {i+1}</div>
+              <textarea value={s} onChange={function(e){if(fb)return;var n={};for(var k in sentences)n[k]=[].concat(sentences[k]);n[activeVerb][i]=e.target.value;setSentences(n);}}
+                rows={3} style={{width:"100%",background:C.surface,border:"1px solid "+(s.trim()?color+"60":C.border),borderRadius:12,padding:14,color:C.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box",opacity:fb?0.6:1}}
               />
             </div>
-          ))}
+          );})}
 
           {!fb&&(
-            <button onClick={()=>handleSubmit(activeVerb)} disabled={loading[activeVerb]||sent.every(s=>!s.trim())} style={{ width:"100%",background:sent.some(s=>s.trim())?color:C.border,color:sent.some(s=>s.trim())?"#08090d":C.muted,border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:16 }}>
-              {loading[activeVerb]?"\u2728 교정 중...":"제출하고 교정 받기 \u2192"}
+            <button onClick={function(){handleSubmit(activeVerb);}} disabled={isLoading[activeVerb]||sent.every(function(s){return !s.trim();})} style={{width:"100%",background:sent.some(function(s){return s.trim();})?color:C.border,color:sent.some(function(s){return s.trim();})?"#08090d":C.muted,border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:16}}>
+              {isLoading[activeVerb]?"✨ 교정 중...":"제출하고 교정 받기 →"}
             </button>
           )}
 
           {fb&&(
             <div>
-              <div style={{ background:color+"15",border:`1px solid ${color}30`,borderRadius:12,padding:16,marginBottom:12 }}>
-                <div style={{ fontSize:11,color,letterSpacing:2,marginBottom:6 }}>OVERALL</div>
-                <div style={{ fontSize:14,color:C.text,lineHeight:1.6 }}>{fb.overall}</div>
+              <div style={{background:color+"15",border:"1px solid "+color+"30",borderRadius:12,padding:16,marginBottom:12}}>
+                <div style={{fontSize:11,color:color,letterSpacing:2,marginBottom:6}}>OVERALL</div>
+                <div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{fb.overall}</div>
               </div>
-              {fb.corrections?.map((c,i)=>(
-                <div key={i} style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:14,marginBottom:10 }}>
-                  <div style={{ fontSize:11,color:C.muted,marginBottom:6 }}>문장 {i+1}</div>
-                  {c.original!==c.corrected&&<div style={{ fontSize:13,color:C.red,textDecoration:"line-through",marginBottom:4,opacity:0.7 }}>{c.original}</div>}
-                  <div style={{ fontSize:14,color,fontWeight:600,marginBottom:6 }}>\u2713 {c.corrected}</div>
-                  <div style={{ fontSize:12,color:C.muted }}>{c.explanation}</div>
-                  {c.more_natural&&<div style={{ marginTop:8,padding:"8px 10px",background:C.blueDim,borderRadius:8,fontSize:12,color:C.blue }}>\u{1F4A1} {c.more_natural}</div>}
+              {fb.corrections?.map(function(c,i){return(
+                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:10}}>
+                  <div style={{fontSize:11,color:C.muted,marginBottom:6}}>문장 {i+1}</div>
+                  {c.original!==c.corrected&&<div style={{fontSize:13,color:C.red,textDecoration:"line-through",marginBottom:4,opacity:0.7}}>{c.original}</div>}
+                  <div style={{fontSize:14,color:color,fontWeight:600,marginBottom:6}}>{"✓ "}{c.corrected}</div>
+                  <div style={{fontSize:12,color:C.muted}}>{c.explanation}</div>
+                  {c.more_natural&&<div style={{marginTop:8,padding:"8px 10px",background:C.blueDim,borderRadius:8,fontSize:12,color:C.blue}}>{"💡 "}{c.more_natural}</div>}
                 </div>
-              ))}
+              );})}
               {fb.bonus&&(
-                <div style={{ background:C.surface,border:`1px solid ${C.orange}40`,borderRadius:12,padding:14,marginBottom:16 }}>
-                  <div style={{ fontSize:11,color:C.orange,letterSpacing:2,marginBottom:6 }}>BONUS</div>
-                  <div style={{ fontSize:14,color:C.text,fontStyle:"italic" }}>"{fb.bonus}"</div>
+                <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:12,padding:14,marginBottom:16}}>
+                  <div style={{fontSize:11,color:C.orange,letterSpacing:2,marginBottom:6}}>BONUS</div>
+                  <div style={{fontSize:14,color:C.text,fontStyle:"italic"}}>"{fb.bonus}"</div>
                 </div>
               )}
               {!bothDone?(
-                <button onClick={()=>setActiveVerb(activeVerb==="basic"?"phrasal":"basic")} style={{ width:"100%",background:activeVerb==="basic"?C.accent:C.yellow,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer" }}>
-                  {activeVerb==="basic"?"구동사 문장 쓰기 \u2192":"기본동사 문장 쓰기 \u2192"}
+                <button onClick={function(){setActiveVerb(activeVerb==="basic"?"phrasal":"basic");}} style={{width:"100%",background:activeVerb==="basic"?C.accent:C.yellow,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
+                  {activeVerb==="basic"?"구동사 문장 쓰기 →":"기본동사 문장 쓰기 →"}
                 </button>
               ):(
-                <button onClick={()=>setDone(true)} style={{ width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer" }}>\u{1F389} 오늘 완료!</button>
+                <button onClick={function(){setDone(true);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"🎉 오늘 완료!"}</button>
               )}
             </div>
           )}
@@ -583,507 +570,327 @@
     }
 
     // ── SPEAK ───────────────────────────────────────────────────────
-    function SpeakScreen({ history, setHistory, aiAvailable }) {
-      const [subMode, setSubMode] = useState("solo");
-      const supported = typeof window!=="undefined"&&("webkitSpeechRecognition" in window||"SpeechRecognition" in window);
+    function SpeakScreen(props) {
+      var history=props.history, setHistory=props.setHistory, aiAvailable=props.aiAvailable;
+      var _s1=useState("solo"); var subMode=_s1[0]; var setSubMode=_s1[1];
+      var supported = typeof window!=="undefined"&&("webkitSpeechRecognition" in window||"SpeechRecognition" in window);
 
       if (!aiAvailable) {
         return (
-          <div className="screen-enter" style={{ padding:"40px 20px", textAlign:"center" }}>
-            <div style={{ fontSize:48, marginBottom:16 }}>\u{1F512}</div>
-            <div style={{ fontSize:20, fontWeight:800, marginBottom:8 }}>회화 코치는 API 키 연결 후</div>
-            <div style={{ fontSize:13, color:C.muted, lineHeight:1.7, marginBottom:24 }}>
-              친구와 나눈 한국어 대화를 미국인이 실제 쓰는<br/>자연스러운 영어로 턴별로 바꿔드려요.
+          <div style={{padding:"40px 20px",textAlign:"center"}}>
+            <div style={{fontSize:48,marginBottom:16}}>{"🔒"}</div>
+            <div style={{fontSize:20,fontWeight:800,marginBottom:8}}>회화 코치는 API 키 연결 후</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>
+              {"친구와 나눈 한국어 대화를 미국인이 실제 쓰는"}<br/>{"자연스러운 영어로 턴별로 바꿔드려요."}
             </div>
           </div>
         );
       }
 
       if (!supported) return (
-        <div style={{ padding:40,textAlign:"center",color:C.muted }}>
-          <div style={{ fontSize:32,marginBottom:12 }}>\u{1F622}</div>
-          <div style={{ fontSize:14,lineHeight:1.7 }}>이 브라우저는 음성 인식을 지원하지 않아요.<br/>Chrome, Safari, 또는 Edge에서 열어주세요.</div>
+        <div style={{padding:40,textAlign:"center",color:C.muted}}>
+          <div style={{fontSize:32,marginBottom:12}}>{"😢"}</div>
+          <div style={{fontSize:14,lineHeight:1.7}}>이 브라우저는 음성 인식을 지원하지 않아요.<br/>Chrome, Safari, 또는 Edge에서 열어주세요.</div>
         </div>
       );
 
       return (
-        <div className="screen-enter" style={{ padding:"24px 20px" }}>
-          <div style={{ fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6 }}>SPEAK COACH</div>
-          <div style={{ fontSize:22,fontWeight:800,marginBottom:4 }}>회화 코치</div>
-          <div style={{ fontSize:13,color:C.muted,marginBottom:20 }}>
-            {subMode==="conversation" ? "친구랑 나눈 한국어 대화 \u2192 미국식 영어로" : "한 문장씩 녹음하고 변환"}
+        <div style={{padding:"24px 20px"}}>
+          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>SPEAK COACH</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>회화 코치</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:20}}>
+            {subMode==="conversation"?"친구랑 나눈 한국어 대화 → 미국식 영어로":"한 문장씩 녹음하고 변환"}
           </div>
-
-          <div style={{ display:"flex",gap:8,marginBottom:20 }}>
-            {[{id:"conversation",label:"\u{1F4AC} 대화",desc:"두 사람"},{id:"solo",label:"\u{1F3A4} 혼자",desc:"한 문장"}].map(t=>(
-              <div key={t.id} onClick={()=>setSubMode(t.id)} style={{ flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:"pointer",background:subMode===t.id?C.accent+"20":C.surface,border:`1px solid ${subMode===t.id?C.accent+"60":C.border}` }}>
-                <div style={{ fontSize:13,fontWeight:700,color:subMode===t.id?C.accent:C.text }}>{t.label}</div>
-                <div style={{ fontSize:10,color:C.muted,marginTop:3 }}>{t.desc}</div>
+          <div style={{display:"flex",gap:8,marginBottom:20}}>
+            {[{id:"solo",label:"🎙️ 혼자",desc:"한 문장"},{id:"conversation",label:"💬 대화",desc:"두 사람"}].map(function(t){return(
+              <div key={t.id} onClick={function(){setSubMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:"pointer",background:subMode===t.id?C.accent+"20":C.surface,border:"1px solid "+(subMode===t.id?C.accent+"60":C.border)}}>
+                <div style={{fontSize:13,fontWeight:700,color:subMode===t.id?C.accent:C.text}}>{t.label}</div>
+                <div style={{fontSize:10,color:C.muted,marginTop:3}}>{t.desc}</div>
               </div>
-            ))}
+            );})}
           </div>
-
-          {subMode==="conversation" ? <ConversationMode/> : <SoloMode history={history} setHistory={setHistory}/>}
+          {subMode==="solo" ? <SoloMode history={history} setHistory={setHistory}/> : <div style={{textAlign:"center",color:C.muted,padding:20,fontSize:13}}>대화 모드는 준비 중이에요</div>}
         </div>
       );
     }
 
-    function SoloMode({ history, setHistory }) {
-      const [recording, setRecording] = useState(false);
-      const [transcript, setTranscript] = useState("");
-      const [interim, setInterim] = useState("");
-      const [result, setResult] = useState(null);
-      const [loading, setLoading] = useState(false);
-      const recRef = useRef(null);
+    function SoloMode(props) {
+      var history=props.history, setHistory=props.setHistory;
+      var _s1=useState(false); var recording=_s1[0]; var setRecording=_s1[1];
+      var _s2=useState(""); var transcript=_s2[0]; var setTranscript=_s2[1];
+      var _s3=useState(""); var interim=_s3[0]; var setInterim=_s3[1];
+      var _s4=useState(null); var result=_s4[0]; var setResult=_s4[1];
+      var _s5=useState(false); var isLoading=_s5[0]; var setIsLoading=_s5[1];
+      var recRef = useRef(null);
 
-      const startRec = () => {
-        const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-        const rec = new SR();
+      var startRec = function() {
+        var SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+        var rec = new SR();
         rec.lang="ko-KR"; rec.continuous=true; rec.interimResults=true;
-        rec.onresult=(e)=>{
-          let fin="",inter="";
-          for(let i=e.resultIndex;i<e.results.length;i++){
+        rec.onresult=function(e){
+          var fin="",inter="";
+          for(var i=e.resultIndex;i<e.results.length;i++){
             if(e.results[i].isFinal)fin+=e.results[i][0].transcript;
             else inter+=e.results[i][0].transcript;
           }
-          if(fin)setTranscript(p=>p+fin);
+          if(fin)setTranscript(function(p){return p+fin;});
           setInterim(inter);
         };
-        rec.onend=()=>{ setRecording(false); setInterim(""); };
+        rec.onend=function(){setRecording(false);setInterim("");};
         rec.start(); recRef.current=rec;
         setRecording(true); setTranscript(""); setInterim(""); setResult(null);
       };
-      const stopRec=()=>{ recRef.current?.stop(); setRecording(false); };
-      const reset=()=>{ setTranscript(""); setResult(null); setInterim(""); };
+      var stopRec=function(){if(recRef.current)recRef.current.stop();setRecording(false);};
+      var reset=function(){setTranscript("");setResult(null);setInterim("");};
 
-      const translate = async () => {
-        const text = transcript.trim();
+      var translate = function() {
+        var text = transcript.trim();
         if (!text) return;
-        setLoading(true);
-        const system=`You are an American English coach. Return ONLY valid JSON:
-{"korean":"원문","casual":"How an American friend would say this","formal":"Work/school version","key_phrases":[{"phrase":"hang out","meaning":"놀다"}],"tip":"핵심 포인트 한국어 1문장"}`;
-        try {
-          const raw = await callClaude(system,`한국어: "${text}"\n미국식으로 변환해줘.`);
-          const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
+        setIsLoading(true);
+        var system='You are an American English coach. Return ONLY valid JSON:\n{"korean":"원문","casual":"How an American friend would say this","formal":"Work/school version","key_phrases":[{"phrase":"hang out","meaning":"놀다"}],"tip":"핵심 포인트 한국어 1문장"}';
+        callClaude(system,'한국어: "'+text+'"\n미국식으로 변환해줘.')
+        .then(function(raw){
+          var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
           setResult(parsed);
-          const next=[{...parsed,id:Date.now()},...history].slice(0,50);
+          var next=[Object.assign({},parsed,{id:Date.now()})].concat(history).slice(0,50);
           setHistory(next); save("speak_history",next);
-        } catch(e) { setResult({korean:text,casual:"오류: "+e.message,formal:"",key_phrases:[],tip:""}); }
-        setLoading(false);
+        }).catch(function(e){setResult({korean:text,casual:"오류: "+e.message,formal:"",key_phrases:[],tip:""});})
+        .finally(function(){setIsLoading(false);});
       };
 
       return (
         <div>
-          <div style={{ display:"flex",flexDirection:"column",alignItems:"center",marginBottom:24 }}>
-            <div style={{ position:"relative" }}>
-              {recording&&<React.Fragment>
-                <div style={{ position:"absolute",inset:-10,borderRadius:"50%",border:`2px solid ${C.red}`,animation:"pulse1 1.2s ease-out infinite",opacity:0.5 }}/>
-                <div style={{ position:"absolute",inset:-20,borderRadius:"50%",border:`2px solid ${C.red}`,animation:"pulse1 1.8s ease-out infinite",opacity:0.25 }}/>
-              </React.Fragment>}
-              <button onClick={recording?stopRec:startRec} style={{ width:80,height:80,borderRadius:"50%",border:"none",cursor:"pointer",background:recording?C.red:C.accent,color:"#08090d",fontSize:28,boxShadow:recording?`0 0 32px ${C.red}60`:`0 8px 32px ${C.accent}40`,display:"flex",alignItems:"center",justifyContent:"center" }}>
-                {recording?"\u23F9":"\u{1F3A4}"}
-              </button>
-            </div>
-            <div style={{ marginTop:14,fontSize:13,color:recording?C.red:C.muted,fontWeight:recording?700:400 }}>
-              {recording?"\u25CF 녹음 중... 말해보세요":"탭해서 한국어로 말하기"}
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:24}}>
+            <button onClick={recording?stopRec:startRec} style={{width:80,height:80,borderRadius:"50%",border:"none",cursor:"pointer",background:recording?C.red:C.accent,color:"#08090d",fontSize:28,boxShadow:recording?"0 0 32px "+C.red+"60":"0 8px 32px "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {recording?"⏹":"🎙️"}
+            </button>
+            <div style={{marginTop:14,fontSize:13,color:recording?C.red:C.muted,fontWeight:recording?700:400}}>
+              {recording?"● 녹음 중... 말해보세요":"탭해서 한국어로 말하기"}
             </div>
           </div>
 
           {(transcript||interim)&&(
-            <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:16 }}>
-              <div style={{ fontSize:11,color:C.muted,letterSpacing:2,marginBottom:8 }}>인식된 한국어</div>
-              <div style={{ fontSize:15,color:C.text,lineHeight:1.6,minHeight:40 }}>
-                {transcript}<span style={{ color:C.muted }}>{interim}</span>
+            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:16}}>
+              <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:8}}>인식된 한국어</div>
+              <div style={{fontSize:15,color:C.text,lineHeight:1.6,minHeight:40}}>
+                {transcript}<span style={{color:C.muted}}>{interim}</span>
               </div>
             </div>
           )}
 
           {transcript&&!recording&&!result&&(
-            <div style={{ display:"flex",gap:10,marginBottom:20 }}>
-              <button onClick={reset} style={{ flex:1,background:C.surface,border:`1px solid ${C.border}`,color:C.muted,borderRadius:12,padding:14,fontSize:14,fontWeight:600,cursor:"pointer" }}>다시 녹음</button>
-              <button onClick={translate} disabled={loading} style={{ flex:2,background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer" }}>
-                {loading?"\u2728 번역 중...":"미국식으로 변환 \u2192"}
+            <div style={{display:"flex",gap:10,marginBottom:20}}>
+              <button onClick={reset} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:14,fontSize:14,fontWeight:600,cursor:"pointer"}}>다시 녹음</button>
+              <button onClick={translate} disabled={isLoading} style={{flex:2,background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                {isLoading?"✨ 번역 중...":"미국식으로 변환 →"}
               </button>
             </div>
           )}
 
           {result&&(
             <div>
-              <div style={{ background:C.accentDim,border:`1px solid ${C.accent}30`,borderRadius:14,padding:16,marginBottom:12 }}>
-                <div style={{ fontSize:11,color:C.accent,letterSpacing:2,marginBottom:8 }}>\u{1F60A} CASUAL \u00B7 친구한테</div>
-                <div style={{ fontSize:16,color:C.text,fontWeight:600,lineHeight:1.6 }}>"{result.casual}"</div>
+              <div style={{background:C.accentDim,border:"1px solid "+C.accent+"30",borderRadius:14,padding:16,marginBottom:12}}>
+                <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:8}}>{"😊 CASUAL · 친구한테"}</div>
+                <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.6}}>"{result.casual}"</div>
               </div>
               {result.formal&&(
-                <div style={{ background:C.surface,border:`1px solid ${C.blue}30`,borderRadius:14,padding:16,marginBottom:12 }}>
-                  <div style={{ fontSize:11,color:C.blue,letterSpacing:2,marginBottom:8 }}>\u{1F454} FORMAL \u00B7 학교/직장</div>
-                  <div style={{ fontSize:15,color:C.text,fontWeight:500,lineHeight:1.6 }}>"{result.formal}"</div>
+                <div style={{background:C.surface,border:"1px solid "+C.blue+"30",borderRadius:14,padding:16,marginBottom:12}}>
+                  <div style={{fontSize:11,color:C.blue,letterSpacing:2,marginBottom:8}}>{"👔 FORMAL · 학교/직장"}</div>
+                  <div style={{fontSize:15,color:C.text,fontWeight:500,lineHeight:1.6}}>"{result.formal}"</div>
                 </div>
               )}
               {result.key_phrases?.length>0&&(
-                <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,padding:16,marginBottom:12 }}>
-                  <div style={{ fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10 }}>\u{1F511} KEY EXPRESSIONS</div>
-                  {result.key_phrases.map((p,i)=>(
-                    <div key={i} style={{ display:"flex",alignItems:"center",gap:10,marginBottom:8 }}>
-                      <span style={{ background:C.accent+"20",color:C.accent,padding:"3px 10px",borderRadius:99,fontSize:13,fontWeight:700,border:`1px solid ${C.accent}40` }}>{p.phrase}</span>
-                      <span style={{ fontSize:13,color:C.muted }}>{p.meaning}</span>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:12}}>
+                  <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10}}>{"🔑 KEY EXPRESSIONS"}</div>
+                  {result.key_phrases.map(function(p,i){return(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                      <span style={{background:C.accent+"20",color:C.accent,padding:"3px 10px",borderRadius:99,fontSize:13,fontWeight:700,border:"1px solid "+C.accent+"40"}}>{p.phrase}</span>
+                      <span style={{fontSize:13,color:C.muted}}>{p.meaning}</span>
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
               {result.tip&&(
-                <div style={{ background:C.yellowDim,border:`1px solid ${C.yellow}30`,borderRadius:12,padding:14,marginBottom:20 }}>
-                  <div style={{ fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:4 }}>\u{1F4A1} TIP</div>
-                  <div style={{ fontSize:13,color:C.text,lineHeight:1.6 }}>{result.tip}</div>
+                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:20}}>
+                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:4}}>{"💡 TIP"}</div>
+                  <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{result.tip}</div>
                 </div>
               )}
-              <button onClick={reset} style={{ width:"100%",background:C.surface,border:`1px solid ${C.border}`,color:C.text,borderRadius:14,padding:14,fontSize:14,fontWeight:700,cursor:"pointer" }}>\u{1F3A4} 새 문장</button>
+              <button onClick={reset} style={{width:"100%",background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:14,padding:14,fontSize:14,fontWeight:700,cursor:"pointer"}}>{"🎙️ 새 문장"}</button>
             </div>
           )}
         </div>
       );
     }
 
-    function ConversationMode() {
-      const [turns, setTurns] = useState([]);
-      const [names, setNames] = useState({ me:"나", other:"상대방" });
-      const [speaker, setSpeaker] = useState("me");
-      const [recording, setRecording] = useState(false);
-      const [transcript, setTranscript] = useState("");
-      const [interim, setInterim] = useState("");
-      const [result, setResult] = useState(null);
-      const [loading, setLoading] = useState(false);
-      const recRef = useRef(null);
-
-      const startRec = () => {
-        const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-        const rec = new SR();
-        rec.lang="ko-KR"; rec.continuous=true; rec.interimResults=true;
-        rec.onresult=(e)=>{
-          let fin="",inter="";
-          for(let i=e.resultIndex;i<e.results.length;i++){
-            if(e.results[i].isFinal)fin+=e.results[i][0].transcript;
-            else inter+=e.results[i][0].transcript;
-          }
-          if(fin)setTranscript(p=>p+fin);
-          setInterim(inter);
-        };
-        rec.onend=()=>setInterim("");
-        rec.start(); recRef.current=rec;
-        setRecording(true); setTranscript(""); setInterim("");
-      };
-
-      const stopRec = () => {
-        recRef.current?.stop();
-        setRecording(false);
-        const text = transcript.trim();
-        if (text) {
-          setTurns(t=>[...t,{speaker,text}]);
-          setSpeaker(s=>s==="me"?"other":"me");
-        }
-        setTranscript(""); setInterim("");
-      };
-
-      const addText = () => {
-        const text = prompt(`${names[speaker]}의 말을 입력:`);
-        if (text?.trim()) {
-          setTurns(t=>[...t,{speaker,text:text.trim()}]);
-          setSpeaker(s=>s==="me"?"other":"me");
-        }
-      };
-
-      const rename = (who) => {
-        const n = prompt(`${who==="me"?"나":"상대방"} 이름:`,names[who]);
-        if (n?.trim()) setNames(s=>({...s,[who]:n.trim().slice(0,10)}));
-      };
-
-      const removeTurn = (i) => setTurns(t=>t.filter((_,j)=>j!==i));
-      const reset = () => { setTurns([]); setResult(null); setSpeaker("me"); };
-
-      const analyze = async () => {
-        if (turns.length<2) return;
-        setLoading(true);
-        const convText = turns.map(t=>`[${t.speaker}] ${names[t.speaker]}: "${t.text}"`).join("\n");
-        const system = `You are a friendly American English coach analyzing a Korean conversation between two friends. Return ONLY valid JSON:
-{"scenario":"대화 상황 한 문장 요약 (한국어)","turns":[{"speaker":"me"|"other","korean":"원문","english":"미국인 친구가 실제 이 상황에서 쓸 법한 자연스러운 영어 (contractions, filler words 환영)","key_phrases":[{"phrase":"표현","meaning":"한국어 뜻"}]}],"overall_tip":"이 대화에서 미국식 말하기의 포인트 (한국어 2-3문장, 따뜻하고 친절하게)"}
-speaker 라벨은 입력의 [me]/[other] 그대로 유지. key_phrases는 각 turn에서 한국인이 배울 만한 표현 0-2개만.`;
-        const user = `대화:\n${convText}\n\nturn 순서와 speaker 라벨을 그대로 유지하고, 각 발화를 미국인 친구끼리 실제로 쓸 법한 자연스러운 영어로 바꿔줘.`;
-        try {
-          const raw = await callClaude(system,user);
-          const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
-          setResult(parsed);
-        } catch(e) { setResult({scenario:"",turns:[],overall_tip:"분석 실패: "+e.message}); }
-        setLoading(false);
-      };
-
-      if (result) {
-        return (
-          <div>
-            {result.scenario&&(
-              <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:14,marginBottom:16 }}>
-                <div style={{ fontSize:11,color:C.muted,letterSpacing:2,marginBottom:6 }}>\u{1F4CD} SITUATION</div>
-                <div style={{ fontSize:13,color:C.text,lineHeight:1.6 }}>{result.scenario}</div>
-              </div>
-            )}
-            {result.turns?.map((t,i)=>{
-              const isMe = t.speaker==="me";
-              const color = isMe?C.accent:C.blue;
-              return (
-                <div key={i} style={{ marginBottom:14 }}>
-                  <div style={{ fontSize:11,color,fontWeight:800,marginBottom:6,display:"flex",alignItems:"center",gap:6 }}>
-                    <span style={{ width:6,height:6,borderRadius:"50%",background:color }}/>
-                    {names[t.speaker]||(isMe?"나":"상대방")}
-                  </div>
-                  <div style={{ background:C.surface,border:`1px solid ${color}40`,borderLeft:`3px solid ${color}`,borderRadius:10,padding:14 }}>
-                    <div style={{ fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic" }}>"{t.korean}"</div>
-                    <div style={{ fontSize:15,color:C.text,fontWeight:600,lineHeight:1.5 }}>\u{1F4AC} "{t.english}"</div>
-                    {t.key_phrases?.length>0&&(
-                      <div style={{ marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}` }}>
-                        {t.key_phrases.map((p,j)=>(
-                          <div key={j} style={{ display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap" }}>
-                            <span style={{ background:color+"20",color,padding:"2px 8px",borderRadius:99,fontSize:12,fontWeight:700 }}>{p.phrase}</span>
-                            <span style={{ fontSize:12,color:C.muted }}>{p.meaning}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+    // ── HISTORY ─────────────────────────────────────────────────────
+    function HistoryScreen(props) {
+      var history = props.history;
+      if (!history.length) return (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",color:C.muted,gap:12}}>
+          <div style={{fontSize:36}}>{"📚"}</div><div style={{fontSize:14}}>아직 학습 기록이 없어요</div>
+        </div>
+      );
+      return (
+        <div style={{padding:"24px 20px"}}>
+          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:8}}>HISTORY</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>학습 기록</div>
+          {[].concat(history).reverse().map(function(item,i){return(
+            <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:10}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{item.date}</div>
+              <div style={{display:"flex",gap:8}}>
+                <div style={{flex:1,background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{fontSize:10,color:C.yellow,marginBottom:3}}>기본동사</div>
+                  <div style={{fontSize:15,fontWeight:800,color:C.yellow}}>{item.basic}</div>
                 </div>
-              );
-            })}
-            {result.overall_tip&&(
-              <div style={{ background:C.yellowDim,border:`1px solid ${C.yellow}30`,borderRadius:12,padding:14,marginBottom:20 }}>
-                <div style={{ fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:6 }}>\u{1F4A1} COACH'S TIP</div>
-                <div style={{ fontSize:13,color:C.text,lineHeight:1.7 }}>{result.overall_tip}</div>
-              </div>
-            )}
-            <button onClick={reset} style={{ width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:14,fontSize:14,fontWeight:800,cursor:"pointer" }}>\u{1F504} 새 대화 시작</button>
-          </div>
-        );
-      }
-
-      return (
-        <div>
-          <div style={{ display:"flex",gap:8,marginBottom:14 }}>
-            {[{id:"me",c:C.accent},{id:"other",c:C.blue}].map(s=>(
-              <div key={s.id} style={{ flex:1 }}>
-                <button onClick={()=>setSpeaker(s.id)} disabled={recording} style={{ width:"100%",padding:"10px",borderRadius:10,background:speaker===s.id?s.c+"20":C.surface,border:`1px solid ${speaker===s.id?s.c+"60":C.border}`,color:speaker===s.id?s.c:C.muted,fontSize:13,fontWeight:700,cursor:recording?"not-allowed":"pointer",opacity:recording?0.5:1 }}>
-                  {speaker===s.id&&"\u{1F3A4} "}{names[s.id]} 차례
-                </button>
-                <button onClick={()=>rename(s.id)} disabled={recording} style={{ background:"none",border:"none",color:C.muted,fontSize:10,cursor:"pointer",marginTop:4,width:"100%",opacity:0.7 }}>
-                  이름 바꾸기
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display:"flex",flexDirection:"column",alignItems:"center",marginBottom:16 }}>
-            <div style={{ position:"relative" }}>
-              {recording&&<React.Fragment>
-                <div style={{ position:"absolute",inset:-10,borderRadius:"50%",border:`2px solid ${C.red}`,animation:"pulse1 1.2s ease-out infinite",opacity:0.5 }}/>
-                <div style={{ position:"absolute",inset:-20,borderRadius:"50%",border:`2px solid ${C.red}`,animation:"pulse1 1.8s ease-out infinite",opacity:0.25 }}/>
-              </React.Fragment>}
-              <button onClick={recording?stopRec:startRec} style={{ width:72,height:72,borderRadius:"50%",border:"none",cursor:"pointer",background:recording?C.red:(speaker==="me"?C.accent:C.blue),color:"#08090d",fontSize:24,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:recording?`0 0 24px ${C.red}60`:`0 4px 20px ${speaker==="me"?C.accent:C.blue}40` }}>
-                {recording?"\u23F9":"\u{1F3A4}"}
-              </button>
-            </div>
-            <div style={{ marginTop:10,fontSize:12,color:recording?C.red:C.muted,fontWeight:recording?700:400 }}>
-              {recording?`\u25CF ${names[speaker]} 말하는 중...`:"탭해서 녹음"}
-            </div>
-            {!recording&&(
-              <button onClick={addText} style={{ marginTop:6,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer",textDecoration:"underline" }}>
-                또는 직접 타이핑
-              </button>
-            )}
-          </div>
-
-          {recording&&(transcript||interim)&&(
-            <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:12,marginBottom:14 }}>
-              <div style={{ fontSize:11,color:C.muted,marginBottom:6 }}>인식 중...</div>
-              <div style={{ fontSize:14,color:C.text,lineHeight:1.5 }}>
-                {transcript}<span style={{ color:C.muted }}>{interim}</span>
+                <div style={{flex:1,background:C.accentDim,border:"1px solid "+C.accent+"30",borderRadius:8,padding:"8px 10px"}}>
+                  <div style={{fontSize:10,color:C.accent,marginBottom:3}}>구동사</div>
+                  <div style={{fontSize:15,fontWeight:800,color:C.accent}}>{item.phrasal}</div>
+                </div>
               </div>
             </div>
-          )}
-
-          {turns.length>0&&(
-            <div style={{ marginBottom:14 }}>
-              <div style={{ fontSize:11,color:C.muted,letterSpacing:2,marginBottom:8 }}>\u{1F4DD} 대화 ({turns.length})</div>
-              {turns.map((t,i)=>{
-                const isMe = t.speaker==="me";
-                const color = isMe?C.accent:C.blue;
-                return (
-                  <div key={i} style={{ background:C.surface,border:`1px solid ${C.border}`,borderLeft:`3px solid ${color}`,borderRadius:8,padding:"10px 12px",marginBottom:6,display:"flex",gap:8 }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:10,color,fontWeight:700,marginBottom:3 }}>{names[t.speaker]}</div>
-                      <div style={{ fontSize:13,color:C.text,lineHeight:1.5 }}>{t.text}</div>
-                    </div>
-                    <button onClick={()=>removeTurn(i)} disabled={recording} style={{ background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer",padding:0,opacity:0.5,alignSelf:"flex-start" }}>\u00D7</button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {turns.length>=2&&!recording&&(
-            <button onClick={analyze} disabled={loading} style={{ width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:15,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:8 }}>
-              {loading?"\u2728 분석 중...":`\u{1F3AF} 미국식으로 변환 (${turns.length}턴)`}
-            </button>
-          )}
-
-          {turns.length<2&&!recording&&turns.length>0&&(
-            <div style={{ textAlign:"center",fontSize:11,color:C.muted,padding:"8px" }}>
-              최소 2턴 이상 대화를 입력해주세요
-            </div>
-          )}
+          );})}
         </div>
       );
     }
 
-    // ── ADMIN DASHBOARD ─────────────────────────────────────────────
-    function AdminDashboard() {
-      const [stats, setStats] = useState(null);
-      useEffect(() => { setStats(fetchStats()); }, []);
-      if (!stats) return <div style={{ padding:20,color:C.muted }}>Loading...</div>;
-      const days = Object.keys(stats).sort().reverse();
+    // ── ADMIN ───────────────────────────────────────────────────────
+    function AdminScreen() {
+      var stats = fetchStats();
+      var days = Object.keys(stats).sort().reverse();
       return (
-        <div className="screen-enter" style={{ padding:"24px 20px" }}>
-          <div style={{ fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6 }}>ADMIN</div>
-          <div style={{ fontSize:22,fontWeight:800,marginBottom:20 }}>Dashboard</div>
-          {days.map(day=>(
-            <div key={day} style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:14,marginBottom:10 }}>
-              <div style={{ fontSize:12,color:C.accent,fontWeight:700,marginBottom:8 }}>{day}</div>
-              <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
-                {Object.entries(stats[day]).filter(([,v])=>v>0).map(([k,v])=>(
-                  <div key={k} style={{ background:C.bg,borderRadius:6,padding:"4px 10px",fontSize:11 }}>
-                    <span style={{ color:C.muted }}>{k}: </span><span style={{ color:C.text,fontWeight:700 }}>{v}</span>
-                  </div>
-                ))}
-                {Object.values(stats[day]).every(v=>v===0)&&<div style={{ fontSize:11,color:C.muted }}>No data</div>}
+        <div style={{padding:"24px 20px"}}>
+          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>ADMIN ONLY</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>{"📊 Talkfit 대시보드"}</div>
+          {days.map(function(d){
+            var s = stats[d];
+            var hasActivity = Object.values(s).some(function(v){return v>0;});
+            if (!hasActivity) return null;
+            return (
+              <div key={d} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"10px 14px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                <div style={{fontSize:12,color:C.muted,fontWeight:700}}>{d}</div>
+                <div style={{display:"flex",gap:10,fontSize:12,color:C.text}}>
+                  <span>{"👥 "}{s.visit||0}</span>
+                  <span>{"📖 "}{s.lesson_start||0}</span>
+                  <span>{"✅ "}{s.lesson_done||0}</span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    // ── BOTTOM NAV ──────────────────────────────────────────────────
-    function BottomNav({ tab, setTab }) {
-      const tabs = [
-        { id:"home", icon:"\u{1F3E0}", label:"홈" },
-        { id:"learn", icon:"\u{1F4D6}", label:"학습" },
-        { id:"speak", icon:"\u{1F3A4}", label:"회화" },
-      ];
-      return (
-        <div style={{ position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.surface+"F0",borderTop:`1px solid ${C.border}`,display:"flex",backdropFilter:"blur(16px)",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)" }}>
-          {tabs.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1,background:"none",border:"none",padding:"12px 0 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",color:tab===t.id?C.accent:C.muted,transition:"color 0.2s" }}>
-              <span style={{ fontSize:20 }}>{t.icon}</span>
-              <span style={{ fontSize:10,fontWeight:tab===t.id?700:400 }}>{t.label}</span>
-            </button>
-          ))}
+            );
+          })}
         </div>
       );
     }
 
     // ── APP ─────────────────────────────────────────────────────────
     function App() {
-      const [tab, setTab] = useState("home");
-      const [screen, setScreen] = useState("home");
-      const [lesson, setLesson] = useState(null);
-      const [todayDone, setTodayDone] = useState(false);
-      const [streak, setStreak] = useState(0);
-      const [loading, setLoading] = useState(false);
-      const [speakHistory, setSpeakHistory] = useState([]);
-      const [aiAvailable, setAiAvailable] = useState(!!getApiKey());
-      const [showApiScreen, setShowApiScreen] = useState(false);
+      var _s1=useState("home"); var tab=_s1[0]; var setTab=_s1[1];
+      var _s2=useState("home"); var screen=_s2[0]; var setScreen=_s2[1];
+      var _s3=useState(null); var lesson=_s3[0]; var setLesson=_s3[1];
+      var _s4=useState(false); var todayDone=_s4[0]; var setTodayDone=_s4[1];
+      var _s5=useState(0); var streak=_s5[0]; var setStreak=_s5[1];
+      var _s6=useState(false); var loading=_s6[0]; var setLoading=_s6[1];
+      var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
+      var _s8=useState([]); var verbHistory=_s8[0]; var setVerbHistory=_s8[1];
+      var _s9=useState(!!getApiKey()); var aiAvailable=_s9[0]; var setAiAvailable=_s9[1];
+      var _s10=useState(false); var showApiScreen=_s10[0]; var setShowApiScreen=_s10[1];
 
-      // Check admin mode
-      const isAdmin = new URLSearchParams(window.location.search).get("admin") === ADMIN_KEY;
+      var isAdmin = false;
+      try { isAdmin = new URLSearchParams(window.location.search).get("admin") === ADMIN_KEY; } catch(e){}
 
-      useEffect(() => {
+      var todayKey = function(){return new Date().toISOString().slice(0,10);};
+
+      useEffect(function(){
         track("visit");
-        const saved = load("streak") || { count:0, lastDate:"" };
-        const today = new Date().toISOString().slice(0,10);
-        if (saved.lastDate === today) { setStreak(saved.count); setTodayDone(true); }
-        else if (saved.lastDate === new Date(Date.now()-86400000).toISOString().slice(0,10)) setStreak(saved.count);
-        else setStreak(0);
-        setLesson(getTodayLesson());
+        var s = load("tk_state");
+        if (s) {
+          setStreak(s.streak||0);
+          setVerbHistory(s.history||[]);
+          if (s.todayKey===todayKey()) { setTodayDone(s.todayDone||false); if(s.lesson)setLesson(s.lesson); }
+        }
+        if (!lesson) setLesson(getTodayLesson());
         setSpeakHistory(load("speak_history") || []);
       }, []);
 
-      const startLesson = () => {
+      var persist = function(updates) {
+        var cur = load("tk_state")||{};
+        for(var k in updates) cur[k]=updates[k];
+        cur.todayKey = todayKey();
+        save("tk_state", cur);
+      };
+
+      var handleStart = function() {
         track("lesson_start");
-        setScreen("learn");
-        setTab("learn");
+        if (!lesson) setLesson(getTodayLesson());
+        setScreen("learn"); setTab("learn");
       };
 
-      const finishLearn = () => {
-        if (aiAvailable) { setScreen("practice"); }
-        else { completeDone(); }
-      };
-
-      const completeDone = () => {
+      var handleComplete = function() {
         track("lesson_done");
-        const today = new Date().toISOString().slice(0,10);
-        const saved = load("streak") || { count:0, lastDate:"" };
-        let newStreak;
-        if (saved.lastDate === new Date(Date.now()-86400000).toISOString().slice(0,10)) newStreak = saved.count + 1;
-        else if (saved.lastDate === today) newStreak = saved.count;
-        else newStreak = 1;
-        save("streak", { count:newStreak, lastDate:today });
-        setStreak(newStreak);
-        setTodayDone(true);
-        setScreen("home");
-        setTab("home");
+        var newStreak = streak+1;
+        var newHistory = [].concat(verbHistory,[{basic:lesson.basic.verb,phrasal:lesson.phrasal.verb,date:todayKey()}]);
+        setStreak(newStreak); setTodayDone(true); setVerbHistory(newHistory);
+        persist({streak:newStreak,todayDone:true,history:newHistory,lesson:lesson});
+        setScreen("home"); setTab("home");
       };
-
-      useEffect(() => {
-        if (tab === "home") setScreen("home");
-        else if (tab === "learn") setScreen("learn");
-        else if (tab === "speak") setScreen("speak");
-      }, [tab]);
 
       if (showApiScreen) {
         return (
-          <div style={{ maxWidth:480,margin:"0 auto",minHeight:"100vh",background:C.bg }}>
+          <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg}}>
             <ApiKeyScreen
-              onSave={() => { setAiAvailable(true); setShowApiScreen(false); }}
-              onSkip={() => setShowApiScreen(false)}
+              onSave={function(){setAiAvailable(true);setShowApiScreen(false);}}
+              onSkip={function(){setShowApiScreen(false);}}
             />
           </div>
         );
       }
 
+      var TABS = [
+        {id:"home",icon:"🏠",label:"홈"},
+        {id:"speak",icon:"🎙️",label:"회화"},
+        {id:"learn",icon:"📖",label:"오늘학습",action:true},
+        {id:"history",icon:"📚",label:"기록"},
+      ];
+
       return (
-        <div style={{ maxWidth:480,margin:"0 auto",minHeight:"100vh",background:C.bg,paddingBottom:80 }}>
-          {isAdmin && <AdminDashboard/>}
+        <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column"}}>
+          <div style={{position:"sticky",top:0,zIndex:10,background:C.bg+"ee",backdropFilter:"blur(12px)",borderBottom:"1px solid "+C.border,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{fontWeight:900,fontSize:16,letterSpacing:-0.5}}>{"💪 Talkfit"}</div>
+            {(screen==="learn"||screen==="practice"||screen==="admin")&&(
+              <button onClick={function(){setScreen("home");setTab("home");}} style={{background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>{"← 홈"}</button>
+            )}
+            {screen==="home"&&(
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
+                <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
+              </div>
+            )}
+          </div>
 
-          {screen==="home" && (
-            <HomeScreen
-              streak={streak} todayDone={todayDone} lesson={lesson}
-              onStart={startLesson} aiAvailable={aiAvailable}
-              onEnableAI={() => setShowApiScreen(true)}
-            />
+          <div style={{flex:1,overflowY:"auto",paddingBottom:90}}>
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lesson={lesson} onStart={handleStart} aiAvailable={aiAvailable} onEnableAI={function(){setShowApiScreen(true);}}/>}
+            {screen==="learn"&&<LearnScreen lesson={lesson} loading={loading} onNext={function(){setScreen("practice");}} aiAvailable={aiAvailable}/>}
+            {screen==="practice"&&<PracticeScreen lesson={lesson} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
+            {screen==="history"&&<HistoryScreen history={verbHistory}/>}
+            {screen==="speak"&&<SpeakScreen history={speakHistory} setHistory={setSpeakHistory} aiAvailable={aiAvailable}/>}
+            {screen==="admin"&&<AdminScreen/>}
+          </div>
+
+          {screen!=="practice"&&screen!=="admin"&&(
+            <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.surface+"f0",backdropFilter:"blur(20px)",borderTop:"1px solid "+C.border,display:"flex",padding:"10px 0 20px",zIndex:20}}>
+              {TABS.map(function(t){return(
+                <button key={t.id} onClick={function(){if(t.action){handleStart();}else{setTab(t.id);setScreen(t.id);}}} style={{flex:1,background:"none",border:"none",color:!t.action&&tab===t.id?C.accent:C.muted,cursor:"pointer",padding:"6px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                  <div style={{fontSize:t.action?22:18}}>{t.icon}</div>
+                  <div style={{fontSize:10,fontWeight:tab===t.id?700:400}}>{t.label}</div>
+                  {!t.action&&tab===t.id&&<div style={{width:4,height:4,borderRadius:"50%",background:C.accent}}/>}
+                </button>
+              );})}
+            </div>
           )}
-
-          {screen==="learn" && (
-            <LearnScreen lesson={lesson} loading={loading} onNext={finishLearn} aiAvailable={aiAvailable}/>
-          )}
-
-          {screen==="practice" && (
-            <PracticeScreen lesson={lesson} onComplete={completeDone} aiAvailable={aiAvailable}/>
-          )}
-
-          {screen==="speak" && (
-            <SpeakScreen history={speakHistory} setHistory={setSpeakHistory} aiAvailable={aiAvailable}/>
-          )}
-
-          <BottomNav tab={tab} setTab={setTab}/>
         </div>
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
   </script>
 </body>
 </html>
