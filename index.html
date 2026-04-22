@@ -1793,7 +1793,7 @@
                       <div style={{fontSize:13,color:C.text,fontWeight:600}}>{ytTitle}</div>
                     </div>
                   )}
-                  {ytSegments.length>0 && (
+                  {ytSegments.length>0 && !result && (
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                         <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>구간 {ytSegIdx+1} / {ytSegments.length}</div>
