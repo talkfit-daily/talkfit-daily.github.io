@@ -1255,7 +1255,11 @@
         var system = 'You are an American English tutor. Return ONLY valid JSON:\n{"overall":"전체 피드백(한국어,2문장)","corrections":[{"original":"...","corrected":"...","explanation":"왜(한국어)","more_natural":"더 자연스럽게(optional)"}],"bonus":"미국인이 쓸 법한 추가 문장(영어)"}';
         callClaude(system, 'Verb: "'+v.verb+'" ('+v.meaning_ko+')\nSentences:\n'+filled.map(function(s,i){return (i+1)+". "+s;}).join("\n"))
         .then(function(raw){
-          var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
+          var pJson = raw;
+          var pFence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (pFence) pJson = pFence[1];
+          else { var ps=raw.indexOf("{"),pe=raw.lastIndexOf("}"); if(ps!==-1&&pe!==-1)pJson=raw.slice(ps,pe+1); }
+          var parsed = JSON.parse(pJson.trim());
           setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[tabId]=parsed; return n;});
         }).catch(function(e){
           var msg = "AI 피드백을 가져오지 못했어요. 잠시 후 다시 시도해주세요.";
