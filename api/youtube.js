@@ -50,20 +50,24 @@ export default async function handler(req, res) {
     const titleMatch = html.match(/<title>(.*?)<\/title>/);
     let title = titleMatch ? titleMatch[1].replace(" - YouTube", "").trim() : "";
 
-    // captionTracks 추출 (여러 패턴 시도)
+    // captionTracks 추출
     let tracks = null;
 
-    // 패턴 1: "captionTracks":[...]
-    const m1 = html.match(/"captionTracks":(\[.*?\])/s);
+    // "captionTracks":[...] 추출 — 중첩 배열 끝까지 잡기
+    const m1 = html.match(/"captionTracks":(\[.*?\])(?=,"|])/s);
     if (m1) {
-      try { tracks = JSON.parse(m1[1]); } catch {}
+      try {
+        // \u0026 등 유니코드 이스케이프 처리
+        const cleaned = m1[1].replace(/\\u0026/g, "&");
+        tracks = JSON.parse(cleaned);
+      } catch {}
     }
 
-    // 패턴 2: captions 객체 내부
+    // 패턴 2
     if (!tracks) {
-      const m2 = html.match(/playerCaptionsTracklistRenderer.*?"captionTracks":(\[.*?\])/s);
+      const m2 = html.match(/captionTracks.*?(\[{.*?}\])/s);
       if (m2) {
-        try { tracks = JSON.parse(m2[1]); } catch {}
+        try { tracks = JSON.parse(m2[1].replace(/\\u0026/g, "&")); } catch {}
       }
     }
 
