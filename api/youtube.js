@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     }
 
     if (!tracks || tracks.length === 0) {
-      // 자막이 없는 영상 → Gemini로 영상 설명 기반 학습 제공
+      // 자막이 없는 영상 → Gemini로 실제 음성 인식
       const apiKey = process.env.GEMINI_API_KEY;
       if (apiKey) {
         const geminiRes = await fetch(
@@ -77,25 +77,30 @@ export default async function handler(req, res) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              systemInstruction: { parts: [{ text: "You extract useful English learning content from YouTube video context. Output Korean text suitable for English learning analysis." }] },
-              contents: [{ role: "user", parts: [{ text: `YouTube video title: "${title}", ID: ${videoId}. This video likely teaches English. Generate a realistic Korean conversation (5-8 lines) that would use similar expressions and topics as this video. Output ONLY the Korean conversation text.` }] }],
-              generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+              systemInstruction: { parts: [{ text: "You are a transcriber. Watch this YouTube video and transcribe ALL spoken dialogue exactly as said. If Korean, write in Korean. If English, write in English. If mixed, write both. Output ONLY the transcript text, one line per sentence. Do NOT summarize or paraphrase. Do NOT add commentary." }] },
+              contents: [{ role: "user", parts: [
+                { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}`, mimeType: "video/mp4" } },
+                { text: "이 영상에서 말하는 내용을 전부 받아적어줘. 있는 그대로 적어. 요약하지 마." }
+              ] }],
+              generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
             }),
           }
         );
         const geminiData = await geminiRes.json();
-        const generated = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (generated) {
+        const transcribed = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (transcribed) {
+          let transcript = transcribed;
+          if (transcript.length > 2000) transcript = transcript.slice(0, 2000) + "\n...(이하 생략)";
           return res.status(200).json({
             title,
-            language: "ko",
-            transcript: generated,
+            language: "auto",
+            transcript,
             videoId,
-            generated: true,
+            source: "audio",
           });
         }
       }
-      return res.status(404).json({ error: "이 영상에는 자막이 없어요. 자막이 있는 영상을 넣어주세요." });
+      return res.status(404).json({ error: "이 영상의 음성을 인식할 수 없어요. 다른 영상을 시도해주세요." });
     }
 
     // 한국어 > 영어 > 첫 번째 자막 순서로 선택
