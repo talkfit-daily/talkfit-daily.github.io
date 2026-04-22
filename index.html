@@ -2177,8 +2177,8 @@
                     <div>
                       {sp.turns&&sp.turns.map(function(t,ti){return(
                         <div key={ti} style={{background:C.accentDim,border:"1px solid "+C.accent+"20",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-                          <div style={{fontSize:12,color:C.muted,marginBottom:4}}>{t.korean}</div>
-                          <div style={{fontSize:14,color:C.accent,fontWeight:700}}>→ {t.english}</div>
+                          <div style={{fontSize:12,color:C.muted,marginBottom:4}}>{renderHighlight(t.korean)}</div>
+                          <div style={{fontSize:14,color:C.text,fontWeight:700}}>→ {renderHighlight(t.english)}</div>
                           {t.verbs_used&&(
                             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:6}}>
                               {t.verbs_used.map(function(vu,vi){return(
