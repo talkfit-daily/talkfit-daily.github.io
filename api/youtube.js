@@ -1,4 +1,4 @@
-// Vercel Serverless - YouTube 자막 추출 (innertube API, 빠름)
+// YouTube 자막 추출 — innertube + HTML fallback
 
 const ALLOWED_ORIGINS = [
   "https://talkfit-daily-github-io.vercel.app",
@@ -14,6 +14,61 @@ function extractVideoId(url) {
     if (u.hostname.includes("youtube.com")) return u.searchParams.get("v");
   } catch {}
   if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+  return null;
+}
+
+async function fetchWithTimeout(url, opts, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
+async function getCaptionTracks(videoId) {
+  // 방법 1: innertube API (빠름, ~1초)
+  try {
+    const res = await fetchWithTimeout("https://www.youtube.com/youtubei/v1/player", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        videoId,
+        context: { client: { clientName: "WEB", clientVersion: "2.20241201.00.00", hl: "ko", gl: "KR" } }
+      })
+    }, 4000);
+    const data = await res.json();
+    const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    if (tracks && tracks.length > 0) return { tracks, title: data?.videoDetails?.title || "" };
+  } catch {}
+
+  // 방법 2: HTML 페이지 scraping (느리지만 확실, ~5초)
+  try {
+    const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+        "Accept": "text/html",
+        "Cookie": "CONSENT=YES+1"
+      }
+    }, 7000);
+    const html = await res.text();
+
+    const titleMatch = html.match(/<title>(.*?)<\/title>/);
+    const title = titleMatch ? titleMatch[1].replace(" - YouTube", "").trim() : "";
+
+    const m = html.match(/"captionTracks":(\[.*?\])(?=,")/s);
+    if (m) {
+      const cleaned = m[1].replace(/\\u0026/g, "&").replace(/\\"/g, '"');
+      const tracks = JSON.parse(cleaned);
+      if (tracks.length > 0) return { tracks, title };
+    }
+  } catch {}
+
   return null;
 }
 
@@ -36,61 +91,44 @@ export default async function handler(req, res) {
   if (!videoId) return res.status(400).json({ error: "올바른 YouTube URL이 아니에요." });
 
   try {
-    // 1. 제목 가져오기 (oembed — 빠름)
-    let title = "";
-    try {
-      const oRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-      if (oRes.ok) { const od = await oRes.json(); title = od.title || ""; }
-    } catch {}
+    const result = await getCaptionTracks(videoId);
 
-    // 2. innertube API로 자막 트랙 정보 가져오기 (HTML 파싱 불필요)
-    const innertubeRes = await fetch("https://www.youtube.com/youtubei/v1/player", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        videoId,
-        context: {
-          client: { clientName: "WEB", clientVersion: "2.20240101.00.00", hl: "ko", gl: "KR" }
-        }
-      })
-    });
-
-    const playerData = await innertubeRes.json();
-    const captionTracks = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-
-    if (!captionTracks || captionTracks.length === 0) {
-      return res.status(404).json({ error: "이 영상에는 자막이 없어요. 자막이 있는 영상을 넣어주세요." });
+    if (!result) {
+      return res.status(404).json({ error: "이 영상에서 자막을 찾을 수 없어요. 자막이 있는 영상을 시도해주세요." });
     }
+
+    const { tracks, title } = result;
 
     // 한국어 > 영어 > 첫 번째
-    let track = captionTracks.find(t => t.languageCode === "ko");
-    if (!track) track = captionTracks.find(t => t.languageCode === "en");
-    if (!track) track = captionTracks[0];
+    let track = tracks.find(t => t.languageCode === "ko");
+    if (!track) track = tracks.find(t => t.languageCode === "en");
+    if (!track) track = tracks[0];
 
-    // 3. 자막 텍스트 가져오기
-    const captionUrl = track.baseUrl + "&fmt=json3";
-    const captionRes = await fetch(captionUrl);
-    const captionData = await captionRes.json();
-
+    // 자막 텍스트 가져오기
     let lines = [];
-    if (captionData.events) {
-      for (const event of captionData.events) {
-        if (event.segs) {
-          const text = event.segs.map(s => s.utf8 || "").join("").replace(/\n/g, " ").trim();
-          if (text) lines.push(text);
+
+    try {
+      const cRes = await fetchWithTimeout(track.baseUrl + "&fmt=json3", {}, 3000);
+      const cData = await cRes.json();
+      if (cData.events) {
+        for (const event of cData.events) {
+          if (event.segs) {
+            const text = event.segs.map(s => s.utf8 || "").join("").replace(/\n/g, " ").trim();
+            if (text) lines.push(text);
+          }
         }
       }
-    }
+    } catch {}
 
-    // JSON 실패시 XML
     if (lines.length === 0) {
-      const xmlRes = await fetch(track.baseUrl);
-      const xml = await xmlRes.text();
-      const matches = [...xml.matchAll(/<text[^>]*>(.*?)<\/text>/gs)];
-      for (const m of matches) {
-        const text = m[1].replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#39;/g,"'").replace(/&quot;/g,'"').trim();
-        if (text) lines.push(text);
-      }
+      try {
+        const xRes = await fetchWithTimeout(track.baseUrl, {}, 3000);
+        const xml = await xRes.text();
+        for (const m of xml.matchAll(/<text[^>]*>(.*?)<\/text>/gs)) {
+          const text = m[1].replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#39;/g,"'").replace(/&quot;/g,'"').trim();
+          if (text) lines.push(text);
+        }
+      } catch {}
     }
 
     if (lines.length === 0) {
@@ -102,6 +140,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ title, language: track.languageCode, transcript, videoId });
   } catch (err) {
-    return res.status(500).json({ error: "자막을 가져오는 중 오류가 발생했어요: " + (err.message || "") });
+    return res.status(500).json({ error: "오류: " + (err.message || "알 수 없는 오류") });
   }
 }
