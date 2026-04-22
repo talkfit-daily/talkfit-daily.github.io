@@ -2157,7 +2157,7 @@
           {screen!=="practice"&&screen!=="admin"&&screen!=="chat"&&(
             <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.surface+"f0",backdropFilter:"blur(20px)",borderTop:"1px solid "+C.border,display:"flex",padding:"10px 0 20px",zIndex:20}}>
               {TABS.map(function(t){return(
-                <button key={t.id} onClick={function(){if(t.action){handleStart();}else{setTab(t.id);setScreen(t.id);}}} style={{flex:1,background:"none",border:"none",color:!t.action&&tab===t.id?C.accent:C.muted,cursor:"pointer",padding:"6px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                <button key={t.id} onClick={function(){if(t.action){if(todayDone){return;}handleStart();}else{setTab(t.id);setScreen(t.id);}}} style={{flex:1,background:"none",border:"none",color:!t.action&&tab===t.id?C.accent:C.muted,cursor:"pointer",padding:"6px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:3,opacity:t.action&&todayDone?0.5:1}}>
                   <div style={{fontSize:t.action?22:18}}>{t.icon}</div>
                   <div style={{fontSize:10,fontWeight:tab===t.id?700:400}}>{t.label}</div>
                   {!t.action&&tab===t.id&&<div style={{width:4,height:4,borderRadius:"50%",background:C.accent}}/>}
