@@ -22,6 +22,11 @@
     textarea::placeholder{color:#2a2f45;}
     @keyframes pulse1{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.8);opacity:0}}
     @keyframes dot{from{opacity:0.2}to{opacity:1}}
+    @keyframes confettiFall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+    @keyframes correctFlash{0%{background:#7ee8a220}50%{background:#7ee8a240}100%{background:#7ee8a220}}
+    @keyframes wrongShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+    @keyframes levelUp{0%{transform:scale(0.5);opacity:0}50%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
+    @keyframes xpPop{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-30px);opacity:0}}
     ::-webkit-scrollbar{width:0}
   </style>
 </head>
@@ -50,8 +55,86 @@
       try { localStorage.setItem("tf_"+key, JSON.stringify(val)); } catch {}
     }
 
+    // ── XP + LEVEL SYSTEM ──────────────────────────────────────────
+    var LEVELS = [
+      {level:1,name:"Beginner",min:0,max:100},
+      {level:2,name:"Starter",min:100,max:300},
+      {level:3,name:"Learner",min:300,max:600},
+      {level:4,name:"Speaker",min:600,max:1000},
+      {level:5,name:"Talker",min:1000,max:1500},
+      {level:6,name:"Fluent",min:1500,max:2200},
+      {level:7,name:"Native-like",min:2200,max:3000},
+      {level:8,name:"Master",min:3000,max:999999},
+    ];
+    function getLevel(xp) {
+      for (var i=LEVELS.length-1;i>=0;i--) { if (xp>=LEVELS[i].min) return LEVELS[i]; }
+      return LEVELS[0];
+    }
+    function addXP(amount) {
+      var state = load("xp_state") || {xp:0};
+      var oldLevel = getLevel(state.xp);
+      state.xp += amount;
+      var newLevel = getLevel(state.xp);
+      save("xp_state", state);
+      return {xp:state.xp, leveledUp:newLevel.level>oldLevel.level, level:newLevel};
+    }
+    function getXP() { return (load("xp_state")||{xp:0}).xp; }
+
+    // ── STREAK BONUS (AI 횟수) ──────────────────────────────────────
+    function getDailyLimit(streak) {
+      if (streak>=30) return 10;
+      if (streak>=7) return 5;
+      return 3;
+    }
+
+    // ── CONFETTI ────────────────────────────────────────────────────
+    function showConfetti() {
+      var container = document.createElement('div');
+      container.style.cssText='position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden';
+      document.body.appendChild(container);
+      var colors=['#7ee8a2','#fbbf24','#60a5fa','#fb923c','#f87171'];
+      for(var i=0;i<60;i++){
+        var p=document.createElement('div');
+        var c=colors[Math.floor(Math.random()*colors.length)];
+        var x=Math.random()*100;var d=Math.random()*3+2;var r=Math.random()*360;
+        p.style.cssText='position:absolute;left:'+x+'%;top:-20px;width:'+d*3+'px;height:'+d*3+'px;background:'+c+';border-radius:'+(Math.random()>0.5?'50%':'2px')+';opacity:0.9;animation:confettiFall '+(Math.random()*2+1.5)+'s ease-out forwards;animation-delay:'+Math.random()*0.5+'s;transform:rotate('+r+'deg)';
+        container.appendChild(p);
+      }
+      setTimeout(function(){container.remove();},4000);
+    }
+
+    // ── QUIZ GENERATOR ─────────────────────────────────────────────
+    function generateQuiz(lesson) {
+      var quizzes = [];
+      // Quiz 1: 기본동사 의미 고르기
+      var b = lesson.basic;
+      var wrongMeanings = ["참다","던지다","끌다","닫다","열다","세다","울다","웃다"];
+      var shuffled = wrongMeanings.sort(function(){return Math.random()-0.5;}).slice(0,2);
+      var correctMeaning = b.meaning_ko.split(",")[0].trim();
+      var opts1 = [correctMeaning].concat(shuffled).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"meaning",question:'"'+b.verb+'" 의 뜻은?',options:opts1,answer:correctMeaning,verb:b.verb});
+
+      // Quiz 2: 구동사 문장 완성
+      var p = lesson.phrasal;
+      var ex = p.examples[0];
+      var blank = ex.english.replace(new RegExp(p.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
+      var wrongVerbs = ["give up","break down","show off","bring up","take over","call off"];
+      var shuffled2 = wrongVerbs.filter(function(v){return v!==p.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,2);
+      var opts2 = [p.verb].concat(shuffled2).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"fillblank",question:blank,hint:ex.korean,options:opts2,answer:p.verb,verb:p.verb});
+
+      // Quiz 3: 한국어 → 영어 고르기
+      var ex2 = b.examples[Math.floor(Math.random()*b.examples.length)];
+      var wrongSentences = ["I have to go now.","She made a big mistake.","Can you take this?"];
+      var shuffled3 = wrongSentences.sort(function(){return Math.random()-0.5;}).slice(0,2);
+      var opts3 = [ex2.english].concat(shuffled3).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"translate",question:'"'+ex2.korean+'" 을 영어로?',options:opts3,answer:ex2.english,verb:b.verb});
+
+      return quizzes;
+    }
+
     // ── CLAUDE API (via server proxy) ──────────────────────────────
-    var aiRemaining = 3; // 하루 남은 횟수
+    var aiRemaining = 3;
 
     async function callClaude(system, user) {
       var res = await fetch("/api/claude", {
@@ -212,6 +295,25 @@
             </div>
           </div>
 
+          {(function(){
+            var xp=getXP();var lv=getLevel(xp);var progress=Math.min(100,((xp-lv.min)/(lv.max-lv.min))*100);
+            return (
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 16px",marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{background:C.accent+"20",color:C.accent,padding:"2px 8px",borderRadius:6,fontSize:12,fontWeight:800}}>Lv.{lv.level}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:C.text}}>{lv.name}</span>
+                  </div>
+                  <div style={{fontSize:12,color:C.accent,fontWeight:700}}>{xp} XP</div>
+                </div>
+                <div style={{height:6,background:C.border,borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:progress+"%",background:"linear-gradient(90deg,"+C.accent+","+C.blue+")",borderRadius:99,transition:"width 0.5s"}}/>
+                </div>
+                <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>{lv.max-xp} XP to Lv.{lv.level+1}</div>
+              </div>
+            );
+          })()}
+
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:10}}>{"오늘의 15분"}</div>
 
           {todayDone?(
@@ -267,9 +369,16 @@
 
     // ── LEARN ───────────────────────────────────────────────────────
     function LearnScreen(props) {
-      var lesson=props.lesson, loading=props.loading, onNext=props.onNext, aiAvailable=props.aiAvailable;
+      var lesson=props.lesson, loading=props.loading, onNext=props.onNext, aiAvailable=props.aiAvailable, onXP=props.onXP;
       var _s1=useState("basic"); var phase=_s1[0]; var setPhase=_s1[1];
       var _s2=useState(0); var step=_s2[0]; var setStep=_s2[1];
+      var _s3=useState(null); var quizzes=_s3[0]; var setQuizzes=_s3[1];
+      var _s4=useState(0); var quizIdx=_s4[0]; var setQuizIdx=_s4[1];
+      var _s5=useState(null); var selected=_s5[0]; var setSelected=_s5[1];
+      var _s6=useState(false); var answered=_s6[0]; var setAnswered=_s6[1];
+      var _s7=useState(0); var correctCount=_s7[0]; var setCorrectCount=_s7[1];
+      var _s8=useState(false); var quizDone=_s8[0]; var setQuizDone=_s8[1];
+      var _s9=useState(null); var xpPopup=_s9[0]; var setXpPopup=_s9[1];
 
       if (loading) return (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
@@ -282,13 +391,46 @@
       var current = phase==="basic" ? lesson.basic : lesson.phrasal;
       var color = phase==="basic" ? C.yellow : C.accent;
 
-      var goNext = function() {
-        if (step<2) { setStep(function(s){return s+1;}); return; }
-        if (phase==="basic") { setPhase("phrasal"); setStep(0); return; }
-        onNext();
+      var showXpGain = function(amount) {
+        setXpPopup("+"+amount+" XP");
+        setTimeout(function(){setXpPopup(null);},1200);
       };
 
-      var btnLabel = step<2 ? "다음 →" : phase==="basic" ? "구동사 학습하기 →" : (aiAvailable ? "✍️ 내 문장 쓰러 가기" : "🎉 오늘 학습 완료");
+      var goNext = function() {
+        if (step<2) {
+          setStep(function(s){return s+1;});
+          var r=addXP(5); showXpGain(5); if(onXP)onXP(r);
+          return;
+        }
+        if (phase==="basic") { setPhase("phrasal"); setStep(0); var r2=addXP(10); showXpGain(10); if(onXP)onXP(r2); return; }
+        // After phrasal done, start quiz
+        setQuizzes(generateQuiz(lesson)); setQuizIdx(0); setSelected(null); setAnswered(false); setCorrectCount(0); setQuizDone(false);
+        setStep(3); // quiz mode
+        var r3=addXP(10); showXpGain(10); if(onXP)onXP(r3);
+      };
+
+      var handleQuizAnswer = function(opt) {
+        if (answered) return;
+        setSelected(opt); setAnswered(true);
+        var isCorrect = opt === quizzes[quizIdx].answer;
+        if (isCorrect) {
+          setCorrectCount(function(c){return c+1;});
+          var r=addXP(15); showXpGain(15); if(onXP)onXP(r);
+        }
+      };
+
+      var nextQuiz = function() {
+        if (quizIdx < quizzes.length - 1) {
+          setQuizIdx(function(i){return i+1;}); setSelected(null); setAnswered(false);
+        } else {
+          setQuizDone(true);
+          var bonus = correctCount === quizzes.length ? 30 : 0;
+          if (bonus) { var r=addXP(bonus); showXpGain(bonus); if(onXP)onXP(r); showConfetti(); }
+          else { showConfetti(); }
+        }
+      };
+
+      var btnLabel = step<2 ? "다음 →" : phase==="basic" ? "구동사 학습하기 →" : "퀴즈 풀기 →";
 
       return (
         <div style={{padding:"24px 20px"}}>
@@ -302,7 +444,7 @@
           </div>
 
           <div style={{display:"flex",gap:5,marginBottom:24}}>
-            {["뜻","예문","패턴"].map(function(s,i){return(
+            {["뜻","예문","패턴","퀴즈"].map(function(s,i){return(
               <div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=step?color:C.border,transition:"background 0.3s"}}/>
             );})}
           </div>
@@ -364,9 +506,76 @@
             </div>
           )}
 
-          <button onClick={goNext} style={{width:"100%",background:color,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
-            {btnLabel}
-          </button>
+          {step===3&&quizzes&&!quizDone&&(
+            <div>
+              <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6}}>QUIZ</div>
+              <div style={{display:"flex",gap:5,marginBottom:16}}>
+                {quizzes.map(function(_,i){return(
+                  <div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=quizIdx?C.accent:C.border,transition:"background 0.3s"}}/>
+                );})}
+              </div>
+              <div style={{fontSize:18,fontWeight:800,marginBottom:6,lineHeight:1.4}}>{quizzes[quizIdx].question}</div>
+              {quizzes[quizIdx].hint&&<div style={{fontSize:13,color:C.muted,marginBottom:16}}>{quizzes[quizIdx].hint}</div>}
+              {quizzes[quizIdx].options.map(function(opt,i){
+                var isCorrect = opt===quizzes[quizIdx].answer;
+                var isSelected = opt===selected;
+                var bg = !answered?C.surface : isCorrect?C.accent+"20" : isSelected?C.red+"20":C.surface;
+                var border = !answered?C.border : isCorrect?C.accent+"60" : isSelected?C.red+"60":C.border;
+                var textColor = !answered?C.text : isCorrect?C.accent : isSelected?C.red:C.muted;
+                return (
+                  <div key={i} onClick={function(){handleQuizAnswer(opt);}}
+                    style={{background:bg,border:"1px solid "+border,borderRadius:12,padding:"14px 16px",marginBottom:8,cursor:answered?"default":"pointer",
+                      animation:answered&&isSelected&&!isCorrect?"wrongShake 0.4s":"none"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:15,fontWeight:600,color:textColor}}>{opt}</div>
+                      {answered&&isCorrect&&<span style={{color:C.accent,fontSize:16}}>{"✓"}</span>}
+                      {answered&&isSelected&&!isCorrect&&<span style={{color:C.red,fontSize:16}}>{"✗"}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+              {answered&&(
+                <button onClick={nextQuiz} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginTop:8}}>
+                  {quizIdx<quizzes.length-1?"다음 문제 →":"결과 보기 →"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {step===3&&quizDone&&(
+            <div style={{textAlign:"center",padding:"20px 0"}}>
+              <div style={{fontSize:64,marginBottom:12}}>{correctCount===quizzes.length?"🎉":"👏"}</div>
+              <div style={{fontSize:24,fontWeight:900,marginBottom:8}}>{correctCount}/{quizzes.length} 정답!</div>
+              <div style={{fontSize:14,color:C.muted,marginBottom:8}}>
+                {correctCount===quizzes.length?"퍼펙트! 보너스 +30 XP 🔥":"잘했어요! 다음엔 더 잘할 수 있어요"}
+              </div>
+              <div style={{display:"flex",justifyContent:"center",gap:12,marginBottom:24}}>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"10px 16px"}}>
+                  <div style={{fontSize:20,fontWeight:800,color:C.accent}}>{getXP()}</div>
+                  <div style={{fontSize:10,color:C.muted}}>Total XP</div>
+                </div>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"10px 16px"}}>
+                  <div style={{fontSize:20,fontWeight:800,color:C.yellow}}>Lv.{getLevel(getXP()).level}</div>
+                  <div style={{fontSize:10,color:C.muted}}>{getLevel(getXP()).name}</div>
+                </div>
+              </div>
+              <button onClick={onNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
+                {aiAvailable?"✍️ 내 문장 쓰러 가기":"🎉 오늘 학습 완료"}
+              </button>
+            </div>
+          )}
+
+          {step<3&&(
+            <button onClick={goNext} style={{width:"100%",background:color,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
+              {btnLabel}
+            </button>
+          )}
+
+          {xpPopup&&(
+            <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:C.accent,color:"#08090d",padding:"8px 20px",borderRadius:99,fontSize:16,fontWeight:800,animation:"xpPop 1.2s forwards",zIndex:100}}>
+              {xpPopup}
+            </div>
+          )}
         </div>
       );
     }
