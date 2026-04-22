@@ -17,6 +17,8 @@ function extractVideoId(url) {
   return null;
 }
 
+export const config = { maxDuration: 60 };
+
 export default async function handler(req, res) {
   const origin = req.headers["origin"] || req.headers["referer"] || "";
   const allowed = ALLOWED_ORIGINS.some((o) => origin.startsWith(o));
@@ -36,19 +38,26 @@ export default async function handler(req, res) {
   if (!videoId) return res.status(400).json({ error: "올바른 YouTube URL이 아니에요." });
 
   try {
-    // 1. YouTube 페이지 가져오기
+    // 1. YouTube 페이지 가져오기 (oembed로 제목, 본문에서 자막)
+    let title = "";
+    try {
+      const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      if (oembedRes.ok) { const od = await oembedRes.json(); title = od.title || ""; }
+    } catch {}
+
     const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept": "text/html,application/xhtml+xml"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+        "Accept": "text/html"
       }
     });
     const html = await pageRes.text();
 
-    // 영상 제목
-    const titleMatch = html.match(/<title>(.*?)<\/title>/);
-    let title = titleMatch ? titleMatch[1].replace(" - YouTube", "").trim() : "";
+    if (!title) {
+      const titleMatch = html.match(/<title>(.*?)<\/title>/);
+      if (titleMatch) title = titleMatch[1].replace(" - YouTube", "").trim();
+    }
 
     // captionTracks 추출
     let tracks = null;
