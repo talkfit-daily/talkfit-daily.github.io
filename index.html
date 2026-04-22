@@ -1907,8 +1907,9 @@
       var lessons = props.lessons;
       var speakHistory = props.speakHistory;
       var todayKey = new Date().toISOString().slice(0,10);
+      var _revealed = useState({}); var revealed = _revealed[0]; var setRevealed = _revealed[1];
+      var toggleReveal = function(key){setRevealed(function(r){var n={};for(var k in r)n[k]=r[k];n[key]=!n[key];return n;});};
 
-      // 오늘 학습한 동사
       var todayVerbs = [];
       if (lessons) {
         for (var li=0;li<lessons.length;li++) {
@@ -1916,10 +1917,7 @@
           if (lessons[li].phrasal) todayVerbs.push(lessons[li].phrasal);
         }
       }
-
-      // 오늘 회화 분석 기록
       var todaySpeak = (speakHistory||[]).filter(function(s){return s.date===todayKey;});
-
       var hasContent = todayVerbs.length > 0 || todaySpeak.length > 0;
 
       if (!hasContent) return (
@@ -1933,28 +1931,57 @@
       return (
         <div style={{padding:"24px 20px"}}>
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>REVIEW</div>
-          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>오늘의 복습</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>오늘의 복습</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:20}}>카드를 탭하면 답이 보여요</div>
 
           {todayVerbs.length>0&&(
             <div style={{marginBottom:24}}>
-              <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:12,fontWeight:700}}>오늘 배운 동사</div>
-              {todayVerbs.map(function(v,i){return(
-                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <div style={{fontSize:20,fontWeight:900,color:i%2===0?C.yellow:C.accent}}>{v.verb}</div>
-                    <div style={{fontSize:11,color:C.muted,background:i%2===0?C.yellowDim:C.accentDim,padding:"2px 8px",borderRadius:6}}>{i%2===0?"기본":"구동사"}</div>
-                  </div>
-                  <div style={{fontSize:14,color:C.text,marginBottom:4}}>{v.meaning_ko}</div>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:10}}>{v.meaning_en}</div>
-                  {v.examples&&v.examples.map(function(ex,ei){return(
-                    <div key={ei} style={{background:C.bg,borderRadius:8,padding:"10px 12px",marginBottom:6}}>
-                      <div style={{fontSize:13,color:C.text,fontWeight:600}}>{ex.en}</div>
-                      <div style={{fontSize:12,color:C.muted,marginTop:2}}>{ex.ko}</div>
+              <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:12,fontWeight:700}}>{"🔤 동사 플래시카드"}</div>
+              {todayVerbs.map(function(v,i){
+                var vKey = "v"+i;
+                var isOpen = revealed[vKey];
+                var color = i%2===0?C.yellow:C.accent;
+                return(
+                <div key={i} onClick={function(){toggleReveal(vKey);}} style={{background:C.surface,border:"1px solid "+(isOpen?color+"60":C.border),borderRadius:16,padding:20,marginBottom:12,cursor:"pointer",transition:"border 0.2s"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                    <div style={{fontSize:24,fontWeight:900,color:color}}>{v.verb}</div>
+                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <div style={{fontSize:10,color:C.muted,background:i%2===0?C.yellowDim:C.accentDim,padding:"2px 8px",borderRadius:6}}>{i%2===0?"기본":"구동사"}</div>
+                      <div style={{fontSize:16,color:C.muted}}>{isOpen?"▲":"▼"}</div>
                     </div>
-                  );})}
-                  {v.good_example&&(
-                    <div style={{background:C.bg,borderRadius:8,padding:"10px 12px",marginBottom:6}}>
-                      <div style={{fontSize:13,color:C.accent,fontWeight:600}}>{v.good_example}</div>
+                  </div>
+
+                  {!isOpen?(
+                    <div>
+                      <div style={{fontSize:15,color:C.text,fontWeight:600,marginBottom:4}}>뜻이 뭐였지?</div>
+                      <div style={{fontSize:12,color:C.muted}}>탭해서 확인</div>
+                    </div>
+                  ):(
+                    <div>
+                      <div style={{fontSize:15,color:C.text,fontWeight:600,marginBottom:2}}>{v.meaning_ko}</div>
+                      <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{v.meaning_en}</div>
+
+                      {v.examples&&v.examples.map(function(ex,ei){return(
+                        <div key={ei} style={{background:color+"10",border:"1px solid "+color+"20",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                          <div style={{fontSize:14,color:C.text,fontWeight:600,marginBottom:3}}>{ex.en}</div>
+                          <div style={{fontSize:12,color:C.muted}}>{ex.ko}</div>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(ex.en);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                        </div>
+                      );})}
+
+                      {v.good_example&&(
+                        <div style={{background:color+"10",border:"1px solid "+color+"30",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                          <div style={{fontSize:11,color:color,letterSpacing:1,marginBottom:4,fontWeight:700}}>REAL EXAMPLE</div>
+                          <div style={{fontSize:14,color:C.text,fontWeight:600}}>{v.good_example}</div>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(v.good_example);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                        </div>
+                      )}
+
+                      {v.practice_hint&&(
+                        <div style={{fontSize:12,color:C.muted,marginTop:8,padding:"10px 12px",background:C.bg,borderRadius:8}}>
+                          {"💡 "}{v.practice_hint}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1964,21 +1991,46 @@
 
           {todaySpeak.length>0&&(
             <div>
-              <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:12,fontWeight:700}}>오늘 회화 분석</div>
-              {todaySpeak.map(function(sp,i){return(
-                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:10}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:8}}>{sp.scenario}</div>
-                  {sp.turns&&sp.turns.map(function(t,ti){return(
-                    <div key={ti} style={{marginBottom:8}}>
-                      <div style={{fontSize:12,color:C.muted}}>{t.korean}</div>
-                      <div style={{fontSize:13,color:C.accent,fontWeight:600}}>→ {t.english}</div>
-                    </div>
-                  );})}
-                  {sp.key_verbs&&(
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
-                      {sp.key_verbs.map(function(kv,ki){return(
-                        <span key={ki} style={{background:C.accentDim,color:C.accent,padding:"4px 8px",borderRadius:6,fontSize:11,fontWeight:700}}>{kv.verb}</span>
+              <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:12,fontWeight:700}}>{"💬 회화 복습"}</div>
+              {todaySpeak.map(function(sp,i){
+                var sKey = "s"+i;
+                var isOpen = revealed[sKey];
+                return(
+                <div key={i} style={{background:C.surface,border:"1px solid "+(isOpen?C.accent+"60":C.border),borderRadius:16,padding:16,marginBottom:12}}>
+                  <div onClick={function(){toggleReveal(sKey);}} style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:isOpen?12:0}}>
+                    <div style={{fontSize:14,fontWeight:600,color:C.text}}>{sp.scenario}</div>
+                    <div style={{fontSize:16,color:C.muted}}>{isOpen?"▲":"▼"}</div>
+                  </div>
+
+                  {isOpen&&(
+                    <div>
+                      {sp.turns&&sp.turns.map(function(t,ti){return(
+                        <div key={ti} style={{background:C.accentDim,border:"1px solid "+C.accent+"20",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                          <div style={{fontSize:12,color:C.muted,marginBottom:4}}>{t.korean}</div>
+                          <div style={{fontSize:14,color:C.accent,fontWeight:700}}>→ {t.english}</div>
+                          {t.verbs_used&&(
+                            <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:6}}>
+                              {t.verbs_used.map(function(vu,vi){return(
+                                <span key={vi} style={{background:C.accent+"20",color:C.accent,padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:700}}>{vu.verb}: {vu.usage}</span>
+                              );})}
+                            </div>
+                          )}
+                          <button onClick={function(){speakEnglish(t.english);}} style={{marginTop:6,background:"none",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                        </div>
                       );})}
+                      {sp.key_verbs&&(
+                        <div style={{marginTop:4}}>
+                          <div style={{fontSize:10,color:C.muted,letterSpacing:1,marginBottom:6}}>KEY VERBS</div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                            {sp.key_verbs.map(function(kv,ki){return(
+                              <div key={ki} style={{background:C.accent+"15",border:"1px solid "+C.accent+"30",padding:"6px 10px",borderRadius:8}}>
+                                <div style={{fontSize:13,fontWeight:800,color:C.accent}}>{kv.verb}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{kv.meaning}</div>
+                              </div>
+                            );})}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

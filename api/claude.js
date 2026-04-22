@@ -8,7 +8,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
 ];
 
-const DAILY_LIMIT = 30;
+const DAILY_LIMIT = 100;
 const MAX_SYSTEM_LEN = 2000;
 const MAX_USER_LEN = 2000;
 
