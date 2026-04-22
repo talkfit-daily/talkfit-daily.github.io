@@ -174,7 +174,7 @@
           var word = part.slice(2, -2);
           var isPhrasal = word.indexOf(" ") !== -1;
           var vc = isPhrasal ? C.accent : C.yellow;
-          return React.createElement("span", {key: i, style: {color: "#08090d", background: vc, padding: "1px 5px", borderRadius: 4, fontWeight: 800}}, word);
+          return React.createElement("span", {key: i, style: {color: vc, fontWeight: 800, borderBottom: "2px solid " + vc}}, word);
         }
         return part;
       });
