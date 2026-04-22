@@ -307,7 +307,10 @@
     }
 
     // ── CLAUDE API (via server proxy) ──────────────────────────────
-    var aiRemaining = 3;
+    var aiRemaining = 30;
+    var aiRemainingListeners = [];
+    function onAiRemainingChange(fn) { aiRemainingListeners.push(fn); }
+    function setAiRemaining(v) { aiRemaining = v; aiRemainingListeners.forEach(function(fn){fn(v);}); }
 
     async function callClaude(system, user) {
       var res = await fetch("/api/claude", {
@@ -317,10 +320,10 @@
       });
       var data = await res.json();
       if (!res.ok) {
-        if (data.remaining !== undefined) aiRemaining = data.remaining;
+        if (data.remaining !== undefined) setAiRemaining(data.remaining);
         throw new Error(data.error || "AI 오류");
       }
-      if (data.remaining !== undefined) aiRemaining = data.remaining;
+      if (data.remaining !== undefined) setAiRemaining(data.remaining);
       return data.text || "";
     }
 
@@ -1834,6 +1837,9 @@
       var _authState = useState(null); var user = _authState[0]; var setUser = _authState[1];
       var _authLoading = useState(true); var authLoading = _authLoading[0]; var setAuthLoading = _authLoading[1];
       var _loginLoading = useState(false); var loginLoading = _loginLoading[0]; var setLoginLoading = _loginLoading[1];
+      var _aiLeft = useState(aiRemaining); var aiLeft = _aiLeft[0]; var setAiLeft = _aiLeft[1];
+
+      useEffect(function(){ onAiRemainingChange(setAiLeft); }, []);
 
       var isAdmin = false;
       try { isAdmin = new URLSearchParams(window.location.search).get("admin") === ADMIN_KEY; } catch(e){}
@@ -1968,6 +1974,7 @@
             {screen==="home"&&user&&(
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
+                <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft+"/30"}</div>
                 <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
                 {user.photoURL && <img src={user.photoURL} style={{width:24,height:24,borderRadius:"50%",cursor:"pointer"}} onClick={function(){if(confirm("로그아웃 하시겠어요?"))signOutUser();}} title="로그아웃" referrerPolicy="no-referrer"/>}
               </div>
