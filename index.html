@@ -1252,7 +1252,7 @@
         if (!filled.length) return;
         setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[tabId]=true; return n;});
         var v = lessons[tab.lessonIdx][tab.type];
-        var system = 'You are an American English tutor. Return ONLY valid JSON:\n{"overall":"전체 피드백(한국어,2문장)","corrections":[{"original":"...","corrected":"...","explanation":"왜(한국어)","more_natural":"더 자연스럽게(optional)"}],"bonus":"미국인이 쓸 법한 추가 문장(영어)"}';
+        var system = 'You are a strict but encouraging American English tutor.\n\nJudge if the student\'s sentences correctly use the given verb. Be strict:\n- If the sentence is gibberish, random letters, or doesn\'t make sense → verdict: "retry"\n- If the verb is not used or used completely wrong → verdict: "retry"\n- If the sentence has errors but shows effort and uses the verb → verdict: "pass"\n- If the sentence is good → verdict: "pass"\n\nReturn ONLY valid JSON:\n{"verdict":"pass or retry","overall":"전체 피드백(한국어,2문장). retry면 왜 다시 써야하는지 설명","corrections":[{"original":"...","corrected":"...","explanation":"왜(한국어)","more_natural":"더 자연스럽게(optional)"}],"bonus":"미국인이 쓸 법한 추가 문장(영어, pass일때만)"}';
         callClaude(system, 'Verb: "'+v.verb+'" ('+v.meaning_ko+')\nSentences:\n'+filled.map(function(s,i){return (i+1)+". "+s;}).join("\n"))
         .then(function(raw){
           var pJson = raw;
@@ -1350,13 +1350,20 @@
                   {c.more_natural&&<div style={{marginTop:8,padding:"8px 10px",background:C.blueDim,borderRadius:8,fontSize:12,color:C.blue}}>{"💡 "}{c.more_natural}</div>}
                 </div>
               );})}
-              {fb.bonus&&(
+              {fb.bonus&&fb.verdict!=="retry"&&(
                 <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:12,padding:14,marginBottom:16}}>
                   <div style={{fontSize:11,color:C.orange,letterSpacing:2,marginBottom:6}}>BONUS</div>
                   <div style={{fontSize:14,color:C.text,fontStyle:"italic"}}>"{fb.bonus}"</div>
                 </div>
               )}
-              {!allDone?(
+              {fb.verdict==="retry"?(
+                <button onClick={function(){
+                  setFeedback(function(f){var n={};for(var k in f)n[k]=f[k];n[activeVerbId]=null;return n;});
+                  setSentences(function(s){var n={};for(var k in s)n[k]=[].concat(s[k]);n[activeVerbId]=["",""];return n;});
+                }} style={{width:"100%",background:C.red,color:"white",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
+                  {"다시 쓰기 ✏️"}
+                </button>
+              ):!allDone?(
                 <button onClick={function(){var next=findNextTab();if(next)setActiveVerbId(next);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
                   다음 동사 문장 쓰기 →
                 </button>
