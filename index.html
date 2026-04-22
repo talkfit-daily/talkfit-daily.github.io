@@ -36,35 +36,22 @@
       try { localStorage.setItem("tf_"+key, JSON.stringify(val)); } catch {}
     }
 
-    // ── API KEY ─────────────────────────────────────────────────────
-    function getApiKey() { return localStorage.getItem("tf_api_key") || ""; }
-    function setApiKey(k) { localStorage.setItem("tf_api_key", k); }
-    function clearApiKey() { localStorage.removeItem("tf_api_key"); }
+    // ── CLAUDE API (via server proxy) ──────────────────────────────
+    var aiRemaining = 3; // 하루 남은 횟수
 
     async function callClaude(system, user) {
-      const key = getApiKey();
-      if (!key) throw new Error("API 키가 없습니다");
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      var res = await fetch("/api/claude", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": key,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1200,
-          system,
-          messages: [{ role: "user", content: user }],
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ system: system, user: user }),
       });
+      var data = await res.json();
       if (!res.ok) {
-        const err = await res.json().catch(function(){return {};});
-        throw new Error(err.error?.message || "API error " + res.status);
+        if (data.remaining !== undefined) aiRemaining = data.remaining;
+        throw new Error(data.error || "AI 오류");
       }
-      const data = await res.json();
-      return data.content?.[0]?.text || "";
+      if (data.remaining !== undefined) aiRemaining = data.remaining;
+      return data.text || "";
     }
 
     // ── ANALYTICS ───────────────────────────────────────────────────
@@ -174,66 +161,6 @@
       text:"#e8eaf0",muted:"#4a5068",
     };
 
-    // ── API KEY SCREEN ──────────────────────────────────────────────
-    function ApiKeyScreen(props) {
-      var onSave = props.onSave, onSkip = props.onSkip;
-      var _s1 = useState(""); var key = _s1[0]; var setKey = _s1[1];
-      var _s2 = useState(false); var testing = _s2[0]; var setTesting = _s2[1];
-      var _s3 = useState(""); var error = _s3[0]; var setError = _s3[1];
-
-      var testAndSave = function() {
-        if (!key.trim()) return;
-        setTesting(true); setError("");
-        fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": key.trim(),
-            "anthropic-version": "2023-06-01",
-            "anthropic-dangerous-direct-browser-access": "true",
-          },
-          body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:10,messages:[{role:"user",content:"hi"}]}),
-        }).then(function(res) {
-          if (res.ok) { setApiKey(key.trim()); setTesting(false); onSave(); }
-          else { return res.json().then(function(d){setError(d.error?.message||"API 키가 유효하지 않아요.");setTesting(false);}).catch(function(){setError("API 키가 유효하지 않아요.");setTesting(false);}); }
-        }).catch(function(e) { setError("연결 실패: "+e.message); setTesting(false); });
-      };
-
-      return React.createElement("div", {style:{padding:"40px 20px",textAlign:"center"}},
-        React.createElement("div", {style:{fontSize:48,marginBottom:16}}, "\uD83D\uDD11"),
-        React.createElement("div", {style:{fontSize:22,fontWeight:800,marginBottom:8}}, "AI 기능 연결"),
-        React.createElement("div", {style:{fontSize:13,color:C.muted,lineHeight:1.7,marginBottom:24}},
-          "문장 교정, 회화 코치 기능을 쓰려면", React.createElement("br"), "본인의 Claude API 키가 필요해요."),
-        React.createElement("div", {style:{textAlign:"left",marginBottom:20}},
-          React.createElement("div", {style:{fontSize:12,color:C.muted,marginBottom:6}}, "Claude API Key"),
-          React.createElement("input", {
-            type:"password", value:key, onChange:function(e){setKey(e.target.value);},
-            placeholder:"sk-ant-api03-...",
-            onKeyDown:function(e){if(e.key==="Enter")testAndSave();},
-            style:{width:"100%",background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"14px 16px",color:C.text,fontSize:14,outline:"none"}
-          }),
-          error ? React.createElement("div", {style:{fontSize:12,color:C.red,marginTop:8}}, error) : null
-        ),
-        React.createElement("button", {
-          onClick:testAndSave, disabled:testing||!key.trim(),
-          style:{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",opacity:testing?0.6:1,marginBottom:12}
-        }, testing ? "연결 확인 중..." : "연결하기"),
-        React.createElement("button", {
-          onClick:onSkip,
-          style:{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",textDecoration:"underline"}
-        }, "체험 모드로 먼저 볼게요"),
-        React.createElement("div", {style:{marginTop:24,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,textAlign:"left"}},
-          React.createElement("div", {style:{fontSize:12,color:C.accent,fontWeight:700,marginBottom:8}}, "API 키 받는 법"),
-          React.createElement("ol", {style:{fontSize:12,color:C.muted,lineHeight:1.8,paddingLeft:16}},
-            React.createElement("li", null, "console.anthropic.com 가입"),
-            React.createElement("li", null, "Settings > API Keys 에서 키 생성"),
-            React.createElement("li", null, "위에 붙여넣기")
-          ),
-          React.createElement("div", {style:{fontSize:11,color:C.muted,marginTop:8,opacity:0.7}},
-            "키는 이 기기의 브라우저에만 저장돼요. 서버로 전송되지 않습니다.")
-        )
-      );
-    }
 
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
@@ -255,16 +182,6 @@
           <div style={{fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4}}>{greeting.t}</div>
           <div style={{fontSize:14,color:C.muted,marginBottom:20}}>{greeting.s}</div>
 
-          {!aiAvailable && (
-            <div style={{background:C.blueDim,border:"1px solid "+C.blue+"40",borderRadius:12,padding:"14px 16px",marginBottom:20}}>
-              <div style={{fontSize:12,color:C.blue,lineHeight:1.6,marginBottom:12}}>
-                {"👀 "}<b>체험 모드</b>{"예요. 샘플 레슨부터 둘러보시고, AI 피드백 기능을 쓰시려면 API 키를 연결해주세요."}
-              </div>
-              <button onClick={onEnableAI} style={{width:"100%",background:C.blue,color:"#08090d",border:"none",borderRadius:10,padding:"10px 14px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
-                {"🔑 API 키 연결하기"}
-              </button>
-            </div>
-          )}
 
           <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"30",borderRadius:16,padding:20,marginBottom:16}}>
             <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6}}>STREAK</div>
@@ -318,11 +235,6 @@
             );})}
           </div>
 
-          {aiAvailable && (
-            <button onClick={function(){clearApiKey();location.reload();}} style={{marginTop:16,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer",opacity:0.5}}>
-              API 키 초기화
-            </button>
-          )}
 
           <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid "+C.border,textAlign:"center"}}>
             <div style={{fontSize:10,color:C.muted,opacity:0.6}}>{CREATOR_NAME} · beta v0.1</div>
@@ -446,20 +358,6 @@
       var _s4=useState({basic:false,phrasal:false}); var isLoading=_s4[0]; var setIsLoading=_s4[1];
       var _s5=useState(false); var done=_s5[0]; var setDone=_s5[1];
 
-      if (!aiAvailable) {
-        return (
-          <div style={{padding:"40px 20px",textAlign:"center"}}>
-            <div style={{fontSize:48,marginBottom:16}}>{"🔒"}</div>
-            <div style={{fontSize:20,fontWeight:800,marginBottom:8}}>문장 피드백은 API 키 연결 후</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.7,marginBottom:24}}>
-              직접 쓴 문장을 미국인이 쓰는 자연스러운 표현으로<br/>AI가 실시간 교정해줘요.
-            </div>
-            <button onClick={onComplete} style={{background:"none",border:"none",color:C.muted,fontSize:13,marginTop:16,cursor:"pointer",textDecoration:"underline"}}>
-              오늘은 여기까지, 내일 봐요 →
-            </button>
-          </div>
-        );
-      }
 
       var color = activeVerb==="basic"?C.yellow:C.accent;
       var current = activeVerb==="basic"?lesson.basic:lesson.phrasal;
@@ -575,17 +473,6 @@
       var _s1=useState("solo"); var subMode=_s1[0]; var setSubMode=_s1[1];
       var supported = typeof window!=="undefined"&&("webkitSpeechRecognition" in window||"SpeechRecognition" in window);
 
-      if (!aiAvailable) {
-        return (
-          <div style={{padding:"40px 20px",textAlign:"center"}}>
-            <div style={{fontSize:48,marginBottom:16}}>{"🔒"}</div>
-            <div style={{fontSize:20,fontWeight:800,marginBottom:8}}>회화 코치는 API 키 연결 후</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>
-              {"친구와 나눈 한국어 대화를 미국인이 실제 쓰는"}<br/>{"자연스러운 영어로 턴별로 바꿔드려요."}
-            </div>
-          </div>
-        );
-      }
 
       if (!supported) return (
         <div style={{padding:40,textAlign:"center",color:C.muted}}>
@@ -791,8 +678,7 @@
       var _s6=useState(false); var loading=_s6[0]; var setLoading=_s6[1];
       var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
       var _s8=useState([]); var verbHistory=_s8[0]; var setVerbHistory=_s8[1];
-      var _s9=useState(!!getApiKey()); var aiAvailable=_s9[0]; var setAiAvailable=_s9[1];
-      var _s10=useState(false); var showApiScreen=_s10[0]; var setShowApiScreen=_s10[1];
+      var aiAvailable = true; // AI 항상 활성화 (서버에서 횟수 제한)
 
       var isAdmin = false;
       try { isAdmin = new URLSearchParams(window.location.search).get("admin") === ADMIN_KEY; } catch(e){}
@@ -833,17 +719,6 @@
         setScreen("home"); setTab("home");
       };
 
-      if (showApiScreen) {
-        return (
-          <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg}}>
-            <ApiKeyScreen
-              onSave={function(){setAiAvailable(true);setShowApiScreen(false);}}
-              onSkip={function(){setShowApiScreen(false);}}
-            />
-          </div>
-        );
-      }
-
       var TABS = [
         {id:"home",icon:"🏠",label:"홈"},
         {id:"speak",icon:"🎙️",label:"회화"},
@@ -867,7 +742,7 @@
           </div>
 
           <div style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lesson={lesson} onStart={handleStart} aiAvailable={aiAvailable} onEnableAI={function(){setShowApiScreen(true);}}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lesson={lesson} onStart={handleStart} aiAvailable={aiAvailable} onEnableAI={function(){}}/>}
             {screen==="learn"&&<LearnScreen lesson={lesson} loading={loading} onNext={function(){setScreen("practice");}} aiAvailable={aiAvailable}/>}
             {screen==="practice"&&<PracticeScreen lesson={lesson} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
             {screen==="history"&&<HistoryScreen history={verbHistory}/>}
