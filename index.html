@@ -2083,22 +2083,24 @@
                   if(!t.english||!t.korean) return;
                   var eng = (t.english||"").replace(/\*\*/g,"");
                   var kor = t.korean;
-                  // 빈칸 채우기: 동사 부분을 ___로
-                  if(t.verbs_used&&t.verbs_used.length>0){
-                    var verb = t.verbs_used[0];
-                    var blank = eng.replace(new RegExp("\\b"+verb.verb.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i"),"_____");
-                    if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
-                  }
-                  // 한→영: 짧으면 입력, 길면 순서 맞추기
-                  if(eng.split(" ").length<=6){
-                    allQuestions.push({type:"translate",korean:kor,answer:eng});
-                  } else {
+                  var wordCount = eng.split(" ").length;
+                  if(wordCount<=8){
+                    // 짧은 문장: 순서 맞추기 (한국어 보고 영어 단어 배치)
                     var words = eng.split(" ");
                     var shuffled = [].concat(words);
                     for(var si=shuffled.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var tmp=shuffled[si];shuffled[si]=shuffled[sj];shuffled[sj]=tmp;}
                     allQuestions.push({type:"order",korean:kor,words:shuffled,answer:eng});
+                  } else if(t.verbs_used&&t.verbs_used.length>0){
+                    // 긴 문장: 빈칸 채우기
+                    var verb = t.verbs_used[0];
+                    var blank = eng.replace(new RegExp("\\b"+verb.verb.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i"),"_____");
+                    if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
                   }
                 });
+                // 빈칸 2개 + 순서 2개로 제한, 짧은 문장 우선
+                var fills = allQuestions.filter(function(q){return q.type==="fill";}).slice(0,2);
+                var orders = allQuestions.filter(function(q){return q.type==="order";}).sort(function(a,b){return a.words.length-b.words.length;}).slice(0,2);
+                allQuestions = fills.concat(orders);
                 if(allQuestions.length===0) return null;
                 var q = allQuestions[practiceIdx%allQuestions.length];
                 var isLast = practiceIdx>=allQuestions.length-1;
