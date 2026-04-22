@@ -167,12 +167,17 @@
 
     // ── TTS HELPER ─────────────────────────────────────────────────
     // **verb** 마크다운을 하이라이트로 변환하는 공용 함수
-    function renderHighlight(text) {
-      if (!text || text.indexOf("**") === -1) return text;
+    function renderHighlight(text, verbsUsed) {
+      if (!text) return text;
+      // ** 없으면 그대로
+      if (text.indexOf("**") === -1) return text;
+      // verbs_used에서 type 정보 가져오기
+      var phrasalList = (verbsUsed||[]).filter(function(v){return v.type==="phrasal"||v.verb.indexOf(" ")!==-1;}).map(function(v){return v.verb.toLowerCase();});
       return text.split(/(\*\*[^*]+\*\*)/).map(function(part, i) {
         if (part.startsWith("**") && part.endsWith("**")) {
           var word = part.slice(2, -2);
-          var isPhrasal = word.indexOf(" ") !== -1;
+          // 구동사 판별: type=phrasal이거나, 공백 포함이거나, phrasalList에 포함
+          var isPhrasal = word.indexOf(" ") !== -1 || phrasalList.some(function(p){return p.indexOf(word.toLowerCase())!==-1 || word.toLowerCase().indexOf(p)!==-1;});
           var vc = isPhrasal ? C.accent : C.yellow;
           return React.createElement("span", {key: i, style: {color: vc, fontWeight: 800}}, word);
         }
@@ -1976,8 +1981,8 @@
                       </div>
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
-                      <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{renderHighlight(t.korean)}"</div>
-                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{renderHighlight(t.english)}</div>
+                      <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{renderHighlight(t.korean,t.verbs_used)}"</div>
+                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{renderHighlight(t.english,t.verbs_used)}</div>
                       {t.verbs_used?.length>0&&(
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {t.verbs_used.map(function(v,j){
@@ -2176,8 +2181,8 @@
                     <div>
                       {sp.turns&&sp.turns.map(function(t,ti){return(
                         <div key={ti} style={{background:C.accentDim,border:"1px solid "+C.accent+"20",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-                          <div style={{fontSize:12,color:C.muted,marginBottom:4}}>{renderHighlight(t.korean)}</div>
-                          <div style={{fontSize:14,color:C.text,fontWeight:700}}>→ {renderHighlight(t.english)}</div>
+                          <div style={{fontSize:12,color:C.muted,marginBottom:4}}>{renderHighlight(t.korean,t.verbs_used)}</div>
+                          <div style={{fontSize:14,color:C.text,fontWeight:700}}>→ {renderHighlight(t.english,t.verbs_used)}</div>
                           {t.verbs_used&&(
                             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:6}}>
                               {t.verbs_used.map(function(vu,vi){return(
