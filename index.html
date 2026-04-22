@@ -66,7 +66,6 @@
     function signInWithGoogle() {
       var provider = new firebase.auth.GoogleAuthProvider();
       return fbAuth.signInWithPopup(provider).catch(function(e) {
-        // 팝업 차단 시 redirect로 폴백
         if (e.code === "auth/popup-blocked" || e.code === "auth/popup-closed-by-user") {
           return fbAuth.signInWithRedirect(provider);
         }
@@ -87,11 +86,9 @@
     function saveLocal(key, val) {
       try { localStorage.setItem("tf_"+key, JSON.stringify(val)); } catch {}
     }
-    // Keep backward-compatible aliases for non-auth code
     function load(key) { return loadLocal(key); }
     function save(key, val) { saveLocal(key, val); }
 
-    // Firestore functions for logged-in users
     async function loadCloud(userId, key) {
       try {
         var doc = await fbDb.collection("users").doc(userId).collection("data").doc(key).get();
@@ -152,32 +149,143 @@
       setTimeout(function(){container.remove();},4000);
     }
 
-    // ── QUIZ GENERATOR ─────────────────────────────────────────────
-    function generateQuiz(lesson) {
+    // ── TTS HELPER ─────────────────────────────────────────────────
+    function speakEnglish(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "en-US";
+      u.rate = 0.9;
+      window.speechSynthesis.speak(u);
+    }
+
+    // ── WEAK VERBS ─────────────────────────────────────────────────
+    function getWeakVerbs() {
+      return load("weak_verbs") || [];
+    }
+    function addWeakVerb(verb) {
+      var list = getWeakVerbs();
+      if (list.indexOf(verb) === -1) {
+        list.push(verb);
+        save("weak_verbs", list);
+      }
+    }
+    function removeWeakVerb(verb) {
+      var list = getWeakVerbs();
+      var idx = list.indexOf(verb);
+      if (idx !== -1) {
+        list.splice(idx, 1);
+        save("weak_verbs", list);
+      }
+    }
+
+    // ── QUIZ GENERATOR (expanded: 6-8 questions, multiple types) ──
+    function generateQuiz(lessons) {
+      // lessons is an array of 2 lesson sets
       var quizzes = [];
-      // Quiz 1: 기본동사 의미 고르기
-      var b = lesson.basic;
-      var wrongMeanings = ["참다","던지다","끌다","닫다","열다","세다","울다","웃다"];
-      var shuffled = wrongMeanings.sort(function(){return Math.random()-0.5;}).slice(0,2);
-      var correctMeaning = b.meaning_ko.split(",")[0].trim();
-      var opts1 = [correctMeaning].concat(shuffled).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"meaning",question:'"'+b.verb+'" 의 뜻은?',options:opts1,answer:correctMeaning,verb:b.verb});
+      var allVerbs = [];
+      var allExamples = [];
 
-      // Quiz 2: 구동사 문장 완성
-      var p = lesson.phrasal;
-      var ex = p.examples[0];
-      var blank = ex.english.replace(new RegExp(p.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
-      var wrongVerbs = ["give up","break down","show off","bring up","take over","call off"];
-      var shuffled2 = wrongVerbs.filter(function(v){return v!==p.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,2);
-      var opts2 = [p.verb].concat(shuffled2).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"fillblank",question:blank,hint:ex.korean,options:opts2,answer:p.verb,verb:p.verb});
+      for (var li = 0; li < lessons.length; li++) {
+        var lesson = lessons[li];
+        allVerbs.push({verb: lesson.basic.verb, meaning: lesson.basic.meaning_ko, type: "basic", lessonIdx: li});
+        allVerbs.push({verb: lesson.phrasal.verb, meaning: lesson.phrasal.meaning_ko, type: "phrasal", lessonIdx: li});
+        for (var ei = 0; ei < lesson.basic.examples.length; ei++) {
+          allExamples.push({ex: lesson.basic.examples[ei], verb: lesson.basic.verb, meaning: lesson.basic.meaning_ko});
+        }
+        for (var pi = 0; pi < lesson.phrasal.examples.length; pi++) {
+          allExamples.push({ex: lesson.phrasal.examples[pi], verb: lesson.phrasal.verb, meaning: lesson.phrasal.meaning_ko});
+        }
+      }
 
-      // Quiz 3: 한국어 → 영어 고르기
-      var ex2 = b.examples[Math.floor(Math.random()*b.examples.length)];
-      var wrongSentences = ["I have to go now.","She made a big mistake.","Can you take this?"];
-      var shuffled3 = wrongSentences.sort(function(){return Math.random()-0.5;}).slice(0,2);
-      var opts3 = [ex2.english].concat(shuffled3).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"translate",question:'"'+ex2.korean+'" 을 영어로?',options:opts3,answer:ex2.english,verb:b.verb});
+      var wrongMeanings = ["참다","던지다","끌다","닫다","열다","세다","울다","웃다","쉬다","놀다","밀다","빌리다"];
+      var wrongVerbs = ["give up","break down","show off","bring up","take over","call off","hang out","figure out","end up","carry on"];
+      var wrongSentences = ["I have to go now.","She made a big mistake.","Can you take this?","Let me think about it.","He ran into some trouble.","We should call it a day."];
+
+      // Q1: meaning quiz for lesson1 basic
+      var b1 = lessons[0].basic;
+      var correctM1 = b1.meaning_ko.split(",")[0].trim();
+      var opts1 = [correctM1].concat(wrongMeanings.filter(function(w){return w!==correctM1;}).sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"meaning", question:'"'+b1.verb+'" 의 뜻은?', options:opts1, answer:correctM1, verb:b1.verb});
+
+      // Q2: fill-blank for lesson1 phrasal
+      var p1 = lessons[0].phrasal;
+      var ex1 = p1.examples[0];
+      var blank1 = ex1.english.replace(new RegExp(p1.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
+      var wrongV1 = wrongVerbs.filter(function(v){return v!==p1.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
+      var opts2 = [p1.verb].concat(wrongV1).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"fillblank", question:blank1, hint:ex1.korean, options:opts2, answer:p1.verb, verb:p1.verb});
+
+      // Q3: listening quiz - TTS plays English, pick Korean meaning
+      var listenEx = allExamples[Math.floor(Math.random() * allExamples.length)];
+      var wrongKorean = allExamples.filter(function(e){return e.ex.korean !== listenEx.ex.korean;}).map(function(e){return e.ex.korean;});
+      // Add some generic wrong Korean options
+      var extraWrong = ["오늘 일찍 퇴근해야 해","그건 좀 어려울 것 같아","나 어제 많이 먹었어"];
+      wrongKorean = wrongKorean.concat(extraWrong);
+      var uniqueWrong = [];
+      for (var wi = 0; wi < wrongKorean.length; wi++) {
+        if (uniqueWrong.indexOf(wrongKorean[wi]) === -1 && wrongKorean[wi] !== listenEx.ex.korean) {
+          uniqueWrong.push(wrongKorean[wi]);
+        }
+      }
+      var listenOpts = [listenEx.ex.korean].concat(uniqueWrong.sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"listening", audio_text:listenEx.ex.english, options:listenOpts, answer:listenEx.ex.korean, verb:listenEx.verb});
+
+      // Q4: meaning quiz for lesson2 phrasal
+      var p2 = lessons[1].phrasal;
+      var correctM2 = p2.meaning_ko.split(",")[0].trim();
+      var opts4 = [correctM2].concat(wrongMeanings.filter(function(w){return w!==correctM2;}).sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"meaning", question:'"'+p2.verb+'" 의 뜻은?', options:opts4, answer:correctM2, verb:p2.verb});
+
+      // Q5: arrange - sentence ordering
+      var arrangeEx = allExamples[Math.floor(Math.random() * allExamples.length)];
+      var arrangeWords = arrangeEx.ex.english.replace(/[.,!?]/g,"").split(" ");
+      var shuffledWords = [].concat(arrangeWords).sort(function(){return Math.random()-0.5;});
+      // Make sure shuffled is different from original
+      var attempts = 0;
+      while (shuffledWords.join(" ") === arrangeWords.join(" ") && attempts < 10) {
+        shuffledWords = [].concat(arrangeWords).sort(function(){return Math.random()-0.5;});
+        attempts++;
+      }
+      quizzes.push({type:"arrange", words:shuffledWords, answer:arrangeWords.join(" "), hint:arrangeEx.ex.korean, verb:arrangeEx.verb});
+
+      // Q6: fill-blank for lesson2 basic
+      var b2 = lessons[1].basic;
+      var ex6 = b2.examples[0];
+      var blank6 = ex6.english.replace(new RegExp(b2.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
+      var wrongV6 = ["get","make","take","put","go","come","keep","look","work","run","call","find"].filter(function(v){return v!==b2.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
+      var opts6 = [b2.verb].concat(wrongV6).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"fillblank", question:blank6, hint:ex6.korean, options:opts6, answer:b2.verb, verb:b2.verb});
+
+      // Q7: situation quiz
+      var sitEx = allExamples[Math.floor(Math.random() * allExamples.length)];
+      var wrongEng = allExamples.filter(function(e){return e.ex.english !== sitEx.ex.english;}).map(function(e){return e.ex.english;});
+      wrongEng = wrongEng.concat(wrongSentences);
+      var uniqueWrongEng = [];
+      for (var we = 0; we < wrongEng.length; we++) {
+        if (uniqueWrongEng.indexOf(wrongEng[we]) === -1 && wrongEng[we] !== sitEx.ex.english) {
+          uniqueWrongEng.push(wrongEng[we]);
+        }
+      }
+      var sitOpts = [sitEx.ex.english].concat(uniqueWrongEng.sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
+      quizzes.push({type:"situation", question:'상황: "'+sitEx.ex.korean+'"\n"'+sitEx.verb+'" 을(를) 사용한 올바른 문장은?', options:sitOpts, answer:sitEx.ex.english, verb:sitEx.verb});
+
+      // Add 1 weak verb review question if available
+      var weakVerbs = getWeakVerbs();
+      if (weakVerbs.length > 0) {
+        var weakVerb = weakVerbs[Math.floor(Math.random() * weakVerbs.length)];
+        // Find the verb in LESSON_POOL
+        for (var lpi = 0; lpi < LESSON_POOL.length; lpi++) {
+          var lp = LESSON_POOL[lpi];
+          if (lp.basic.verb === weakVerb || lp.phrasal.verb === weakVerb) {
+            var weakItem = lp.basic.verb === weakVerb ? lp.basic : lp.phrasal;
+            var weakCorrect = weakItem.meaning_ko.split(",")[0].trim();
+            var weakOpts = [weakCorrect].concat(wrongMeanings.filter(function(w){return w!==weakCorrect;}).sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
+            quizzes.push({type:"meaning", question:'[복습] "'+weakItem.verb+'" 의 뜻은?', options:weakOpts, answer:weakCorrect, verb:weakItem.verb, isReview:true});
+            break;
+          }
+        }
+      }
 
       return quizzes;
     }
@@ -282,7 +390,6 @@
           examples:[{situation:"갑작스런일",english:"Sorry, something came up.",korean:"미안, 일이 좀 생겼어."},{situation:"이벤트",english:"My birthday's coming up next week.",korean:"다음 주에 생일이야."},{situation:"대화",english:"Your name came up in the meeting.",korean:"회의에서 네 이름이 나왔어."}],
           bad_example:"Problem come up. I busy.",good_example:"Something came up at work so I had to cancel dinner.",practice_hint:"갑자기 생긴 일이나 다가오는 일정으로 써보세요."}
       },
-      // ── Week 2 ──
       {
         basic:{verb:"keep",meaning_ko:"유지하다, 계속하다, 보관하다",meaning_en:"to maintain, continue, or hold",
           meanings:[{meaning:"계속하다",example:"Keep going."},{meaning:"유지하다",example:"Keep it quiet."},{meaning:"보관하다",example:"I'll keep this."}],
@@ -337,7 +444,6 @@
           examples:[{situation:"약속",english:"They called off the wedding.",korean:"걔네 결혼식 취소했어."},{situation:"행사",english:"The game was called off because of rain.",korean:"비 때문에 경기가 취소됐어."},{situation:"계획",english:"Should we call off the trip?",korean:"여행 취소할까?"}],
           bad_example:"I call off the meet yesterday.",good_example:"We had to call off the picnic because the weather forecast looked terrible.",practice_hint:"취소했거나 취소될 뻔한 상황으로 써보세요."}
       },
-      // ── Week 3 ──
       {
         basic:{verb:"give",meaning_ko:"주다, 전하다",meaning_en:"to hand over or provide",
           meanings:[{meaning:"주다",example:"Give me a second."},{meaning:"전하다",example:"Give her my regards."},{meaning:"양보하다",example:"I'll give you that."}],
@@ -371,7 +477,7 @@
           examples:[{situation:"확인",english:"Can you check if the door is locked?",korean:"문 잠겼는지 확인해줄래?"},{situation:"이메일",english:"I need to check my messages.",korean:"메시지 확인해야 해."},{situation:"시간",english:"Let me check my schedule.",korean:"스케줄 확인해볼게."}],
           bad_example:"I check the email yesterday.",good_example:"Hold on, let me check if I'm free that day.",practice_hint:"뭔가를 확인했거나 확인해야 하는 상황으로 써보세요."},
         phrasal:{verb:"check out",meaning_ko:"확인하다, 구경하다, 퇴실하다",meaning_en:"to look at, examine, or leave a hotel",meanings:[],
-          examples:[{situation:"추천",english:"You should check out this new café.",korean:"이 새 카페 한번 가봐."},{situation:"관심",english:"Check out this video, it's hilarious.",korean:"이 영상 봐봐, 개웃겨."},{situation:"호텔",english:"What time do we check out?",korean:"체크아웃 몇 시야?"}],
+          examples:[{situation:"추천",english:"You should check out this new cafe.",korean:"이 새 카페 한번 가봐."},{situation:"관심",english:"Check out this video, it's hilarious.",korean:"이 영상 봐봐, 개웃겨."},{situation:"호텔",english:"What time do we check out?",korean:"체크아웃 몇 시야?"}],
           bad_example:"I check out the place yesterday.",good_example:"You should totally check out that ramen place near the station.",practice_hint:"추천하거나 구경한 것을 써보세요."}
       },
       {
@@ -421,9 +527,12 @@
       }
     ];
 
+    // ── getTodayLesson: returns array of 2 lesson sets ─────────────
     function getTodayLesson() {
-      var dayIndex = Math.floor(Date.now() / 86400000) % LESSON_POOL.length;
-      return LESSON_POOL[dayIndex];
+      var dayIndex = Math.floor(Date.now() / 86400000);
+      var idx1 = (dayIndex * 2) % LESSON_POOL.length;
+      var idx2 = (dayIndex * 2 + 1) % LESSON_POOL.length;
+      return [LESSON_POOL[idx1], LESSON_POOL[idx2]];
     }
 
     async function generateNewLesson(completedVerbs) {
@@ -444,15 +553,24 @@
 
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
-      var streak=props.streak, todayDone=props.todayDone, lesson=props.lesson, onStart=props.onStart, onSpeak=props.onSpeak;
+      var streak=props.streak, todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat;
       var days = ["S","M","T","W","T","F","S"];
       var today = new Date().getDay();
       var hour = new Date().getHours();
-      var greeting = hour<5?{t:"Still up? 🌙",s:"자기 전 영어 한 입 어때요"}
-        :hour<12?{t:"Good morning 👋",s:"쉬운 동사로 다 말한다 💪"}
-        :hour<18?{t:"Good afternoon ☀️",s:"점심 쉬는 틈에 15분 영어 🥪"}
-        :hour<22?{t:"Good evening 🌆",s:"오늘 하루 마무리 15분 💪"}
-        :{t:"Late night study 🌙",s:"집중 잘 되는 시간이죠"};
+      var greeting = hour<5?{t:"Still up?",s:"자기 전 영어 한 입 어때요"}
+        :hour<12?{t:"Good morning",s:"쉬운 동사로 다 말한다"}
+        :hour<18?{t:"Good afternoon",s:"점심 쉬는 틈에 15분 영어"}
+        :hour<22?{t:"Good evening",s:"오늘 하루 마무리 15분"}
+        :{t:"Late night study",s:"집중 잘 되는 시간이죠"};
+
+      // Extract all 4 verbs from the 2 lesson sets
+      var allVerbTags = [];
+      if (lessons && lessons.length >= 2) {
+        for (var li = 0; li < lessons.length; li++) {
+          if (lessons[li].basic) allVerbTags.push({verb: lessons[li].basic.verb, color: C.yellow});
+          if (lessons[li].phrasal) allVerbTags.push({verb: lessons[li].phrasal.verb, color: C.accent});
+        }
+      }
 
       return (
         <div style={{padding:"32px 20px 24px"}}>
@@ -464,7 +582,7 @@
 
           <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"30",borderRadius:16,padding:20,marginBottom:20}}>
             <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6}}>STREAK</div>
-            <div style={{fontSize:48,fontWeight:900,color:C.accent,lineHeight:1}}>{streak}<span style={{fontSize:20,marginLeft:4}}>🔥</span></div>
+            <div style={{fontSize:48,fontWeight:900,color:C.accent,lineHeight:1}}>{streak}<span style={{fontSize:20,marginLeft:4}}>{"🔥"}</span></div>
             <div style={{fontSize:12,color:C.muted,marginTop:4}}>연속 학습일</div>
             <div style={{display:"flex",gap:6,marginTop:16}}>
               {days.map(function(d,i){return(
@@ -503,39 +621,48 @@
             <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:20,textAlign:"center",marginBottom:14}}>
               <div style={{fontSize:24,marginBottom:8}}>{"✅"}</div>
               <div style={{fontWeight:700,marginBottom:4}}>오늘 완료!</div>
-              <div style={{fontSize:12,color:C.muted}}>내일 또 만나요 🌅</div>
+              <div style={{fontSize:12,color:C.muted}}>내일 또 만나요</div>
             </div>
           ):(
             <div>
               <div onClick={onStart} style={{background:C.surface,border:"1px solid "+C.yellow+"40",borderRadius:16,padding:20,marginBottom:10,cursor:"pointer",transition:"transform 0.1s"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"📖 오늘의 동사 레슨"}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{"~10분"}</div>
+                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"오늘의 동사 레슨"}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{"~15분"}</div>
                 </div>
-                {lesson&&(
-                  <div style={{display:"flex",gap:8,marginBottom:10}}>
-                    <span style={{background:C.yellow+"20",color:C.yellow,padding:"4px 12px",borderRadius:8,fontSize:14,fontWeight:800}}>{lesson.basic?.verb}</span>
-                    <span style={{color:C.muted,fontSize:14}}>+</span>
-                    <span style={{background:C.accent+"20",color:C.accent,padding:"4px 12px",borderRadius:8,fontSize:14,fontWeight:800}}>{lesson.phrasal?.verb}</span>
+                {allVerbTags.length>0&&(
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                    {allVerbTags.map(function(vt,i){return(
+                      <span key={i} style={{background:vt.color+"20",color:vt.color,padding:"4px 10px",borderRadius:8,fontSize:13,fontWeight:800}}>{vt.verb}</span>
+                    );})}
                   </div>
                 )}
-                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>뜻 → 예문 → 패턴 → 내 문장 쓰기</div>
-                <div style={{marginTop:10,background:C.yellow,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>학습 시작 →</div>
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>{"뜻 → 예문 → 패턴 → 퀴즈 → 롤플레이 → 내 문장 쓰기"}</div>
+                <div style={{marginTop:10,background:C.yellow,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>{"학습 시작 →"}</div>
               </div>
 
-              <div onClick={onSpeak} style={{background:C.surface,border:"1px solid "+C.accent+"40",borderRadius:16,padding:20,marginBottom:14,cursor:"pointer"}}>
+              <div onClick={onSpeak} style={{background:C.surface,border:"1px solid "+C.accent+"40",borderRadius:16,padding:20,marginBottom:10,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"🎙️ 내 대화로 배우기"}</div>
+                  <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"내 대화로 배우기"}</div>
                   <div style={{fontSize:11,color:C.muted}}>{"~5분"}</div>
                 </div>
                 <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>오늘 한 말 녹음/입력 → 쉬운 영어로 변환</div>
-                <div style={{marginTop:10,background:C.accent,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>녹음 시작 →</div>
+                <div style={{marginTop:10,background:C.accent,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>{"녹음 시작 →"}</div>
+              </div>
+
+              <div onClick={onChat} style={{background:C.surface,border:"1px solid "+C.blue+"40",borderRadius:16,padding:20,marginBottom:14,cursor:"pointer"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div style={{fontSize:11,color:C.blue,letterSpacing:2,fontWeight:700}}>{"AI 영어 대화"}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{"자유 연습"}</div>
+                </div>
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>AI와 영어로 채팅하며 자연스럽게 연습</div>
+                <div style={{marginTop:10,background:C.blue,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>{"대화 시작 →"}</div>
               </div>
             </div>
           )}
 
           <div style={{display:"flex",gap:10,marginTop:4}}>
-            {[{label:"학습한 날",value:streak+"일"},{label:"오늘 학습",value:"15분"}].map(function(s,i){return(
+            {[{label:"학습한 날",value:streak+"일"},{label:"오늘 동사",value:"4가지"}].map(function(s,i){return(
               <div key={i} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px"}}>
                 <div style={{fontSize:18,fontWeight:800}}>{s.value}</div>
                 <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
@@ -544,7 +671,7 @@
           </div>
 
           <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid "+C.border,textAlign:"center"}}>
-            <div style={{fontSize:10,color:C.muted,opacity:0.6}}>{CREATOR_NAME} · beta v0.2</div>
+            <div style={{fontSize:10,color:C.muted,opacity:0.6}}>{CREATOR_NAME} · beta v0.3</div>
           </div>
         </div>
       );
@@ -552,8 +679,11 @@
 
     // ── LEARN ───────────────────────────────────────────────────────
     function LearnScreen(props) {
-      var lesson=props.lesson, loading=props.loading, onNext=props.onNext, aiAvailable=props.aiAvailable, onXP=props.onXP;
-      var _s1=useState("basic"); var phase=_s1[0]; var setPhase=_s1[1];
+      var lessons=props.lessons, loading=props.loading, onNext=props.onNext, aiAvailable=props.aiAvailable, onXP=props.onXP;
+      // lessonSetIdx: 0 or 1 (which of the 2 sets)
+      // phase: "basic" or "phrasal"
+      var _s1=useState(0); var lessonSetIdx=_s1[0]; var setLessonSetIdx=_s1[1];
+      var _s1b=useState("basic"); var phase=_s1b[0]; var setPhase=_s1b[1];
       var _s2=useState(0); var step=_s2[0]; var setStep=_s2[1];
       var _s3=useState(null); var quizzes=_s3[0]; var setQuizzes=_s3[1];
       var _s4=useState(0); var quizIdx=_s4[0]; var setQuizIdx=_s4[1];
@@ -562,6 +692,9 @@
       var _s7=useState(0); var correctCount=_s7[0]; var setCorrectCount=_s7[1];
       var _s8=useState(false); var quizDone=_s8[0]; var setQuizDone=_s8[1];
       var _s9=useState(null); var xpPopup=_s9[0]; var setXpPopup=_s9[1];
+      // For arrange quiz type
+      var _sa=useState([]); var arrangeSelected=_sa[0]; var setArrangeSelected=_sa[1];
+      var _sb=useState(false); var arrangeChecked=_sb[0]; var setArrangeChecked=_sb[1];
 
       if (loading) return (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
@@ -569,10 +702,16 @@
           <div style={{color:C.muted,fontSize:14}}>오늘의 레슨 준비 중...</div>
         </div>
       );
-      if (!lesson) return null;
+      if (!lessons || !lessons.length) return null;
 
+      var lesson = lessons[lessonSetIdx];
+      if (!lesson) return null;
       var current = phase==="basic" ? lesson.basic : lesson.phrasal;
       var color = phase==="basic" ? C.yellow : C.accent;
+
+      // Progress label: set1 basic, set1 phrasal, set2 basic, set2 phrasal
+      var totalPhases = lessons.length * 2; // 4 phases
+      var currentPhaseNum = lessonSetIdx * 2 + (phase==="basic"?0:1);
 
       var showXpGain = function(amount) {
         setXpPopup("+"+amount+" XP");
@@ -585,11 +724,25 @@
           var r=addXP(5); showXpGain(5); if(onXP)onXP(r);
           return;
         }
-        if (phase==="basic") { setPhase("phrasal"); setStep(0); var r2=addXP(10); showXpGain(10); if(onXP)onXP(r2); return; }
-        // After phrasal done, start quiz
-        setQuizzes(generateQuiz(lesson)); setQuizIdx(0); setSelected(null); setAnswered(false); setCorrectCount(0); setQuizDone(false);
-        setStep(3); // quiz mode
-        var r3=addXP(10); showXpGain(10); if(onXP)onXP(r3);
+        if (phase==="basic") {
+          setPhase("phrasal"); setStep(0);
+          var r2=addXP(10); showXpGain(10); if(onXP)onXP(r2);
+          return;
+        }
+        // After phrasal done for current set
+        if (lessonSetIdx < lessons.length - 1) {
+          // Move to next lesson set
+          setLessonSetIdx(function(i){return i+1;});
+          setPhase("basic"); setStep(0);
+          var r3=addXP(10); showXpGain(10); if(onXP)onXP(r3);
+          return;
+        }
+        // All 4 verbs done, start quiz
+        setQuizzes(generateQuiz(lessons));
+        setQuizIdx(0); setSelected(null); setAnswered(false); setCorrectCount(0); setQuizDone(false);
+        setArrangeSelected([]); setArrangeChecked(false);
+        setStep(3);
+        var r4=addXP(10); showXpGain(10); if(onXP)onXP(r4);
       };
 
       var handleQuizAnswer = function(opt) {
@@ -599,12 +752,40 @@
         if (isCorrect) {
           setCorrectCount(function(c){return c+1;});
           var r=addXP(15); showXpGain(15); if(onXP)onXP(r);
+          // If it was a review question and correct, remove from weak verbs
+          if (quizzes[quizIdx].isReview) {
+            removeWeakVerb(quizzes[quizIdx].verb);
+          }
+        } else {
+          // Wrong answer: add to weak verbs
+          addWeakVerb(quizzes[quizIdx].verb);
+        }
+      };
+
+      var handleArrangeCheck = function() {
+        setArrangeChecked(true);
+        var builtSentence = arrangeSelected.join(" ");
+        var isCorrect = builtSentence.toLowerCase() === quizzes[quizIdx].answer.toLowerCase();
+        setAnswered(true);
+        if (isCorrect) {
+          setCorrectCount(function(c){return c+1;});
+          var r=addXP(15); showXpGain(15); if(onXP)onXP(r);
+          if (quizzes[quizIdx].isReview) removeWeakVerb(quizzes[quizIdx].verb);
+        } else {
+          addWeakVerb(quizzes[quizIdx].verb);
+        }
+      };
+
+      var handleListeningPlay = function() {
+        if (quizzes && quizzes[quizIdx] && quizzes[quizIdx].audio_text) {
+          speakEnglish(quizzes[quizIdx].audio_text);
         }
       };
 
       var nextQuiz = function() {
         if (quizIdx < quizzes.length - 1) {
           setQuizIdx(function(i){return i+1;}); setSelected(null); setAnswered(false);
+          setArrangeSelected([]); setArrangeChecked(false);
         } else {
           setQuizDone(true);
           var bonus = correctCount === quizzes.length ? 30 : 0;
@@ -613,24 +794,37 @@
         }
       };
 
-      var btnLabel = step<2 ? "다음 →" : phase==="basic" ? "구동사 학습하기 →" : "퀴즈 풀기 →";
+      var phaseLabels = [];
+      for (var pli = 0; pli < lessons.length; pli++) {
+        phaseLabels.push({id:"set"+pli+"basic",label:lessons[pli].basic.verb,color:C.yellow,setIdx:pli,phase:"basic"});
+        phaseLabels.push({id:"set"+pli+"phrasal",label:lessons[pli].phrasal.verb,color:C.accent,setIdx:pli,phase:"phrasal"});
+      }
+
+      var btnLabel = step<2 ? "다음 →" : phase==="basic" ? "구동사 학습하기 →" : (lessonSetIdx < lessons.length - 1 ? "다음 동사 세트 →" : "퀴즈 풀기 →");
 
       return (
         <div style={{padding:"24px 20px"}}>
-          <div style={{display:"flex",gap:8,marginBottom:20}}>
-            {[{id:"basic",label:"📒 기본동사",color:C.yellow},{id:"phrasal",label:"📗 구동사",color:C.accent}].map(function(t){return(
-              <div key={t.id} style={{flex:1,padding:"9px 0",borderRadius:10,textAlign:"center",background:phase===t.id?t.color+"20":C.surface,border:"1px solid "+(phase===t.id?t.color+"60":C.border),fontSize:12,fontWeight:700,color:phase===t.id?t.color:C.muted,cursor:"pointer"}}
-                onClick={function(){if(t.id==="basic"){setPhase("basic");setStep(0);}}}>
-                {phase==="phrasal"&&t.id==="basic"?"✓ 완료":t.label}
+          {step<3&&(
+            <div>
+              <div style={{display:"flex",gap:4,marginBottom:20,flexWrap:"wrap"}}>
+                {phaseLabels.map(function(t,ti){
+                  var isCurrent = t.setIdx===lessonSetIdx && t.phase===phase;
+                  var isDone = t.setIdx<lessonSetIdx || (t.setIdx===lessonSetIdx && t.phase==="basic" && phase==="phrasal");
+                  return(
+                    <div key={t.id} style={{flex:1,minWidth:60,padding:"7px 4px",borderRadius:8,textAlign:"center",background:isCurrent?t.color+"20":C.surface,border:"1px solid "+(isCurrent?t.color+"60":C.border),fontSize:11,fontWeight:700,color:isCurrent?t.color:C.muted}}>
+                      {isDone?"✓ ":""}{t.label}
+                    </div>
+                  );
+                })}
               </div>
-            );})}
-          </div>
 
-          <div style={{display:"flex",gap:5,marginBottom:24}}>
-            {["뜻","예문","패턴","퀴즈"].map(function(s,i){return(
-              <div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=step?color:C.border,transition:"background 0.3s"}}/>
-            );})}
-          </div>
+              <div style={{display:"flex",gap:5,marginBottom:24}}>
+                {["뜻","예문","패턴","퀴즈"].map(function(s,i){return(
+                  <div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=step?color:C.border,transition:"background 0.3s"}}/>
+                );})}
+              </div>
+            </div>
+          )}
 
           {step===0&&(
             <div>
@@ -697,27 +891,140 @@
                   <div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=quizIdx?C.accent:C.border,transition:"background 0.3s"}}/>
                 );})}
               </div>
-              <div style={{fontSize:18,fontWeight:800,marginBottom:6,lineHeight:1.4}}>{quizzes[quizIdx].question}</div>
-              {quizzes[quizIdx].hint&&<div style={{fontSize:13,color:C.muted,marginBottom:16}}>{quizzes[quizIdx].hint}</div>}
-              {quizzes[quizIdx].options.map(function(opt,i){
-                var isCorrect = opt===quizzes[quizIdx].answer;
-                var isSelected = opt===selected;
-                var bg = !answered?C.surface : isCorrect?C.accent+"20" : isSelected?C.red+"20":C.surface;
-                var border = !answered?C.border : isCorrect?C.accent+"60" : isSelected?C.red+"60":C.border;
-                var textColor = !answered?C.text : isCorrect?C.accent : isSelected?C.red:C.muted;
-                return (
-                  <div key={i} onClick={function(){handleQuizAnswer(opt);}}
-                    style={{background:bg,border:"1px solid "+border,borderRadius:12,padding:"14px 16px",marginBottom:8,cursor:answered?"default":"pointer",
-                      animation:answered&&isSelected&&!isCorrect?"wrongShake 0.4s":"none"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div style={{fontSize:15,fontWeight:600,color:textColor}}>{opt}</div>
-                      {answered&&isCorrect&&<span style={{color:C.accent,fontSize:16}}>{"✓"}</span>}
-                      {answered&&isSelected&&!isCorrect&&<span style={{color:C.red,fontSize:16}}>{"✗"}</span>}
+
+              {/* LISTENING type */}
+              {quizzes[quizIdx].type==="listening"&&(
+                <div>
+                  <div style={{fontSize:14,color:C.muted,marginBottom:8}}>듣고 올바른 뜻을 고르세요</div>
+                  <button onClick={handleListeningPlay} style={{background:C.blue+"20",border:"1px solid "+C.blue+"60",borderRadius:12,padding:"16px 24px",cursor:"pointer",marginBottom:16,display:"flex",alignItems:"center",gap:10,width:"100%",justifyContent:"center"}}>
+                    <span style={{fontSize:24}}>{"🔊"}</span>
+                    <span style={{fontSize:15,fontWeight:700,color:C.blue}}>들어보기</span>
+                  </button>
+                  {answered&&(
+                    <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:12,marginBottom:12}}>
+                      <div style={{fontSize:12,color:C.muted,marginBottom:4}}>원문:</div>
+                      <div style={{fontSize:14,color:C.text,fontWeight:600}}>{quizzes[quizIdx].audio_text}</div>
+                    </div>
+                  )}
+                  {quizzes[quizIdx].options.map(function(opt,i){
+                    var isCorrect = opt===quizzes[quizIdx].answer;
+                    var isSelected = opt===selected;
+                    var bg = !answered?C.surface : isCorrect?C.accent+"20" : isSelected?C.red+"20":C.surface;
+                    var border = !answered?C.border : isCorrect?C.accent+"60" : isSelected?C.red+"60":C.border;
+                    var textColor = !answered?C.text : isCorrect?C.accent : isSelected?C.red:C.muted;
+                    return (
+                      <div key={i} onClick={function(){handleQuizAnswer(opt);}}
+                        style={{background:bg,border:"1px solid "+border,borderRadius:12,padding:"14px 16px",marginBottom:8,cursor:answered?"default":"pointer",
+                          animation:answered&&isSelected&&!isCorrect?"wrongShake 0.4s":"none"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div style={{fontSize:15,fontWeight:600,color:textColor}}>{opt}</div>
+                          {answered&&isCorrect&&<span style={{color:C.accent,fontSize:16}}>{"✓"}</span>}
+                          {answered&&isSelected&&!isCorrect&&<span style={{color:C.red,fontSize:16}}>{"✗"}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ARRANGE type */}
+              {quizzes[quizIdx].type==="arrange"&&(
+                <div>
+                  <div style={{fontSize:14,color:C.muted,marginBottom:8}}>단어를 올바른 순서로 배열하세요</div>
+                  {quizzes[quizIdx].hint&&<div style={{fontSize:13,color:C.muted,marginBottom:12}}>{quizzes[quizIdx].hint}</div>}
+
+                  {/* Built sentence area */}
+                  <div style={{background:C.surface,border:"1px solid "+(arrangeChecked?(arrangeSelected.join(" ").toLowerCase()===quizzes[quizIdx].answer.toLowerCase()?C.accent+"60":C.red+"60"):C.border),borderRadius:12,padding:16,marginBottom:16,minHeight:50}}>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",minHeight:32}}>
+                      {arrangeSelected.length===0&&<span style={{color:C.muted,fontSize:13}}>여기에 단어가 표시됩니다</span>}
+                      {arrangeSelected.map(function(w,i){return(
+                        <button key={i} onClick={function(){if(arrangeChecked)return;setArrangeSelected(function(prev){var n=[].concat(prev);n.splice(i,1);return n;});}}
+                          style={{background:C.accent+"20",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:8,padding:"6px 12px",fontSize:14,fontWeight:600,cursor:arrangeChecked?"default":"pointer"}}>
+                          {w}
+                        </button>
+                      );})}
                     </div>
                   </div>
-                );
-              })}
-              {answered&&(
+
+                  {/* Word chips */}
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+                    {quizzes[quizIdx].words.map(function(w,i){
+                      var usedCount = 0;
+                      for (var ui = 0; ui < arrangeSelected.length; ui++) {
+                        if (arrangeSelected[ui] === w) usedCount++;
+                      }
+                      var availCount = 0;
+                      for (var ai = 0; ai < quizzes[quizIdx].words.length; ai++) {
+                        if (ai <= i && quizzes[quizIdx].words[ai] === w) availCount++;
+                      }
+                      // Check how many times this word appears at this index or before
+                      var totalInWords = quizzes[quizIdx].words.filter(function(ww){return ww===w;}).length;
+                      var usedTotal = arrangeSelected.filter(function(ww){return ww===w;}).length;
+                      var isUsed = usedTotal >= totalInWords;
+                      // Simpler: track by index
+                      var usedIndices = [];
+                      var tempSelected = [].concat(arrangeSelected);
+                      for (var ti = 0; ti < quizzes[quizIdx].words.length; ti++) {
+                        var idx = tempSelected.indexOf(quizzes[quizIdx].words[ti]);
+                        if (idx !== -1) { usedIndices.push(ti); tempSelected.splice(idx, 1); }
+                      }
+                      var thisUsed = usedIndices.indexOf(i) !== -1;
+
+                      return(
+                        <button key={i} onClick={function(){if(arrangeChecked||thisUsed)return;setArrangeSelected(function(prev){return [].concat(prev,[w]);});}}
+                          style={{background:thisUsed?C.border:C.surface,border:"1px solid "+C.border,color:thisUsed?C.muted:C.text,borderRadius:8,padding:"8px 14px",fontSize:14,fontWeight:600,cursor:arrangeChecked||thisUsed?"default":"pointer",opacity:thisUsed?0.4:1}}>
+                          {w}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {!arrangeChecked&&(
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={function(){setArrangeSelected([]);}} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:14,fontSize:14,fontWeight:600,cursor:"pointer"}}>초기화</button>
+                      <button onClick={handleArrangeCheck} disabled={arrangeSelected.length===0} style={{flex:2,background:arrangeSelected.length>0?C.accent:C.border,color:arrangeSelected.length>0?"#08090d":C.muted,border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>확인</button>
+                    </div>
+                  )}
+                  {arrangeChecked&&(
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:arrangeSelected.join(" ").toLowerCase()===quizzes[quizIdx].answer.toLowerCase()?C.accent:C.red,marginBottom:8}}>
+                        {arrangeSelected.join(" ").toLowerCase()===quizzes[quizIdx].answer.toLowerCase()?"정답!":"오답!"}
+                      </div>
+                      {arrangeSelected.join(" ").toLowerCase()!==quizzes[quizIdx].answer.toLowerCase()&&(
+                        <div style={{fontSize:13,color:C.muted,marginBottom:8}}>정답: {quizzes[quizIdx].answer}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STANDARD types: meaning, fillblank, translate, situation */}
+              {quizzes[quizIdx].type!=="listening"&&quizzes[quizIdx].type!=="arrange"&&(
+                <div>
+                  <div style={{fontSize:18,fontWeight:800,marginBottom:6,lineHeight:1.4,whiteSpace:"pre-line"}}>{quizzes[quizIdx].question}</div>
+                  {quizzes[quizIdx].hint&&<div style={{fontSize:13,color:C.muted,marginBottom:16}}>{quizzes[quizIdx].hint}</div>}
+                  {quizzes[quizIdx].options.map(function(opt,i){
+                    var isCorrect = opt===quizzes[quizIdx].answer;
+                    var isSelected = opt===selected;
+                    var bg = !answered?C.surface : isCorrect?C.accent+"20" : isSelected?C.red+"20":C.surface;
+                    var border = !answered?C.border : isCorrect?C.accent+"60" : isSelected?C.red+"60":C.border;
+                    var textColor = !answered?C.text : isCorrect?C.accent : isSelected?C.red:C.muted;
+                    return (
+                      <div key={i} onClick={function(){handleQuizAnswer(opt);}}
+                        style={{background:bg,border:"1px solid "+border,borderRadius:12,padding:"14px 16px",marginBottom:8,cursor:answered?"default":"pointer",
+                          animation:answered&&isSelected&&!isCorrect?"wrongShake 0.4s":"none"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div style={{fontSize:15,fontWeight:600,color:textColor}}>{opt}</div>
+                          {answered&&isCorrect&&<span style={{color:C.accent,fontSize:16}}>{"✓"}</span>}
+                          {answered&&isSelected&&!isCorrect&&<span style={{color:C.red,fontSize:16}}>{"✗"}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {(answered||arrangeChecked)&&(
                 <button onClick={nextQuiz} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginTop:8}}>
                   {quizIdx<quizzes.length-1?"다음 문제 →":"결과 보기 →"}
                 </button>
@@ -730,7 +1037,7 @@
               <div style={{fontSize:64,marginBottom:12}}>{correctCount===quizzes.length?"🎉":"👏"}</div>
               <div style={{fontSize:24,fontWeight:900,marginBottom:8}}>{correctCount}/{quizzes.length} 정답!</div>
               <div style={{fontSize:14,color:C.muted,marginBottom:8}}>
-                {correctCount===quizzes.length?"퍼펙트! 보너스 +30 XP 🔥":"잘했어요! 다음엔 더 잘할 수 있어요"}
+                {correctCount===quizzes.length?"퍼펙트! 보너스 +30 XP":"잘했어요! 다음엔 더 잘할 수 있어요"}
               </div>
               <div style={{display:"flex",justifyContent:"center",gap:12,marginBottom:24}}>
                 <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"10px 16px"}}>
@@ -743,7 +1050,7 @@
                 </div>
               </div>
               <button onClick={onNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
-                {aiAvailable?"✍️ 내 문장 쓰러 가기":"🎉 오늘 학습 완료"}
+                {aiAvailable?"롤플레이 하러 가기 →":"오늘 학습 완료"}
               </button>
             </div>
           )}
@@ -763,39 +1070,189 @@
       );
     }
 
+    // ── ROLEPLAY ────────────────────────────────────────────────────
+    function RoleplayScreen(props) {
+      var lessons=props.lessons, onNext=props.onNext;
+      var _s1=useState(null); var situation=_s1[0]; var setSituation=_s1[1];
+      var _s2=useState(true); var isLoading=_s2[0]; var setIsLoading=_s2[1];
+      var _s3=useState(""); var userResponse=_s3[0]; var setUserResponse=_s3[1];
+      var _s4=useState(null); var evaluation=_s4[0]; var setEvaluation=_s4[1];
+      var _s5=useState(false); var evalLoading=_s5[0]; var setEvalLoading=_s5[1];
+
+      var allVerbs = [];
+      for (var li = 0; li < lessons.length; li++) {
+        allVerbs.push(lessons[li].basic.verb);
+        allVerbs.push(lessons[li].phrasal.verb);
+      }
+
+      useEffect(function(){
+        var system = 'Create a realistic everyday situation for English practice. The student should use these verbs: [' + allVerbs.join(", ") + ']. Return ONLY valid JSON:\n{"situation_ko":"카페에서 음료 주문하기","context_en":"You are at a coffee shop ordering a drink.","starter":"Hi! What can I get for you today?","target_verbs":' + JSON.stringify(allVerbs) + '}';
+        callClaude(system, 'Generate an everyday roleplay situation using these verbs: ' + allVerbs.join(", ") + '. Make it feel natural and conversational.')
+        .then(function(raw){
+          var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
+          setSituation(parsed);
+        }).catch(function(){
+          setSituation({situation_ko:"카페에서 친구와 대화하기",context_en:"You run into a friend at a coffee shop. They ask how you've been.",starter:"Hey! Long time no see! How have you been?",target_verbs:allVerbs});
+        }).finally(function(){setIsLoading(false);});
+      }, []);
+
+      var handleSubmit = function() {
+        if (!userResponse.trim()) return;
+        setEvalLoading(true);
+        var system = 'Evaluate this English roleplay response. Situation: ' + situation.context_en + '. Starter: "' + situation.starter + '". Student responded: "' + userResponse + '". Target verbs: ' + JSON.stringify(allVerbs) + '.\nReturn ONLY valid JSON:\n{"score":3,"feedback":"한국어 피드백 2문장","corrected":"자연스러운 버전","used_verbs":["get"],"missed_verbs":["get over"]}';
+        callClaude(system, 'Evaluate: "' + userResponse + '"')
+        .then(function(raw){
+          var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
+          setEvaluation(parsed);
+        }).catch(function(){
+          setEvaluation({score:3,feedback:"평가를 가져오지 못했어요. 하지만 시도한 것만으로도 훌륭해요!",corrected:userResponse,used_verbs:[],missed_verbs:[]});
+        }).finally(function(){setEvalLoading(false);});
+      };
+
+      if (isLoading) return (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
+          <div style={{fontSize:36}}>{"🎭"}</div>
+          <div style={{color:C.muted,fontSize:14}}>롤플레이 상황 생성 중...</div>
+        </div>
+      );
+
+      return (
+        <div style={{padding:"24px 20px"}}>
+          <div style={{fontSize:11,color:C.orange,letterSpacing:3,marginBottom:6}}>ROLEPLAY</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:16}}>상황 롤플레이</div>
+
+          {situation&&(
+            <div>
+              <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:12,padding:16,marginBottom:12}}>
+                <div style={{fontSize:11,color:C.orange,letterSpacing:2,marginBottom:8}}>상황</div>
+                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{situation.situation_ko}</div>
+                <div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>{situation.context_en}</div>
+              </div>
+
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+                <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:6}}>사용할 동사</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {allVerbs.map(function(v,i){return(
+                    <span key={i} style={{background:C.accent+"20",color:C.accent,padding:"4px 10px",borderRadius:8,fontSize:13,fontWeight:700}}>{v}</span>
+                  );})}
+                </div>
+              </div>
+
+              <div style={{background:C.blue+"10",border:"1px solid "+C.blue+"30",borderRadius:12,padding:14,marginBottom:16}}>
+                <div style={{fontSize:11,color:C.blue,marginBottom:6}}>AI</div>
+                <div style={{fontSize:15,color:C.text,lineHeight:1.6}}>"{situation.starter}"</div>
+              </div>
+
+              {!evaluation&&(
+                <div>
+                  <textarea value={userResponse} onChange={function(e){setUserResponse(e.target.value);}}
+                    rows={4} placeholder={"영어로 대답해보세요! 위의 동사들을 사용해보세요."} style={{width:"100%",background:C.surface,border:"1px solid "+(userResponse.trim()?C.accent+"60":C.border),borderRadius:12,padding:14,color:C.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}
+                  />
+                  <button onClick={handleSubmit} disabled={evalLoading||!userResponse.trim()} style={{width:"100%",marginTop:10,background:userResponse.trim()?C.orange:C.border,color:userResponse.trim()?"#08090d":C.muted,border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
+                    {evalLoading?"평가 중...":"제출하기 →"}
+                  </button>
+                </div>
+              )}
+
+              {evaluation&&(
+                <div>
+                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <div style={{fontSize:11,color:C.orange,letterSpacing:2}}>평가</div>
+                      <div style={{fontSize:18}}>{Array(evaluation.score||0).fill("★").join("")}{Array(5-(evaluation.score||0)).fill("☆").join("")}</div>
+                    </div>
+                    <div style={{fontSize:14,color:C.text,lineHeight:1.7,marginBottom:10}}>{evaluation.feedback}</div>
+                    {evaluation.corrected&&evaluation.corrected!==userResponse&&(
+                      <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:8,padding:12,marginBottom:8}}>
+                        <div style={{fontSize:11,color:C.accent,marginBottom:4}}>자연스러운 버전</div>
+                        <div style={{fontSize:14,color:C.text,lineHeight:1.5}}>"{evaluation.corrected}"</div>
+                      </div>
+                    )}
+                    {evaluation.used_verbs&&evaluation.used_verbs.length>0&&(
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                        <span style={{fontSize:11,color:C.muted}}>사용한 동사:</span>
+                        {evaluation.used_verbs.map(function(v,i){return(
+                          <span key={i} style={{background:C.accent+"20",color:C.accent,padding:"2px 8px",borderRadius:6,fontSize:12,fontWeight:700}}>{v}</span>
+                        );})}
+                      </div>
+                    )}
+                    {evaluation.missed_verbs&&evaluation.missed_verbs.length>0&&(
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        <span style={{fontSize:11,color:C.muted}}>놓친 동사:</span>
+                        {evaluation.missed_verbs.map(function(v,i){return(
+                          <span key={i} style={{background:C.red+"20",color:C.red,padding:"2px 8px",borderRadius:6,fontSize:12,fontWeight:700}}>{v}</span>
+                        );})}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={onNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
+                    {"다음 →"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     // ── PRACTICE ────────────────────────────────────────────────────
     function PracticeScreen(props) {
-      var lesson=props.lesson, onComplete=props.onComplete, aiAvailable=props.aiAvailable;
-      var _s1=useState("basic"); var activeVerb=_s1[0]; var setActiveVerb=_s1[1];
-      var _s2=useState({basic:["",""],phrasal:["",""]}); var sentences=_s2[0]; var setSentences=_s2[1];
-      var _s3=useState({basic:null,phrasal:null}); var feedback=_s3[0]; var setFeedback=_s3[1];
-      var _s4=useState({basic:false,phrasal:false}); var isLoading=_s4[0]; var setIsLoading=_s4[1];
+      var lessons=props.lessons, onComplete=props.onComplete, aiAvailable=props.aiAvailable;
+      // Practice all 4 verbs: set0 basic, set0 phrasal, set1 basic, set1 phrasal
+      var verbTabs = [];
+      for (var vi = 0; vi < lessons.length; vi++) {
+        verbTabs.push({id:"set"+vi+"basic",label:"기본동사",c:C.yellow,verb:lessons[vi].basic.verb,lessonIdx:vi,type:"basic"});
+        verbTabs.push({id:"set"+vi+"phrasal",label:"구동사",c:C.accent,verb:lessons[vi].phrasal.verb,lessonIdx:vi,type:"phrasal"});
+      }
+
+      var _s1=useState(verbTabs[0].id); var activeVerbId=_s1[0]; var setActiveVerbId=_s1[1];
+      var initSentences = {};
+      var initFeedback = {};
+      var initLoading = {};
+      for (var vti = 0; vti < verbTabs.length; vti++) {
+        initSentences[verbTabs[vti].id] = ["",""];
+        initFeedback[verbTabs[vti].id] = null;
+        initLoading[verbTabs[vti].id] = false;
+      }
+      var _s2=useState(initSentences); var sentences=_s2[0]; var setSentences=_s2[1];
+      var _s3=useState(initFeedback); var feedback=_s3[0]; var setFeedback=_s3[1];
+      var _s4=useState(initLoading); var isLoading=_s4[0]; var setIsLoading=_s4[1];
       var _s5=useState(false); var done=_s5[0]; var setDone=_s5[1];
 
+      var activeTab = verbTabs.filter(function(t){return t.id===activeVerbId;})[0] || verbTabs[0];
+      var color = activeTab.c;
+      var current = lessons[activeTab.lessonIdx][activeTab.type];
+      var fb = feedback[activeVerbId];
+      var sent = sentences[activeVerbId];
+      var allDone = verbTabs.every(function(t){return feedback[t.id]!==null;});
 
-      var color = activeVerb==="basic"?C.yellow:C.accent;
-      var current = activeVerb==="basic"?lesson.basic:lesson.phrasal;
-      var fb = feedback[activeVerb];
-      var sent = sentences[activeVerb];
-      var bothDone = feedback.basic && feedback.phrasal;
-
-      var handleSubmit = function(type) {
-        var filled = sentences[type].filter(function(s){return s.trim().length>4;});
+      var handleSubmit = function(tabId) {
+        var tab = verbTabs.filter(function(t){return t.id===tabId;})[0];
+        var filled = sentences[tabId].filter(function(s){return s.trim().length>4;});
         if (!filled.length) return;
-        setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[type]=true; return n;});
-        var v = type==="basic"?lesson.basic:lesson.phrasal;
+        setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[tabId]=true; return n;});
+        var v = lessons[tab.lessonIdx][tab.type];
         var system = 'You are an American English tutor. Return ONLY valid JSON:\n{"overall":"전체 피드백(한국어,2문장)","corrections":[{"original":"...","corrected":"...","explanation":"왜(한국어)","more_natural":"더 자연스럽게(optional)"}],"bonus":"미국인이 쓸 법한 추가 문장(영어)"}';
         callClaude(system, 'Verb: "'+v.verb+'" ('+v.meaning_ko+')\nSentences:\n'+filled.map(function(s,i){return (i+1)+". "+s;}).join("\n"))
         .then(function(raw){
           var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
-          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[type]=parsed; return n;});
+          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[tabId]=parsed; return n;});
         }).catch(function(e){
           var msg = "AI 피드백을 가져오지 못했어요. 잠시 후 다시 시도해주세요.";
           if (e.message && e.message.indexOf("limit") !== -1) msg = "오늘 AI 사용 횟수를 초과했어요. 내일 다시 시도해주세요!";
-          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[type]={overall:msg,corrections:[],bonus:""}; return n;});
+          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[tabId]={overall:msg,corrections:[],bonus:""}; return n;});
         }).finally(function(){
-          setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[type]=false; return n;});
+          setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[tabId]=false; return n;});
         });
+      };
+
+      // Find next verb without feedback
+      var findNextTab = function() {
+        for (var ni = 0; ni < verbTabs.length; ni++) {
+          if (!feedback[verbTabs[ni].id]) return verbTabs[ni].id;
+        }
+        return null;
       };
 
       if (done) return (
@@ -803,7 +1260,12 @@
           <div style={{fontSize:64,marginBottom:16}}>{"🎉"}</div>
           <div style={{fontSize:26,fontWeight:900,marginBottom:8}}>오늘 완료!</div>
           <div style={{fontSize:14,color:C.muted,marginBottom:16,lineHeight:1.8}}>
-            <span style={{color:C.yellow,fontWeight:700}}>"{lesson.basic.verb}"</span>{" + "}<span style={{color:C.accent,fontWeight:700}}>"{lesson.phrasal.verb}"</span><br/>{"둘 다 마스터! 🔥"}
+            {verbTabs.map(function(t,i){return(
+              <span key={i}>
+                <span style={{color:t.c,fontWeight:700}}>"{t.verb}"</span>
+                {i<verbTabs.length-1?" + ":""}
+              </span>
+            );})}<br/>{"모두 마스터!"}
           </div>
           <div style={{display:"flex",gap:10,marginBottom:20}}>
             {[{e:"😃",k:"reaction_good",l:"좋았어요"},{e:"😐",k:"reaction_mid",l:"그냥그래요"},{e:"😞",k:"reaction_bad",l:"별로였어요"}].map(function(r){return(
@@ -819,12 +1281,13 @@
 
       return (
         <div style={{padding:"24px 20px"}}>
-          <div style={{display:"flex",gap:8,marginBottom:20}}>
-            {[{id:"basic",label:"기본동사",c:C.yellow,verb:lesson.basic.verb},{id:"phrasal",label:"구동사",c:C.accent,verb:lesson.phrasal.verb}].map(function(t){return(
-              <div key={t.id} onClick={function(){setActiveVerb(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:"pointer",background:activeVerb===t.id?t.c+"20":C.surface,border:"1px solid "+(activeVerb===t.id?t.c+"60":C.border)}}>
-                <div style={{fontSize:10,color:activeVerb===t.id?t.c:C.muted,letterSpacing:2,marginBottom:3}}>{t.label}</div>
-                <div style={{fontSize:14,fontWeight:800,color:activeVerb===t.id?t.c:C.muted}}>{t.verb}</div>
-                {feedback[t.id]&&<div style={{fontSize:10,color:t.c,marginTop:3}}>{"✓ 완료"}</div>}
+          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:12}}>내 문장 쓰기</div>
+          <div style={{display:"flex",gap:4,marginBottom:20,flexWrap:"wrap"}}>
+            {verbTabs.map(function(t){return(
+              <div key={t.id} onClick={function(){setActiveVerbId(t.id);}} style={{flex:1,minWidth:60,padding:"8px 4px",borderRadius:8,textAlign:"center",cursor:"pointer",background:activeVerbId===t.id?t.c+"20":C.surface,border:"1px solid "+(activeVerbId===t.id?t.c+"60":C.border)}}>
+                <div style={{fontSize:9,color:activeVerbId===t.id?t.c:C.muted,letterSpacing:1,marginBottom:2}}>{t.label}</div>
+                <div style={{fontSize:12,fontWeight:800,color:activeVerbId===t.id?t.c:C.muted}}>{t.verb}</div>
+                {feedback[t.id]&&<div style={{fontSize:9,color:t.c,marginTop:2}}>{"✓"}</div>}
               </div>
             );})}
           </div>
@@ -837,15 +1300,15 @@
           {sent.map(function(s,i){return(
             <div key={i} style={{marginBottom:12}}>
               <div style={{fontSize:12,color:C.muted,marginBottom:6}}>문장 {i+1}</div>
-              <textarea value={s} onChange={function(e){if(fb)return;var n={};for(var k in sentences)n[k]=[].concat(sentences[k]);n[activeVerb][i]=e.target.value;setSentences(n);}}
+              <textarea value={s} onChange={function(e){if(fb)return;var n={};for(var k in sentences)n[k]=[].concat(sentences[k]);n[activeVerbId][i]=e.target.value;setSentences(n);}}
                 rows={3} placeholder={"이 동사를 사용해서 문장을 써보세요!"} style={{width:"100%",background:C.surface,border:"1px solid "+(s.trim()?color+"60":C.border),borderRadius:12,padding:14,color:C.text,fontSize:14,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box",opacity:fb?0.6:1}}
               />
             </div>
           );})}
 
           {!fb&&(
-            <button onClick={function(){handleSubmit(activeVerb);}} disabled={isLoading[activeVerb]||sent.every(function(s){return !s.trim();})} style={{width:"100%",background:sent.some(function(s){return s.trim();})?color:C.border,color:sent.some(function(s){return s.trim();})?"#08090d":C.muted,border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:16}}>
-              {isLoading[activeVerb]?"✨ 교정 중...":"제출하고 교정 받기 →"}
+            <button onClick={function(){handleSubmit(activeVerbId);}} disabled={isLoading[activeVerbId]||sent.every(function(s){return !s.trim();})} style={{width:"100%",background:sent.some(function(s){return s.trim();})?color:C.border,color:sent.some(function(s){return s.trim();})?"#08090d":C.muted,border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:16}}>
+              {isLoading[activeVerbId]?"교정 중...":"제출하고 교정 받기 →"}
             </button>
           )}
 
@@ -870,15 +1333,114 @@
                   <div style={{fontSize:14,color:C.text,fontStyle:"italic"}}>"{fb.bonus}"</div>
                 </div>
               )}
-              {!bothDone?(
-                <button onClick={function(){setActiveVerb(activeVerb==="basic"?"phrasal":"basic");}} style={{width:"100%",background:activeVerb==="basic"?C.accent:C.yellow,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
-                  {activeVerb==="basic"?"구동사 문장 쓰기 →":"기본동사 문장 쓰기 →"}
+              {!allDone?(
+                <button onClick={function(){var next=findNextTab();if(next)setActiveVerbId(next);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
+                  다음 동사 문장 쓰기 →
                 </button>
               ):(
-                <button onClick={function(){setDone(true);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"🎉 오늘 완료!"}</button>
+                <button onClick={function(){setDone(true);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"오늘 완료!"}</button>
               )}
             </div>
           )}
+        </div>
+      );
+    }
+
+    // ── CHAT SCREEN ─────────────────────────────────────────────────
+    function ChatScreen(props) {
+      var onHome = props.onHome;
+      var _s1=useState([]); var messages=_s1[0]; var setMessages=_s1[1];
+      var _s2=useState(""); var input=_s2[0]; var setInput=_s2[1];
+      var _s3=useState(false); var isLoading=_s3[0]; var setIsLoading=_s3[1];
+      var chatEndRef = useRef(null);
+
+      useEffect(function(){
+        // AI greeting
+        setMessages([{role:"ai",text:"Hey! How's it going? What's on your mind today?",correction:""}]);
+      },[]);
+
+      useEffect(function(){
+        if(chatEndRef.current) chatEndRef.current.scrollIntoView({behavior:"smooth"});
+      },[messages]);
+
+      var sendMessage = function() {
+        var text = input.trim();
+        if (!text || isLoading) return;
+        var newMessages = [].concat(messages, [{role:"user",text:text,correction:""}]);
+        setMessages(newMessages);
+        setInput("");
+        setIsLoading(true);
+
+        var conversationHistory = newMessages.map(function(m){return (m.role==="ai"?"AI: ":"Student: ")+m.text;}).join("\n");
+        var system = 'You are a friendly American English conversation partner. Rules:\n- Keep responses SHORT (1-2 sentences)\n- Use natural American English\n- If the student makes mistakes, add [교정: correction in Korean]\n- Ask follow-up questions to continue\nReturn ONLY valid JSON:\n{"response":"English reply","correction":"교정 (or empty string)"}';
+        callClaude(system, 'Conversation so far:\n'+conversationHistory+'\n\nRespond to the student\'s last message naturally.')
+        .then(function(raw){
+          var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
+          setMessages(function(prev){return [].concat(prev,[{role:"ai",text:parsed.response,correction:parsed.correction||""}]);});
+        }).catch(function(){
+          setMessages(function(prev){return [].concat(prev,[{role:"ai",text:"Sorry, I had a brain freeze! Try again?",correction:""}]);});
+        }).finally(function(){setIsLoading(false);});
+      };
+
+      var handleKeyDown = function(e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      };
+
+      var resetChat = function() {
+        setMessages([{role:"ai",text:"Hey! Fresh start! What do you want to talk about?",correction:""}]);
+        setInput("");
+      };
+
+      return (
+        <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 60px)"}}>
+          <div style={{padding:"16px 20px",borderBottom:"1px solid "+C.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:11,color:C.blue,letterSpacing:3}}>AI CHAT</div>
+              <div style={{fontSize:18,fontWeight:800}}>영어 대화 연습</div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={resetChat} style={{background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>새 대화</button>
+              <button onClick={onHome} style={{background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>홈으로</button>
+            </div>
+          </div>
+
+          <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
+            {messages.map(function(m,i){
+              var isAi = m.role==="ai";
+              return(
+                <div key={i} style={{display:"flex",justifyContent:isAi?"flex-start":"flex-end",marginBottom:12}}>
+                  <div style={{maxWidth:"80%",background:isAi?C.surface:C.blue+"20",border:"1px solid "+(isAi?C.border:C.blue+"40"),borderRadius:isAi?"4px 14px 14px 14px":"14px 4px 14px 14px",padding:"12px 14px"}}>
+                    <div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{m.text}</div>
+                    {m.correction&&(
+                      <div style={{marginTop:8,padding:"6px 10px",background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:8,fontSize:12,color:C.yellow,lineHeight:1.5}}>
+                        {"[교정] "}{m.correction}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {isLoading&&(
+              <div style={{display:"flex",justifyContent:"flex-start",marginBottom:12}}>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:"4px 14px 14px 14px",padding:"12px 14px"}}>
+                  <div style={{fontSize:14,color:C.muted}}>{"..."}</div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef}/>
+          </div>
+
+          <div style={{padding:"12px 20px 24px",borderTop:"1px solid "+C.border,display:"flex",gap:8}}>
+            <textarea value={input} onChange={function(e){setInput(e.target.value);}} onKeyDown={handleKeyDown}
+              rows={1} placeholder="Type in English..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px",color:C.text,fontSize:14,lineHeight:1.4,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}
+            />
+            <button onClick={sendMessage} disabled={isLoading||!input.trim()} style={{background:input.trim()?C.blue:C.border,color:input.trim()?"#08090d":C.muted,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>
+              {"→"}
+            </button>
+          </div>
         </div>
       );
     }
@@ -951,7 +1513,7 @@
           {!result && (
             <div>
               <div style={{display:"flex",gap:8,marginBottom:20}}>
-                {[{id:"record",label:"🎙️ 녹음",desc:"대화 녹음"},{id:"type",label:"⌨️ 입력",desc:"직접 타이핑"}].map(function(t){return(
+                {[{id:"record",label:"녹음",desc:"대화 녹음"},{id:"type",label:"입력",desc:"직접 타이핑"}].map(function(t){return(
                   <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
                     <div style={{fontSize:13,fontWeight:700,color:mode===t.id?C.accent:C.text}}>{t.label}</div>
                     <div style={{fontSize:10,color:C.muted,marginTop:3}}>{t.desc}</div>
@@ -998,7 +1560,7 @@
                     {mode==="record"?"다시 녹음":"지우기"}
                   </button>
                   <button onClick={analyze} disabled={isLoading} style={{flex:2,background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                    {isLoading?"✨ 분석 중...":"쉬운 영어로 변환 →"}
+                    {isLoading?"분석 중...":"쉬운 영어로 변환 →"}
                   </button>
                 </div>
               )}
@@ -1011,7 +1573,7 @@
                 <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <div>
-                      <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>{"📍 상황"}</div>
+                      <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>상황</div>
                       <div style={{fontSize:14,color:C.text,fontWeight:600}}>{result.scenario}</div>
                     </div>
                     <div style={{background:C.accent+"20",color:C.accent,padding:"4px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>
@@ -1034,7 +1596,7 @@
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
                       <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{t.korean}"</div>
-                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{"💬 "}{t.english}</div>
+                      <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{t.english}</div>
                       {t.verbs_used?.length>0&&(
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {t.verbs_used.map(function(v,j){return(
@@ -1049,7 +1611,7 @@
 
               {result.key_verbs?.length>0&&(
                 <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,padding:16,marginBottom:14}}>
-                  <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:12}}>{"🔑 이 대화에 쓰인 기본동사"}</div>
+                  <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:12}}>이 대화에 쓰인 기본동사</div>
                   {result.key_verbs.map(function(v,i){return(
                     <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<result.key_verbs.length-1?"1px solid "+C.border:"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
@@ -1064,12 +1626,12 @@
 
               {result.coach_tip&&(
                 <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:20}}>
-                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:6}}>{"💡 COACH'S TIP"}</div>
+                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:6}}>{"COACH'S TIP"}</div>
                   <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{result.coach_tip}</div>
                 </div>
               )}
 
-              <button onClick={reset} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"🎙️ 새 대화 분석"}</button>
+              <button onClick={reset} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>새 대화 분석</button>
               <button onClick={function(){reset();if(onHome)onHome();}} style={{width:"100%",background:"none",border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:12,fontSize:13,cursor:"pointer"}}>홈으로</button>
             </div>
           )}
@@ -1092,15 +1654,22 @@
           {[].concat(history).reverse().map(function(item,i){return(
             <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:10}}>
               <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{item.date}</div>
-              <div style={{display:"flex",gap:8}}>
-                <div style={{flex:1,background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:8,padding:"8px 10px"}}>
-                  <div style={{fontSize:10,color:C.yellow,marginBottom:3}}>기본동사</div>
-                  <div style={{fontSize:15,fontWeight:800,color:C.yellow}}>{item.basic}</div>
-                </div>
-                <div style={{flex:1,background:C.accentDim,border:"1px solid "+C.accent+"30",borderRadius:8,padding:"8px 10px"}}>
-                  <div style={{fontSize:10,color:C.accent,marginBottom:3}}>구동사</div>
-                  <div style={{fontSize:15,fontWeight:800,color:C.accent}}>{item.phrasal}</div>
-                </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {item.verbs?item.verbs.map(function(v,vi){return(
+                  <div key={vi} style={{background:(vi%2===0?C.yellowDim:C.accentDim),border:"1px solid "+(vi%2===0?C.yellow:C.accent)+"30",borderRadius:8,padding:"6px 10px"}}>
+                    <div style={{fontSize:10,color:vi%2===0?C.yellow:C.accent,marginBottom:2}}>{vi%2===0?"기본":"구동사"}</div>
+                    <div style={{fontSize:14,fontWeight:800,color:vi%2===0?C.yellow:C.accent}}>{v}</div>
+                  </div>
+                );}):(<Fragment>
+                  <div style={{flex:1,background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:8,padding:"8px 10px"}}>
+                    <div style={{fontSize:10,color:C.yellow,marginBottom:3}}>기본동사</div>
+                    <div style={{fontSize:15,fontWeight:800,color:C.yellow}}>{item.basic}</div>
+                  </div>
+                  <div style={{flex:1,background:C.accentDim,border:"1px solid "+C.accent+"30",borderRadius:8,padding:"8px 10px"}}>
+                    <div style={{fontSize:10,color:C.accent,marginBottom:3}}>구동사</div>
+                    <div style={{fontSize:15,fontWeight:800,color:C.accent}}>{item.phrasal}</div>
+                  </div>
+                </Fragment>)}
               </div>
             </div>
           );})}
@@ -1115,7 +1684,7 @@
       return (
         <div style={{padding:"24px 20px"}}>
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>ADMIN ONLY</div>
-          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>{"📊 Talkfit 대시보드"}</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>Talkfit 대시보드</div>
           {days.map(function(d){
             var s = stats[d];
             var hasActivity = Object.values(s).some(function(v){return v>0;});
@@ -1124,9 +1693,9 @@
               <div key={d} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"10px 14px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
                 <div style={{fontSize:12,color:C.muted,fontWeight:700}}>{d}</div>
                 <div style={{display:"flex",gap:10,fontSize:12,color:C.text}}>
-                  <span>{"👥 "}{s.visit||0}</span>
-                  <span>{"📖 "}{s.lesson_start||0}</span>
-                  <span>{"✅ "}{s.lesson_done||0}</span>
+                  <span>{s.visit||0}</span>
+                  <span>{s.lesson_start||0}</span>
+                  <span>{s.lesson_done||0}</span>
                 </div>
               </div>
             );
@@ -1148,8 +1717,8 @@
             <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             {loading ? "로그인 중..." : "Google로 시작하기"}
           </button>
-          <div style={{fontSize:11,color:C.muted,marginTop:20,lineHeight:1.6}}>{"로그인하면 기기가 바뀌어도"}<br/>{"학습 기록이 유지돼요 📱💻"}</div>
-          <div style={{marginTop:40,fontSize:10,color:C.muted,opacity:0.5}}>{"by yoonsoo · beta v0.2"}</div>
+          <div style={{fontSize:11,color:C.muted,marginTop:20,lineHeight:1.6}}>{"로그인하면 기기가 바뀌어도"}<br/>{"학습 기록이 유지돼요"}</div>
+          <div style={{marginTop:40,fontSize:10,color:C.muted,opacity:0.5}}>{"by yoonsoo · beta v0.3"}</div>
         </div>
       );
     }
@@ -1158,15 +1727,14 @@
     function App() {
       var _s1=useState("home"); var tab=_s1[0]; var setTab=_s1[1];
       var _s2=useState("home"); var screen=_s2[0]; var setScreen=_s2[1];
-      var _s3=useState(null); var lesson=_s3[0]; var setLesson=_s3[1];
+      var _s3=useState(null); var lessons=_s3[0]; var setLessons=_s3[1];
       var _s4=useState(false); var todayDone=_s4[0]; var setTodayDone=_s4[1];
       var _s5=useState(0); var streak=_s5[0]; var setStreak=_s5[1];
       var _s6=useState(false); var loading=_s6[0]; var setLoading=_s6[1];
       var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
       var _s8=useState([]); var verbHistory=_s8[0]; var setVerbHistory=_s8[1];
-      var aiAvailable = true; // AI 항상 활성화 (서버에서 횟수 제한)
+      var aiAvailable = true;
 
-      // Auth state
       var _authState = useState(null); var user = _authState[0]; var setUser = _authState[1];
       var _authLoading = useState(true); var authLoading = _authLoading[0]; var setAuthLoading = _authLoading[1];
       var _loginLoading = useState(false); var loginLoading = _loginLoading[0]; var setLoginLoading = _loginLoading[1];
@@ -1176,9 +1744,7 @@
 
       var todayKey = function(){return new Date().toISOString().slice(0,10);};
 
-      // Listen to auth changes + handle redirect result
       useEffect(function() {
-        // redirect 로그인에서 돌아온 경우 처리
         fbAuth.getRedirectResult().catch(function(e){ console.error("Redirect error:", e); });
         var unsub = fbAuth.onAuthStateChanged(function(u) {
           setUser(u);
@@ -1187,7 +1753,6 @@
         return unsub;
       }, []);
 
-      // Load data from Firestore when user logs in
       useEffect(function(){
         if (!user) return;
         (async function(){
@@ -1195,19 +1760,18 @@
           if (cloudState) {
             setStreak(cloudState.streak||0);
             setVerbHistory(cloudState.history||[]);
-            if (cloudState.todayKey===todayKey()) { setTodayDone(cloudState.todayDone||false); if(cloudState.lesson)setLesson(cloudState.lesson); }
+            if (cloudState.todayKey===todayKey()) { setTodayDone(cloudState.todayDone||false); if(cloudState.lessons)setLessons(cloudState.lessons); }
             saveLocal("tk_state", cloudState);
           } else {
-            // First time user or migrate from localStorage
             var localState = loadLocal("tk_state");
             if (localState) {
               await saveCloud(user.uid, "tk_state", localState);
               setStreak(localState.streak||0);
               setVerbHistory(localState.history||[]);
-              if (localState.todayKey===todayKey()) { setTodayDone(localState.todayDone||false); if(localState.lesson)setLesson(localState.lesson); }
+              if (localState.todayKey===todayKey()) { setTodayDone(localState.todayDone||false); if(localState.lessons)setLessons(localState.lessons); }
             }
           }
-          if (!lesson) setLesson(getTodayLesson());
+          if (!lessons) setLessons(getTodayLesson());
 
           var cloudSpeak = await loadCloud(user.uid, "speak_history");
           if (cloudSpeak) setSpeakHistory(cloudSpeak);
@@ -1231,9 +1795,9 @@
         if (s) {
           setStreak(s.streak||0);
           setVerbHistory(s.history||[]);
-          if (s.todayKey===todayKey()) { setTodayDone(s.todayDone||false); if(s.lesson)setLesson(s.lesson); }
+          if (s.todayKey===todayKey()) { setTodayDone(s.todayDone||false); if(s.lessons)setLessons(s.lessons); }
         }
-        if (!lesson) setLesson(getTodayLesson());
+        if (!lessons) setLessons(getTodayLesson());
         setSpeakHistory(loadLocal("speak_history") || []);
       }, []);
 
@@ -1256,40 +1820,23 @@
 
       var handleStart = function() {
         track("lesson_start");
-        var dayIndex = Math.floor(Date.now() / 86400000);
-        if (dayIndex % LESSON_POOL.length === dayIndex && !lesson) setLesson(getTodayLesson());
-        if (!lesson) setLesson(getTodayLesson());
-
-        // Check if pool is exhausted and try AI generation
-        var totalDays = Math.floor(Date.now() / 86400000);
-        if (totalDays % LESSON_POOL.length === 0 && verbHistory.length >= LESSON_POOL.length) {
-          var storedLesson = loadLocal("ai_lesson_" + todayKey());
-          if (storedLesson) {
-            setLesson(storedLesson);
-          } else {
-            setLoading(true);
-            var completedVerbs = verbHistory.map(function(v){return v.basic;});
-            generateNewLesson(completedVerbs).then(function(newLesson){
-              setLesson(newLesson);
-              saveLocal("ai_lesson_" + todayKey(), newLesson);
-            }).catch(function(){
-              setLesson(getTodayLesson());
-            }).finally(function(){
-              setLoading(false);
-            });
-          }
-        }
-
+        if (!lessons) setLessons(getTodayLesson());
         setScreen("learn"); setTab("learn");
       };
 
       var handleComplete = function() {
         track("lesson_done");
         var newStreak = streak+1;
-        var newHistory = [].concat(verbHistory,[{basic:lesson.basic.verb,phrasal:lesson.phrasal.verb,date:todayKey()}]);
+        var allVerbs = [];
+        if (lessons) {
+          for (var li = 0; li < lessons.length; li++) {
+            allVerbs.push(lessons[li].basic.verb);
+            allVerbs.push(lessons[li].phrasal.verb);
+          }
+        }
+        var newHistory = [].concat(verbHistory,[{verbs:allVerbs,date:todayKey()}]);
         setStreak(newStreak); setTodayDone(true); setVerbHistory(newHistory);
-        persist({streak:newStreak,todayDone:true,history:newHistory,lesson:lesson});
-        // Sync XP to Firestore
+        persist({streak:newStreak,todayDone:true,history:newHistory,lessons:lessons});
         if (user) {
           var xpState = loadLocal("xp_state");
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
@@ -1297,7 +1844,6 @@
         setScreen("home"); setTab("home");
       };
 
-      // Show loading while checking auth
       if (authLoading) return (
         <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{textAlign:"center"}}>
@@ -1307,7 +1853,6 @@
         </div>
       );
 
-      // Show login screen when not authenticated
       if (!user) return <LoginScreen onLogin={handleLogin} loading={loginLoading} />;
 
       var TABS = [
@@ -1321,7 +1866,7 @@
         <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column"}}>
           <div style={{position:"sticky",top:0,zIndex:10,background:C.bg+"ee",backdropFilter:"blur(12px)",borderBottom:"1px solid "+C.border,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{fontWeight:900,fontSize:16,letterSpacing:-0.5}}>{"💪 Talkfit"}</div>
-            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak")&&(
+            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak"||screen==="roleplay"||screen==="chat")&&(
               <button onClick={function(){setScreen("home");setTab("home");}} style={{background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>{"← 홈"}</button>
             )}
             {screen==="home"&&user&&(
@@ -1334,15 +1879,17 @@
           </div>
 
           <div style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lesson={lesson} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}}/>}
-            {screen==="learn"&&<LearnScreen lesson={lesson} loading={loading} onNext={function(){setScreen("practice");}} aiAvailable={aiAvailable}/>}
-            {screen==="practice"&&<PracticeScreen lesson={lesson} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}}/>}
+            {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
+            {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
+            {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
             {screen==="history"&&<HistoryScreen history={verbHistory}/>}
             {screen==="speak"&&<SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/>}
+            {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
             {screen==="admin"&&<AdminScreen/>}
           </div>
 
-          {screen!=="practice"&&screen!=="admin"&&(
+          {screen!=="practice"&&screen!=="admin"&&screen!=="chat"&&(
             <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.surface+"f0",backdropFilter:"blur(20px)",borderTop:"1px solid "+C.border,display:"flex",padding:"10px 0 20px",zIndex:20}}>
               {TABS.map(function(t){return(
                 <button key={t.id} onClick={function(){if(t.action){handleStart();}else{setTab(t.id);setScreen(t.id);}}} style={{flex:1,background:"none",border:"none",color:!t.action&&tab===t.id?C.accent:C.muted,cursor:"pointer",padding:"6px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
