@@ -6,6 +6,14 @@
   <title>TalkFit — 매일 15분 미국식 영어</title>
   <meta name="description" content="매일 15분, 미국인이 실제 쓰는 영어 표현 트레이닝"/>
   <meta name="theme-color" content="#08090d"/>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml"/>
+  <style>
+    @keyframes splashFade{0%{opacity:1}80%{opacity:1}100%{opacity:0}}
+    #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#08090d;animation:splashFade 2s forwards}
+    #splash svg{width:120px;height:120px}
+    #splash .splash-text{margin-top:16px;font-size:22px;font-weight:900;color:#7ee8a2;letter-spacing:-0.5px}
+    #splash .splash-sub{margin-top:6px;font-size:12px;color:#4a5068}
+  </style>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
     body{background:#08090d;color:#e8eaf0;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;}
@@ -18,7 +26,13 @@
   </style>
 </head>
 <body>
+  <div id="splash">
+    <svg viewBox="0 0 512 512"><defs><linearGradient id="sbg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0a0d14"/><stop offset="100%" style="stop-color:#111827"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#sbg)"/><path d="M140 140 h232 a40 40 0 0 1 40 40 v140 a40 40 0 0 1 -40 40 h-140 l-60 50 v-50 h-32 a40 40 0 0 1 -40 -40 v-140 a40 40 0 0 1 40 -40z" fill="none" stroke="#7ee8a2" stroke-width="16" stroke-linejoin="round"/><text x="256" y="300" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="160" fill="#7ee8a2">T</text><circle cx="370" cy="170" r="14" fill="#fbbf24"/></svg>
+    <div class="splash-text">TalkFit</div>
+    <div class="splash-sub">쉬운 동사로 다 말한다</div>
+  </div>
   <div id="root"></div>
+  <script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.remove();},2000);</script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>

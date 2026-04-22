@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head><title>Icon Generator</title></head>
+<body style="background:#222;display:flex;flex-direction:column;align-items:center;gap:20px;padding:40px;">
+<canvas id="c2" width="1024" height="1024"></canvas>
+<button onclick="download()" style="padding:16px 32px;font-size:18px;cursor:pointer;background:#7ee8a2;border:none;border-radius:8px;font-weight:bold;">PNG 다운로드</button>
+
+<script>
+function download(){
+  var a=document.createElement('a');a.download='dev-profile-icon.png';
+  a.href=document.getElementById('c2').toDataURL('image/png');a.click();
+}
+
+(function(){
+  var c=document.getElementById('c2'),x=c.getContext('2d'),w=1024;
+  var g=x.createLinearGradient(0,0,w,w);
+  g.addColorStop(0,'#0f0f1a');g.addColorStop(1,'#1a1a2e');
+  x.fillStyle=g;
+  roundRect(x,0,0,w,w,160);x.fill();
+  x.strokeStyle='#60a5fa';x.lineWidth=32;x.lineCap='round';x.lineJoin='round';
+  x.beginPath();x.moveTo(380,280);x.lineTo(220,512);x.lineTo(380,744);x.stroke();
+  x.strokeStyle='#7ee8a2';
+  x.beginPath();x.moveTo(644,280);x.lineTo(804,512);x.lineTo(644,744);x.stroke();
+  x.strokeStyle='#fbbf24';x.lineWidth=28;
+  x.beginPath();x.moveTo(560,240);x.lineTo(464,784);x.stroke();
+  x.fillStyle='#f87171';x.beginPath();x.arc(420,512,18,0,Math.PI*2);x.fill();
+  x.fillStyle='#7ee8a2';x.beginPath();x.arc(512,512,18,0,Math.PI*2);x.fill();
+  x.fillStyle='#60a5fa';x.beginPath();x.arc(604,512,18,0,Math.PI*2);x.fill();
+})();
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+</script>
+</body>
+</html>
