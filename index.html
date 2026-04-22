@@ -1512,6 +1512,11 @@
       var _s11f=useState(""); var fileTranscript=_s11f[0]; var setFileTranscript=_s11f[1];
       var _altSit=useState(null); var altSituations=_altSit[0]; var setAltSituations=_altSit[1];
       var _altLoad=useState(false); var altLoading=_altLoad[0]; var setAltLoading=_altLoad[1];
+      var _practiceMode=useState(false); var practiceMode=_practiceMode[0]; var setPracticeMode=_practiceMode[1];
+      var _practiceIdx=useState(0); var practiceIdx=_practiceIdx[0]; var setPracticeIdx=_practiceIdx[1];
+      var _practiceAnswer=useState(""); var practiceAnswer=_practiceAnswer[0]; var setPracticeAnswer=_practiceAnswer[1];
+      var _practiceCheck=useState(null); var practiceCheck=_practiceCheck[0]; var setPracticeCheck=_practiceCheck[1];
+      var _practiceScore=useState({correct:0,total:0}); var practiceScore=_practiceScore[0]; var setPracticeScore=_practiceScore[1];
       var recRef = useRef(null);
       var timerRef = useRef(null);
 
@@ -2068,8 +2073,79 @@
                 </div>
               )}
 
-              <button onClick={reset} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>새 대화 분석</button>
-              <button onClick={function(){reset();if(onHome)onHome();}} style={{width:"100%",background:"none",border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:12,fontSize:13,cursor:"pointer"}}>홈으로</button>
+              {result.turns&&result.turns.length>0&&!practiceMode&&(
+                <button onClick={function(){setPracticeMode(true);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);setPracticeScore({correct:0,total:0});}} style={{width:"100%",background:C.orange,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"📝 연습하기"}</button>
+              )}
+
+              {practiceMode&&(function(){
+                var allQuestions = [];
+                result.turns.forEach(function(t){
+                  if(!t.english||!t.korean) return;
+                  var eng = (t.english||"").replace(/\*\*/g,"");
+                  var kor = t.korean;
+                  // 빈칸 채우기: 동사 부분을 ___로
+                  if(t.verbs_used&&t.verbs_used.length>0){
+                    var verb = t.verbs_used[0];
+                    var blank = eng.replace(new RegExp("\\b"+verb.verb.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i"),"_____");
+                    if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
+                  }
+                  // 한→영: 짧으면 입력, 길면 순서 맞추기
+                  if(eng.split(" ").length<=6){
+                    allQuestions.push({type:"translate",korean:kor,answer:eng});
+                  } else {
+                    var words = eng.split(" ");
+                    var shuffled = [].concat(words);
+                    for(var si=shuffled.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var tmp=shuffled[si];shuffled[si]=shuffled[sj];shuffled[sj]=tmp;}
+                    allQuestions.push({type:"order",korean:kor,words:shuffled,answer:eng});
+                  }
+                });
+                if(allQuestions.length===0) return null;
+                var q = allQuestions[practiceIdx%allQuestions.length];
+                var isLast = practiceIdx>=allQuestions.length-1;
+
+                return(
+                <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:16,padding:20,marginBottom:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                    <div style={{fontSize:11,color:C.orange,letterSpacing:2,fontWeight:700}}>{q.type==="fill"?"빈칸 채우기":q.type==="translate"?"한→영 번역":"순서 맞추기"}</div>
+                    <div style={{fontSize:11,color:C.muted}}>{practiceIdx+1}/{allQuestions.length}</div>
+                  </div>
+                  <div style={{fontSize:14,color:C.text,marginBottom:12,lineHeight:1.6}}>
+                    {q.type==="fill"&&<div><div style={{fontSize:12,color:C.muted,marginBottom:4}}>{q.korean}</div><div style={{fontSize:16,fontWeight:600}}>{q.sentence}</div></div>}
+                    {q.type==="translate"&&<div style={{fontSize:16,fontWeight:600}}>{q.korean}</div>}
+                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:10}}>{q.korean}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
+                      var selected = practiceAnswer.split(" ");
+                      var used = selected.filter(function(s){return s===w;}).length;
+                      var available = q.words.filter(function(ww,wwi){return ww===w&&wwi<=wi;}).length;
+                      var isUsed = used>=available;
+                      return <button key={wi} disabled={isUsed||practiceCheck} onClick={function(){setPracticeAnswer(function(a){return a?a+" "+w:w;});}} style={{background:isUsed?C.border:C.accent+"20",color:isUsed?C.muted:C.accent,border:"1px solid "+(isUsed?C.border:C.accent+"40"),borderRadius:8,padding:"6px 12px",fontSize:13,fontWeight:600,cursor:isUsed?"not-allowed":"pointer"}}>{w}</button>;
+                    })}</div>{practiceAnswer&&<div style={{marginTop:10,fontSize:14,color:C.text,background:C.bg,borderRadius:8,padding:10}}>{practiceAnswer}</div>}</div>}
+                  </div>
+                  {q.type!=="order"&&!practiceCheck&&(
+                    <input value={practiceAnswer} onChange={function(e){setPracticeAnswer(e.target.value);}} placeholder={q.type==="fill"?"동사를 입력하세요":"영어로 써보세요"} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:10}}/>
+                  )}
+                  {!practiceCheck?(
+                    <button disabled={!practiceAnswer.trim()} onClick={function(){
+                      var correct = practiceAnswer.trim().toLowerCase()===q.answer.toLowerCase();
+                      setPracticeCheck({correct:correct,answer:q.answer});
+                      setPracticeScore(function(s){return{correct:s.correct+(correct?1:0),total:s.total+1};});
+                    }} style={{width:"100%",background:practiceAnswer.trim()?C.orange:C.border,color:practiceAnswer.trim()?"#08090d":C.muted,border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>확인</button>
+                  ):(
+                    <div>
+                      <div style={{background:practiceCheck.correct?C.accent+"20":C.red+"20",border:"1px solid "+(practiceCheck.correct?C.accent:C.red)+"40",borderRadius:10,padding:12,marginBottom:10}}>
+                        <div style={{fontSize:14,fontWeight:700,color:practiceCheck.correct?C.accent:C.red,marginBottom:4}}>{practiceCheck.correct?"정답! 🎉":"오답"}</div>
+                        {!practiceCheck.correct&&<div style={{fontSize:13,color:C.text}}>정답: <span style={{fontWeight:700}}>{practiceCheck.answer}</span></div>}
+                      </div>
+                      <button onClick={function(){
+                        if(isLast){setPracticeMode(false);}
+                        else{setPracticeIdx(practiceIdx+1);setPracticeAnswer("");setPracticeCheck(null);}
+                      }} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>{isLast?"연습 완료! ("+practiceScore.correct+"/"+practiceScore.total+")":"다음 →"}</button>
+                    </div>
+                  )}
+                </div>);
+              })()}
+
+              <button onClick={function(){setPracticeMode(false);reset();}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>새 대화 분석</button>
+              <button onClick={function(){setPracticeMode(false);reset();if(onHome)onHome();}} style={{width:"100%",background:"none",border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:12,fontSize:13,cursor:"pointer"}}>홈으로</button>
             </div>
           )}
         </div>
