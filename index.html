@@ -65,7 +65,7 @@
 
     function signInWithGoogle() {
       var provider = new firebase.auth.GoogleAuthProvider();
-      return fbAuth.signInWithPopup(provider);
+      return fbAuth.signInWithRedirect(provider);
     }
     function signOutUser() {
       return fbAuth.signOut();
