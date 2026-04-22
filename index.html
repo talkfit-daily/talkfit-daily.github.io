@@ -1527,22 +1527,29 @@
       var _ytSegIdx = useState(0); var ytSegIdx = _ytSegIdx[0]; var setYtSegIdx = _ytSegIdx[1];
       var _ytVideoId = useState(""); var ytVideoId = _ytVideoId[0]; var setYtVideoId = _ytVideoId[1];
       var _savedYt = useState(function(){return load("yt_saved")||[];}); var savedYt = _savedYt[0]; var setSavedYt = _savedYt[1];
+      var _ytHasMore = useState(false); var ytHasMore = _ytHasMore[0]; var setYtHasMore = _ytHasMore[1];
+      var _ytCurrentMin = useState(0); var ytCurrentMin = _ytCurrentMin[0]; var setYtCurrentMin = _ytCurrentMin[1];
 
       function splitSegments(text) {
         var lines = text.split("\n").filter(function(l){return l.trim();});
+        if (lines.length <= 1) {
+          // 줄바꿈 없으면 문장 단위로 분리
+          var sentences = text.split(/(?<=[.!?])\s+/).filter(function(s){return s.trim();});
+          lines = sentences.length > 1 ? sentences : [text];
+        }
         var segs = []; var cur = [];
         for (var i=0;i<lines.length;i++) {
           cur.push(lines[i]);
-          if (cur.length >= 6) { segs.push(cur.join("\n")); cur=[]; }
+          if (cur.length >= 4) { segs.push(cur.join("\n")); cur=[]; }
         }
         if (cur.length) segs.push(cur.join("\n"));
         return segs;
       }
 
-      function saveYtProgress(videoId, title, segments, segIdx) {
+      function saveYtProgress(videoId, title, segments, segIdx, hasMore, currentMin) {
         var list = load("yt_saved")||[];
-        var existing = list.findIndex(function(s){return s.videoId===videoId;});
-        var entry = {videoId:videoId, title:title, segments:segments, segIdx:segIdx, total:segments.length, date:new Date().toISOString().slice(0,10)};
+        var existing = list.findIndex(function(s){return s.videoId===videoId&&s.currentMin===(currentMin||0);});
+        var entry = {videoId:videoId, title:title, segments:segments, segIdx:segIdx, total:segments.length, date:new Date().toISOString().slice(0,10), hasMore:hasMore||false, currentMin:currentMin||0};
         if (existing>=0) list[existing]=entry; else list.unshift(entry);
         list = list.slice(0,20);
         save("yt_saved", list);
@@ -1725,7 +1732,7 @@
                     <input value={ytUrl} onChange={function(e){setYtUrl(e.target.value);}} placeholder="https://youtube.com/watch?v=..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
                     <button disabled={ytLoading||!ytUrl.trim()} onClick={function(){
                       setYtLoading(true);setYtTitle("");setYtTranscript("");
-                      fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:ytUrl.trim()})})
+                      fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:ytUrl.trim(),startMin:0})})
                       .then(function(r){return r.json();}).then(function(data){
                         if(data.transcript){
                           setYtTitle(data.title||"");
@@ -1734,7 +1741,9 @@
                           setYtSegments(segs);
                           setYtSegIdx(0);
                           setYtTranscript(segs[0]||data.transcript);
-                          saveYtProgress(data.videoId||"", data.title||"", segs, 0);
+                          setYtHasMore(data.hasMore||false);
+                          setYtCurrentMin(data.startMin||0);
+                          saveYtProgress(data.videoId||"", data.title||"", segs, 0, data.hasMore, data.startMin||0);
                         } else{alert(data.error||"자막을 가져올 수 없어요.");}
                       }).catch(function(){alert("오류가 발생했어요.");}).finally(function(){setYtLoading(false);});
                     }} style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
@@ -1758,9 +1767,30 @@
                       </div>
                       <textarea value={ytTranscript} onChange={function(e){setYtTranscript(e.target.value);}} rows={6} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:14,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
                       <div style={{display:"flex",gap:8,marginTop:10}}>
-                        <button disabled={ytSegIdx<=0} onClick={function(){var ni=ytSegIdx-1;setYtSegIdx(ni);setYtTranscript(ytSegments[ni]);setResult(null);saveYtProgress(ytVideoId,ytTitle,ytSegments,ni);}} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:ytSegIdx<=0?C.border:C.muted,borderRadius:10,padding:"10px",fontSize:12,fontWeight:600,cursor:ytSegIdx<=0?"not-allowed":"pointer"}}>{"← 이전"}</button>
-                        <button disabled={ytSegIdx>=ytSegments.length-1} onClick={function(){var ni=ytSegIdx+1;setYtSegIdx(ni);setYtTranscript(ytSegments[ni]);setResult(null);saveYtProgress(ytVideoId,ytTitle,ytSegments,ni);}} style={{flex:1,background:ytSegIdx>=ytSegments.length-1?C.surface:C.accent+"20",border:"1px solid "+(ytSegIdx>=ytSegments.length-1?C.border:C.accent+"40"),color:ytSegIdx>=ytSegments.length-1?C.border:C.accent,borderRadius:10,padding:"10px",fontSize:12,fontWeight:700,cursor:ytSegIdx>=ytSegments.length-1?"not-allowed":"pointer"}}>{"다음 구간 →"}</button>
+                        <button disabled={ytSegIdx<=0} onClick={function(){var ni=ytSegIdx-1;setYtSegIdx(ni);setYtTranscript(ytSegments[ni]);setResult(null);saveYtProgress(ytVideoId,ytTitle,ytSegments,ni,ytHasMore,ytCurrentMin);}} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:ytSegIdx<=0?C.border:C.muted,borderRadius:10,padding:"10px",fontSize:12,fontWeight:600,cursor:ytSegIdx<=0?"not-allowed":"pointer"}}>{"← 이전"}</button>
+                        <button disabled={ytSegIdx>=ytSegments.length-1} onClick={function(){var ni=ytSegIdx+1;setYtSegIdx(ni);setYtTranscript(ytSegments[ni]);setResult(null);saveYtProgress(ytVideoId,ytTitle,ytSegments,ni,ytHasMore,ytCurrentMin);}} style={{flex:1,background:ytSegIdx>=ytSegments.length-1?C.surface:C.accent+"20",border:"1px solid "+(ytSegIdx>=ytSegments.length-1?C.border:C.accent+"40"),color:ytSegIdx>=ytSegments.length-1?C.border:C.accent,borderRadius:10,padding:"10px",fontSize:12,fontWeight:700,cursor:ytSegIdx>=ytSegments.length-1?"not-allowed":"pointer"}}>{"다음 구간 →"}</button>
                       </div>
+                      {ytSegIdx>=ytSegments.length-1&&ytHasMore&&(
+                        <button disabled={ytLoading} onClick={function(){
+                          var nextMin = (ytCurrentMin||0)+5;
+                          setYtLoading(true);
+                          fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+ytVideoId,startMin:nextMin})})
+                          .then(function(r){return r.json();}).then(function(data){
+                            if(data.transcript){
+                              var segs = splitSegments(data.transcript);
+                              setYtSegments(segs);
+                              setYtSegIdx(0);
+                              setYtTranscript(segs[0]||data.transcript);
+                              setYtHasMore(data.hasMore||false);
+                              setYtCurrentMin(nextMin);
+                              setResult(null);
+                              saveYtProgress(ytVideoId,ytTitle,segs,0,data.hasMore,nextMin);
+                            } else{alert(data.error||"더 이상 가져올 수 없어요.");}
+                          }).catch(function(){alert("오류가 발생했어요.");}).finally(function(){setYtLoading(false);});
+                        }} style={{width:"100%",marginTop:10,background:C.orange+"20",border:"1px solid "+C.orange+"40",color:C.orange,borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                          {ytLoading?"가져오는 중... (2-3분 소요)":"▶ 다음 5분 가져오기 ("+(ytCurrentMin+5)+"-"+(ytCurrentMin+10)+"분)"}
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -1769,7 +1799,7 @@
                       <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>저장된 영상</div>
                       {savedYt.map(function(item,i){return(
                         <div key={i} onClick={function(){loadYtLesson(item);}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:8,cursor:"pointer"}}>
-                          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{item.title||"YouTube 영상"}</div>
+                          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{item.title||"YouTube 영상"}{item.currentMin>0?" ("+(item.currentMin)+"-"+(item.currentMin+5)+"분)":""}</div>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                             <div style={{fontSize:11,color:C.muted}}>{item.date}</div>
                             <div style={{display:"flex",alignItems:"center",gap:6}}>
