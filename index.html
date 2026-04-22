@@ -1699,7 +1699,7 @@
                     <input value={ytUrl} onChange={function(e){setYtUrl(e.target.value);}} placeholder="https://youtube.com/watch?v=..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
                     <button disabled={ytLoading||!ytUrl.trim()} onClick={function(){
                       setYtLoading(true);setYtTitle("");setYtTranscript("");
-                      fetch("/api/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:ytUrl.trim()})})
+                      fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:ytUrl.trim()})})
                       .then(function(r){return r.json();}).then(function(data){
                         if(data.transcript){
                           setYtTitle(data.title||"");
