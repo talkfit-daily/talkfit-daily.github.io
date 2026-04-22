@@ -64,7 +64,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: user }] }],
-          generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
+          generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
         }),
       }
     );
