@@ -1529,6 +1529,42 @@
       var _savedYt = useState(function(){return load("yt_saved")||[];}); var savedYt = _savedYt[0]; var setSavedYt = _savedYt[1];
       var _ytHasMore = useState(false); var ytHasMore = _ytHasMore[0]; var setYtHasMore = _ytHasMore[1];
       var _ytCurrentMin = useState(0); var ytCurrentMin = _ytCurrentMin[0]; var setYtCurrentMin = _ytCurrentMin[1];
+      var _myChannels = useState(function(){return load("yt_channels")||[];}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
+      var _chSearch = useState(""); var chSearch = _chSearch[0]; var setChSearch = _chSearch[1];
+      var _chResults = useState([]); var chResults = _chResults[0]; var setChResults = _chResults[1];
+      var _chSearching = useState(false); var chSearching = _chSearching[0]; var setChSearching = _chSearching[1];
+      var _recVideos = useState([]); var recVideos = _recVideos[0]; var setRecVideos = _recVideos[1];
+      var _recLoading = useState(false); var recLoading = _recLoading[0]; var setRecLoading = _recLoading[1];
+      var _showChMgr = useState(false); var showChMgr = _showChMgr[0]; var setShowChMgr = _showChMgr[1];
+
+      function searchChannels() {
+        if (!chSearch.trim()) return;
+        setChSearching(true);
+        fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"search",query:chSearch.trim()})})
+        .then(function(r){return r.json();}).then(function(d){setChResults(d.channels||[]);})
+        .catch(function(){}).finally(function(){setChSearching(false);});
+      }
+
+      function addChannel(ch) {
+        var list = myChannels.filter(function(c){return c.id!==ch.id;});
+        list.push({id:ch.id,title:ch.title,thumbnail:ch.thumbnail});
+        setMyChannels(list); save("yt_channels",list);
+        setChResults([]); setChSearch("");
+      }
+
+      function removeChannel(chId) {
+        var list = myChannels.filter(function(c){return c.id!==chId;});
+        setMyChannels(list); save("yt_channels",list);
+      }
+
+      function loadRandomRecs() {
+        if (myChannels.length===0) return;
+        setRecLoading(true);
+        var randomCh = myChannels[Math.floor(Math.random()*myChannels.length)];
+        fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:randomCh.id})})
+        .then(function(r){return r.json();}).then(function(d){setRecVideos((d.videos||[]).map(function(v){v.channel=randomCh.title;return v;}));})
+        .catch(function(){}).finally(function(){setRecLoading(false);});
+      }
 
       function splitSegments(text) {
         var lines = text.split("\n").filter(function(l){return l.trim();});
@@ -1796,29 +1832,66 @@
 
                   {!ytTranscript && !ytLoading && (
                     <div style={{marginTop:16}}>
-                      <div style={{fontSize:11,color:C.red,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🔥 오늘의 추천 영상"}</div>
-                      <div style={{fontSize:11,color:C.muted,marginBottom:10}}>링크가 없어도 OK! 인기 영상으로 바로 시작</div>
-                      {[
-                        {id:"NfZRQ9o2Q4U",title:"일상 대화로 배우는 영어회화",channel:"라이브 아카데미",level:"초급",tag:"한국어해설"},
-                        {id:"bq6GBbh3uhU",title:"How to Talk About Your Daily Routine",channel:"BBC Learning English",level:"초급",tag:"일상"},
-                        {id:"FzW2gVf7SCw",title:"원어민이 쓰는 영어패턴 30개",channel:"영어해결사 크리크리",level:"중급",tag:"패턴"},
-                        {id:"TR0JZiapxXM",title:"50+ Advanced Phrases For Conversations",channel:"mmmEnglish",level:"고급",tag:"회화"},
-                        {id:"QQugvUh9fpU",title:"Why can't I stop buying STUPID THINGS?",channel:"Hey Tablo",level:"중급",tag:"재미"},
-                        {id:"oWjmNy9pmf8",title:"English Conversation for Beginners",channel:"Learn English with Jessica",level:"초급",tag:"대화"},
-                      ].map(function(rec,i){
-                        var levelColor = rec.level==="초급"?C.accent:rec.level==="중급"?C.yellow:C.orange;
-                        return(
-                        <div key={i} onClick={function(){setYtUrl("https://youtu.be/"+rec.id);}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>{rec.title}</div>
-                            <div style={{fontSize:11,color:C.muted}}>{rec.channel}</div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <div style={{fontSize:11,color:C.red,letterSpacing:2,fontWeight:700}}>{"🔥 내 채널에서 추천"}</div>
+                        <button onClick={function(){setShowChMgr(!showChMgr);}} style={{background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:8,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{showChMgr?"닫기":"채널 관리"}</button>
+                      </div>
+
+                      {showChMgr&&(
+                        <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:12}}>
+                          <div style={{fontSize:12,color:C.text,fontWeight:700,marginBottom:8}}>좋아하는 영어 채널 등록</div>
+                          <div style={{display:"flex",gap:6,marginBottom:10}}>
+                            <input value={chSearch} onChange={function(e){setChSearch(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter")searchChannels();}} placeholder="채널명 검색 (예: BBC English)" style={{flex:1,background:C.bg,border:"1px solid "+C.border,borderRadius:8,padding:"10px 12px",color:C.text,fontSize:13,outline:"none"}}/>
+                            <button disabled={chSearching} onClick={searchChannels} style={{background:C.accent,color:"#08090d",border:"none",borderRadius:8,padding:"10px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{chSearching?"검색 중...":"검색"}</button>
                           </div>
-                          <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
-                            <span style={{fontSize:10,color:levelColor,background:levelColor+"15",padding:"2px 6px",borderRadius:4,fontWeight:700}}>{rec.level}</span>
-                            <span style={{fontSize:10,color:C.muted,background:C.border,padding:"2px 6px",borderRadius:4}}>{rec.tag}</span>
-                          </div>
+                          {chResults.map(function(ch){return(
+                            <div key={ch.id} onClick={function(){addChannel(ch);}} style={{display:"flex",gap:10,alignItems:"center",padding:"8px",borderRadius:8,cursor:"pointer",marginBottom:4,background:C.bg}}>
+                              <img src={ch.thumbnail} style={{width:36,height:36,borderRadius:"50%"}} referrerPolicy="no-referrer"/>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:13,fontWeight:600,color:C.text}}>{ch.title}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{ch.description}</div>
+                              </div>
+                              <div style={{fontSize:11,color:C.accent,fontWeight:700}}>+ 추가</div>
+                            </div>
+                          );})}
+                          {myChannels.length>0&&(
+                            <div style={{marginTop:10}}>
+                              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>내 구독 채널</div>
+                              {myChannels.map(function(ch){return(
+                                <div key={ch.id} style={{display:"flex",gap:10,alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+C.border}}>
+                                  <img src={ch.thumbnail} style={{width:28,height:28,borderRadius:"50%"}} referrerPolicy="no-referrer"/>
+                                  <div style={{flex:1,fontSize:13,color:C.text}}>{ch.title}</div>
+                                  <button onClick={function(){removeChannel(ch.id);}} style={{background:"none",border:"none",color:C.red,fontSize:11,cursor:"pointer"}}>삭제</button>
+                                </div>
+                              );})}
+                            </div>
+                          )}
                         </div>
-                      );})}
+                      )}
+
+                      {myChannels.length>0?(
+                        <div>
+                          <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                            {myChannels.map(function(ch){return(
+                              <span key={ch.id} style={{background:C.accent+"15",color:C.accent,padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600}}>{ch.title}</span>
+                            );})}
+                          </div>
+                          <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
+                          {recVideos.map(function(rv){return(
+                            <div key={rv.id} onClick={function(){setYtUrl("https://youtu.be/"+rv.id);}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
+                              <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{rv.channel} · {rv.date}</div>
+                              </div>
+                            </div>
+                          );})}
+                        </div>
+                      ):(
+                        <div style={{fontSize:12,color:C.muted,textAlign:"center",padding:"20px 0"}}>
+                          위 "채널 관리"에서 좋아하는 영어 채널을 등록하면<br/>매번 랜덤으로 영상을 추천해줘요!
+                        </div>
+                      )}
                     </div>
                   )}
 
