@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/claude", "destination": "/api/claude" }
+    { "source": "/api/claude", "destination": "/api/claude" },
+    { "source": "/api/transcribe", "destination": "/api/transcribe" }
   ]
 }

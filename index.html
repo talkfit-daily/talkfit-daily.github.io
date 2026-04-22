@@ -681,7 +681,7 @@
           )}
 
           <div style={{display:"flex",gap:10,marginTop:4}}>
-            {[{label:"학습한 날",value:streak+"일"},{label:"오늘 동사",value:"4가지"}].map(function(s,i){return(
+            {[{label:"학습한 날",value:streak+"일"},{label:"AI 남은 횟수",value:aiRemaining+"회"}].map(function(s,i){return(
               <div key={i} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px"}}>
                 <div style={{fontSize:18,fontWeight:800}}>{s.value}</div>
                 <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
@@ -1507,13 +1507,33 @@
       var reset=function(){setTranscript("");setResult(null);setInterim("");setTextInput("");setSeconds(0);setAudioFile(null);if(audioUrl)URL.revokeObjectURL(audioUrl);setAudioUrl(null);setFileTranscript("");setAltSituations(null);setAltLoading(false);};
       var formatTime=function(s){return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
 
+      var _fileLoading = useState(false); var fileLoading = _fileLoading[0]; var setFileLoading = _fileLoading[1];
+
       var handleFileUpload = function(e) {
         var file = e.target.files && e.target.files[0];
         if (!file) return;
+        if (file.size > 4 * 1024 * 1024) { alert("4MB 이하의 파일만 가능해요."); return; }
         setAudioFile(file);
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         var url = URL.createObjectURL(file);
         setAudioUrl(url);
+        // 자동 음성인식
+        setFileLoading(true);
+        setFileTranscript("음성 인식 중...");
+        var reader = new FileReader();
+        reader.onload = function() {
+          var base64 = reader.result.split(",")[1];
+          fetch("/api/transcribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audio: base64, mimeType: file.type || "audio/webm" })
+          }).then(function(r){return r.json();}).then(function(data){
+            if (data.text) { setFileTranscript(data.text); }
+            else { setFileTranscript(""); alert(data.error || "음성 인식에 실패했어요."); }
+          }).catch(function(){ setFileTranscript(""); alert("음성 인식 중 오류가 발생했어요."); })
+          .finally(function(){ setFileLoading(false); });
+        };
+        reader.readAsDataURL(file);
       };
 
       var fetchAltSituations = function(parsed) {
@@ -1604,10 +1624,10 @@
 
               {mode==="file" && (
                 <div style={{marginBottom:16}}>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>녹음 파일을 업로드하고, 대화 내용을 입력하세요</div>
+                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>오디오 파일을 올리면 AI가 자동으로 텍스트로 변환해요</div>
                   <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:12}}>
-                    <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:10}}>{"1. \uC624\uB514\uC624 \uD30C\uC77C"}</div>
-                    <input type="file" accept="audio/*" onChange={handleFileUpload} style={{fontSize:13,color:C.text,marginBottom:8,width:"100%"}}/>
+                    <input type="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.aac" onChange={handleFileUpload} style={{fontSize:13,color:C.text,marginBottom:8,width:"100%"}}/>
+                    <div style={{fontSize:10,color:C.muted,marginTop:4}}>mp3, m4a, wav, webm 지원 · 최대 4MB</div>
                     {audioUrl && (
                       <div style={{marginTop:10}}>
                         <audio controls src={audioUrl} style={{width:"100%",height:40,borderRadius:8}}/>
@@ -1615,11 +1635,21 @@
                       </div>
                     )}
                   </div>
-                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
-                    <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:10}}>{"2. \uB300\uD654 \uB0B4\uC6A9 \uC785\uB825"}</div>
-                    <div style={{fontSize:11,color:C.muted,marginBottom:8}}>파일을 들으면서 대화 내용을 한국어로 적어주세요</div>
-                    <textarea value={fileTranscript} onChange={function(e){setFileTranscript(e.target.value);}} rows={6} placeholder={"예시:\n야 오늘 점심 뭐 먹을래?\n나 어제 먹은 데 또 가자\n거기 줄 길지 않을까?"} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:14,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-                  </div>
+                  {fileLoading && (
+                    <div style={{background:C.accentDim,border:"1px solid "+C.accent+"30",borderRadius:14,padding:16,textAlign:"center"}}>
+                      <div style={{fontSize:14,marginBottom:4}}>{"🎧"}</div>
+                      <div style={{fontSize:13,color:C.accent,fontWeight:700}}>AI가 음성을 인식하고 있어요...</div>
+                    </div>
+                  )}
+                  {!fileLoading && fileTranscript && fileTranscript !== "음성 인식 중..." && (
+                    <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>인식된 텍스트</div>
+                        <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
+                      </div>
+                      <textarea value={fileTranscript} onChange={function(e){setFileTranscript(e.target.value);}} rows={4} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:14,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                    </div>
+                  )}
                 </div>
               )}
 
