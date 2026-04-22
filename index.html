@@ -2081,7 +2081,7 @@
     function ReviewScreen(props) {
       var lessons = props.lessons;
       var speakHistory = props.speakHistory;
-      var todayKey = new Date().toISOString().slice(0,10);
+      var todayKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       var _revealed = useState({}); var revealed = _revealed[0]; var setRevealed = _revealed[1];
       var toggleReveal = function(key){setRevealed(function(r){var n={};for(var k in r)n[k]=r[k];n[key]=!n[key];return n;});};
 
@@ -2324,7 +2324,7 @@
       var isAdmin = false;
       try { isAdmin = new URLSearchParams(window.location.search).get("admin") === ADMIN_KEY; } catch(e){}
 
-      var todayKey = function(){return new Date().toISOString().slice(0,10);};
+      var todayKey = function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);};
 
       useEffect(function() {
         fbAuth.getRedirectResult().catch(function(e){ console.error("Redirect error:", e); });
