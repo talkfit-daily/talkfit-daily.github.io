@@ -45,12 +45,21 @@ export default async function handler(req, res) {
   const dailyLimit = getDailyLimit(userLevel);
 
   if (!global._rlStore) global._rlStore = {};
-  if (global._rlDate !== today) { global._rlStore = {}; global._rlDate = today; }
+  if (global._rlDate !== today) { global._rlStore = {}; global._rlDate = today; global._globalCount = 0; }
+
+  // 글로벌 일일 캡 — Gemini 무료 tier 1500회 중 안전하게 1200회
+  global._globalCount = (global._globalCount || 0);
+  if (global._globalCount >= 1200) {
+    return res.status(429).json({
+      error: "오늘 서버 사용량이 초과됐어요. 내일 다시 이용해주세요!",
+      remaining: 0,
+    });
+  }
 
   const count = global._rlStore[rlKey] || 0;
   if (count >= dailyLimit) {
     return res.status(429).json({
-      error: `오늘 AI 사용 횟수(${dailyLimit}회)를 모두 사용했어요. 레벨업하면 더 많이 쓸 수 있어요!`,
+      error: `오늘 AI 사용 횟수(${dailyLimit}회)를 모두 사용했어요.`,
       remaining: 0,
     });
   }
@@ -84,6 +93,7 @@ export default async function handler(req, res) {
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     global._rlStore[rlKey] = count + 1;
+    global._globalCount = (global._globalCount || 0) + 1;
 
     return res.status(200).json({
       text,
