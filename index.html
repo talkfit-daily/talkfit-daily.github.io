@@ -580,21 +580,25 @@
 
     // ── getTodayLesson: returns array of 2 lesson sets ─────────────
     function getTodayLesson() {
-      // 회화에서 만난 동사 중 LESSON_POOL에 있는 것 우선
-      var encountered = load("my_encountered_verbs") || [];
+      // 로그인한 사용자는 AI 생성 동사 풀도 포함
+      var isLoggedIn = !!load("tk_state"); // tk_state는 로그인 시 저장됨
+      var myPool = isLoggedIn ? (load("my_lesson_pool") || []) : [];
+      var POOL = LESSON_POOL.concat(myPool);
+
+      var encountered = isLoggedIn ? (load("my_encountered_verbs") || []) : [];
       var learnedDates = load("learned_lesson_dates") || {};
       var todayKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
 
       // 이미 오늘 정해진 레슨이 있으면 그대로
       if (learnedDates[todayKey]) {
-        var lessons = learnedDates[todayKey].map(function(idx){return LESSON_POOL[idx];}).filter(Boolean);
+        var lessons = learnedDates[todayKey].map(function(idx){return POOL[idx];}).filter(Boolean);
         if (lessons.length === 2) return lessons;
       }
 
-      // 회화에서 본 동사 중 LESSON_POOL에 있는 것 찾기
+      // 회화에서 본 동사 중 POOL에 있는 것 찾기
       var matchedIndices = [];
       var encounteredVerbs = encountered.map(function(e){return e.verb.toLowerCase();});
-      LESSON_POOL.forEach(function(lp,i){
+      POOL.forEach(function(lp,i){
         if (lp.basic && encounteredVerbs.indexOf(lp.basic.verb.toLowerCase()) !== -1) matchedIndices.push(i);
         else if (lp.phrasal && encounteredVerbs.indexOf(lp.phrasal.verb.toLowerCase()) !== -1) matchedIndices.push(i);
       });
@@ -603,26 +607,23 @@
       var idx1, idx2;
 
       if (matchedIndices.length >= 1) {
-        // 회화 동사 매칭된 것 우선
         idx1 = matchedIndices[dayIndex % matchedIndices.length];
-        // 두 번째는 풀에서 다른 것
-        idx2 = ((dayIndex + 1) * 2) % LESSON_POOL.length;
-        if (idx2 === idx1) idx2 = (idx2 + 1) % LESSON_POOL.length;
+        idx2 = ((dayIndex + 1) * 2) % POOL.length;
+        if (idx2 === idx1) idx2 = (idx2 + 1) % POOL.length;
       } else {
-        idx1 = (dayIndex * 2) % LESSON_POOL.length;
-        idx2 = (dayIndex * 2 + 1) % LESSON_POOL.length;
+        idx1 = (dayIndex * 2) % POOL.length;
+        idx2 = (dayIndex * 2 + 1) % POOL.length;
       }
 
-      // 모든 풀 다 학습했는지 체크 (한 번씩 다 봤으면 복습 모드)
+      // 모든 풀 다 학습했는지 체크
       var allLearnedIndices = {};
       Object.values(learnedDates).forEach(function(arr){arr.forEach(function(i){allLearnedIndices[i]=true;});});
       var totalLearned = Object.keys(allLearnedIndices).length;
 
-      if (totalLearned >= LESSON_POOL.length) {
-        // 풀 다 학습 → 약점 동사 우선 복습 (회화 빈도 높은 것)
+      if (totalLearned >= POOL.length) {
         var weakIndices = [];
         encountered.sort(function(a,b){return (b.count||1)-(a.count||1);}).forEach(function(e){
-          LESSON_POOL.forEach(function(lp,i){
+          POOL.forEach(function(lp,i){
             if (lp.basic && lp.basic.verb === e.verb.toLowerCase()) weakIndices.push(i);
             if (lp.phrasal && lp.phrasal.verb === e.verb.toLowerCase()) weakIndices.push(i);
           });
@@ -630,13 +631,13 @@
         if (weakIndices.length >= 2) {
           idx1 = weakIndices[dayIndex % weakIndices.length];
           idx2 = weakIndices[(dayIndex+1) % weakIndices.length];
-          if (idx1 === idx2) idx2 = (idx2+1) % LESSON_POOL.length;
+          if (idx1 === idx2) idx2 = (idx2+1) % POOL.length;
         }
       }
 
       learnedDates[todayKey] = [idx1, idx2];
       save("learned_lesson_dates", learnedDates);
-      return [LESSON_POOL[idx1], LESSON_POOL[idx2]];
+      return [POOL[idx1], POOL[idx2]];
     }
 
     async function generateNewLesson(completedVerbs) {
@@ -1839,9 +1840,11 @@
           var parsed = JSON.parse(jsonStr.trim());
           setResult(parsed);
           var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-          // 회화에서 만난 동사들을 "내 동사 풀"에 저장
-          if (parsed.key_verbs && parsed.key_verbs.length > 0) {
+          // 로그인 사용자만 개인 동사 풀 적용
+          var loggedIn = !!load("tk_state");
+          if (loggedIn && parsed.key_verbs && parsed.key_verbs.length > 0) {
             var myVerbs = load("my_encountered_verbs") || [];
+            var newVerbs = [];
             parsed.key_verbs.forEach(function(kv) {
               var existing = myVerbs.find(function(v){return v.verb===kv.verb;});
               if (existing) {
@@ -1849,9 +1852,37 @@
                 existing.lastSeen = todayK;
               } else {
                 myVerbs.push({verb:kv.verb,type:kv.type||(kv.verb.indexOf(" ")!==-1?"phrasal":"basic"),meaning:kv.meaning,example:kv.example,count:1,firstSeen:todayK,lastSeen:todayK,source:"회화"});
+                newVerbs.push(kv);
               }
             });
             save("my_encountered_verbs", myVerbs);
+
+            // 새 동사 중 LESSON_POOL에 없는 것 → 백그라운드로 정식 레슨 생성
+            var myPool = load("my_lesson_pool") || [];
+            newVerbs.forEach(function(kv) {
+              var v = kv.verb.toLowerCase();
+              var inPool = LESSON_POOL.some(function(lp){return (lp.basic&&lp.basic.verb===v)||(lp.phrasal&&lp.phrasal.verb===v);});
+              var inMyPool = myPool.some(function(lp){return (lp.basic&&lp.basic.verb===v)||(lp.phrasal&&lp.phrasal.verb===v);});
+              if (!inPool && !inMyPool) {
+                // AI에게 레슨 생성 요청 (백그라운드)
+                setTimeout(function(){
+                  var sys='Generate a TalkFit-style lesson for the verb "'+kv.verb+'" (Korean meaning: '+(kv.meaning||"")+'). Include 1 basic verb form and 1 phrasal verb form (must share root with this verb if possible). Return ONLY valid JSON: {"basic":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[{"meaning":"","example":""}],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","good_example":"","practice_hint":"","confuse_with":{"verb":"","diff_ko":"","example_this":"","example_other":""}},"phrasal":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","good_example":"","practice_hint":""}}';
+                  callClaude(sys,'Create lesson for: '+kv.verb).then(function(r){
+                    try{
+                      var j=r;var fm=r.match(/```(?:json)?\s*([\s\S]*?)```/);
+                      if(fm)j=fm[1];else{var s=r.indexOf("{"),e=r.lastIndexOf("}");if(s!==-1&&e!==-1)j=r.slice(s,e+1);}
+                      var newLesson=JSON.parse(j.trim());
+                      newLesson.aiGenerated=true;
+                      newLesson.sourceVerb=kv.verb;
+                      newLesson.createdAt=todayK;
+                      var pool=load("my_lesson_pool")||[];
+                      pool.push(newLesson);
+                      save("my_lesson_pool",pool);
+                    }catch(e){}
+                  }).catch(function(){});
+                }, 2000);
+              }
+            });
           }
           var entry = {id:Date.now(),date:todayK,scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs,key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip,sourceText:text};
           var next=[entry].concat(history).slice(0,50);
