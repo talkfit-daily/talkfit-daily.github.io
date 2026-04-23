@@ -2584,15 +2584,8 @@
             <div>
               {result.scenario&&(
                 <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div>
-                      <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>상황</div>
-                      <div style={{fontSize:14,color:C.text,fontWeight:600}}>{result.scenario}</div>
-                    </div>
-                    <div style={{background:C.accent+"20",color:C.accent,padding:"4px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>
-                      {result.speakers||1}{"명"}
-                    </div>
-                  </div>
+                  <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>상황</div>
+                  <div style={{fontSize:14,color:C.text,fontWeight:600}}>{result.scenario}</div>
                 </div>
               )}
 
@@ -2613,12 +2606,17 @@
                 </div>
               )}
 
-              {expanded.turns&&result.turns?.map(function(t,i){
-                var colors = [C.accent,C.blue,C.yellow,C.orange];
-                var color = colors[i % colors.length];
+              {expanded.turns&&(function(){
+                // 실제로 화자가 2명 이상인지 체크 (턴의 speaker 값이 다른 게 있는지)
+                var uniqueSpeakers={};result.turns.forEach(function(t){if(t.speaker)uniqueSpeakers[t.speaker]=true;});
+                var hasMul=Object.keys(uniqueSpeakers).length>1;
+                var speakerColors={};var cidx=0;var colors=[C.accent,C.blue,C.yellow,C.orange];
+                Object.keys(uniqueSpeakers).forEach(function(s){speakerColors[s]=colors[cidx%colors.length];cidx++;});
+                return result.turns.map(function(t,i){
+                var color = hasMul&&t.speaker?speakerColors[t.speaker]||C.accent:C.accent;
                 return (
                   <div key={i} style={{marginBottom:14}}>
-                    {result.speakers>1&&(
+                    {hasMul&&t.speaker&&(
                       <div style={{fontSize:11,color:color,fontWeight:800,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
                         <span style={{width:6,height:6,borderRadius:"50%",background:color}}/>
                         {t.speaker}
@@ -2645,7 +2643,7 @@
                     </div>
                   </div>
                 );
-              })}
+              });})()}
 
               {result.key_verbs?.length>0&&(
                 <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
