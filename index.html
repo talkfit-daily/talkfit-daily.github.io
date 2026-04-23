@@ -2493,6 +2493,13 @@
                 </div>
               </div>
 
+              {result.turns?.length>0&&!expanded.turns&&(
+                <div className="tf-press" onClick={function(){toggleSection("turns");}} style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:12,padding:"14px 16px",marginBottom:12,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"💬 원문 대화 · "+result.turns.length+"턴"}</div>
+                  <div style={{fontSize:14,color:C.muted}}>{"▼"}</div>
+                </div>
+              )}
+
               {expanded.turns&&result.turns?.map(function(t,i){
                 var colors = [C.accent,C.blue,C.yellow,C.orange];
                 var color = colors[i % colors.length];
