@@ -580,9 +580,41 @@
 
     // ── getTodayLesson: returns array of 2 lesson sets ─────────────
     function getTodayLesson() {
+      // 회화에서 만난 동사 중 LESSON_POOL에 있는 것 우선
+      var encountered = load("my_encountered_verbs") || [];
+      var learnedDates = load("learned_lesson_dates") || {};
+      var todayKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+
+      // 이미 오늘 정해진 레슨이 있으면 그대로
+      if (learnedDates[todayKey]) {
+        var lessons = learnedDates[todayKey].map(function(idx){return LESSON_POOL[idx];}).filter(Boolean);
+        if (lessons.length === 2) return lessons;
+      }
+
+      // 회화에서 본 동사 중 LESSON_POOL에 있는 것 찾기
+      var matchedIndices = [];
+      var encounteredVerbs = encountered.map(function(e){return e.verb.toLowerCase();});
+      LESSON_POOL.forEach(function(lp,i){
+        if (lp.basic && encounteredVerbs.indexOf(lp.basic.verb.toLowerCase()) !== -1) matchedIndices.push(i);
+        else if (lp.phrasal && encounteredVerbs.indexOf(lp.phrasal.verb.toLowerCase()) !== -1) matchedIndices.push(i);
+      });
+
       var dayIndex = Math.floor(Date.now() / 86400000);
-      var idx1 = (dayIndex * 2) % LESSON_POOL.length;
-      var idx2 = (dayIndex * 2 + 1) % LESSON_POOL.length;
+      var idx1, idx2;
+
+      if (matchedIndices.length >= 1) {
+        // 회화 동사 매칭된 것 우선
+        idx1 = matchedIndices[dayIndex % matchedIndices.length];
+        // 두 번째는 풀에서 다른 것
+        idx2 = ((dayIndex + 1) * 2) % LESSON_POOL.length;
+        if (idx2 === idx1) idx2 = (idx2 + 1) % LESSON_POOL.length;
+      } else {
+        idx1 = (dayIndex * 2) % LESSON_POOL.length;
+        idx2 = (dayIndex * 2 + 1) % LESSON_POOL.length;
+      }
+
+      learnedDates[todayKey] = [idx1, idx2];
+      save("learned_lesson_dates", learnedDates);
       return [LESSON_POOL[idx1], LESSON_POOL[idx2]];
     }
 
@@ -1786,6 +1818,20 @@
           var parsed = JSON.parse(jsonStr.trim());
           setResult(parsed);
           var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+          // 회화에서 만난 동사들을 "내 동사 풀"에 저장
+          if (parsed.key_verbs && parsed.key_verbs.length > 0) {
+            var myVerbs = load("my_encountered_verbs") || [];
+            parsed.key_verbs.forEach(function(kv) {
+              var existing = myVerbs.find(function(v){return v.verb===kv.verb;});
+              if (existing) {
+                existing.count = (existing.count||1) + 1;
+                existing.lastSeen = todayK;
+              } else {
+                myVerbs.push({verb:kv.verb,type:kv.type||(kv.verb.indexOf(" ")!==-1?"phrasal":"basic"),meaning:kv.meaning,example:kv.example,count:1,firstSeen:todayK,lastSeen:todayK,source:"회화"});
+              }
+            });
+            save("my_encountered_verbs", myVerbs);
+          }
           var entry = {id:Date.now(),date:todayK,scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs,key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip,sourceText:text};
           var next=[entry].concat(history).slice(0,50);
           setHistory(next);
