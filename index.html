@@ -1675,31 +1675,35 @@
         setResult(null);
       }
 
-      // 백그라운드로 다음 구간 자동 가져오기
+      // 백그라운드 폴링: ytStatus로 진행도 확인
       var _bgLoading = useState(false); var bgLoading = _bgLoading[0]; var setBgLoading = _bgLoading[1];
-      function fetchNextChunkInBackground(videoId, title, currentMin, currentSegs) {
+      function pollYtStatus(videoId, title, totalChunks) {
         if (!videoId) return;
         setBgLoading(true);
-        var nextMin = currentMin + 5;
-        fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+videoId,startMin:nextMin})})
-        .then(function(r){return r.json();}).then(function(data){
-          if(data.transcript){
-            var newSegs = splitSegments(data.transcript);
-            setYtSegments(function(prev){
-              var combined = prev.concat(newSegs);
-              saveYtProgress(videoId, title, combined, 0, data.hasMore, 0);
-              // hasMore면 다시 백그라운드로
-              if(data.hasMore && nextMin < 60) {
-                setTimeout(function(){fetchNextChunkInBackground(videoId, title, nextMin, combined);}, 500);
-              } else {
-                setBgLoading(false);
-              }
-              return combined;
-            });
-          } else {
-            setBgLoading(false);
-          }
-        }).catch(function(){setBgLoading(false);});
+        var pollFn = function(){
+          fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/ytStatus?videoId="+encodeURIComponent(videoId))
+          .then(function(r){return r.json();}).then(function(data){
+            if(data.exists && data.chunks){
+              // 모든 구간 transcript 합쳐서 segments 재계산
+              var allText = data.chunks.map(function(c){return c.transcript;}).join("\n");
+              var allSegs = splitSegments(allText);
+              setYtSegments(function(prev){
+                if(allSegs.length > prev.length){
+                  saveYtProgress(videoId, title, allSegs, 0, !data.done, 0);
+                  return allSegs;
+                }
+                return prev;
+              });
+              if(data.done){setBgLoading(false);return;}
+            }
+            setTimeout(pollFn, 3000); // 3초마다
+          }).catch(function(){setTimeout(pollFn, 5000);});
+        };
+        setTimeout(pollFn, 2000);
+      }
+      function fetchNextChunkInBackground(videoId, title, currentMin, currentSegs) {
+        // 호환성용 — 새 폴링 방식 사용
+        pollYtStatus(videoId, title, 0);
       }
 
       var handleFileUpload = function(e) {
