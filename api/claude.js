@@ -8,16 +8,16 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
 ];
 
-// 레벨별 일일 AI 한도 (1~99) — 박하게
+// 레벨별 일일 AI 한도 (1~99) — 레슨(2)+회화(3)+채팅(10) 최소 보장
 function getDailyLimit(level) {
   var lv = parseInt(level) || 1;
-  if (lv <= 3) return 5 + lv;               // Lv1=6, Lv3=8
-  if (lv <= 10) return 8 + (lv - 3) * 2;    // Lv4=10, Lv10=22
-  if (lv <= 20) return 22 + (lv - 10) * 2;  // Lv11=24, Lv20=42
-  if (lv <= 30) return 42 + (lv - 20) * 2;  // Lv21=44, Lv30=62
-  if (lv <= 50) return 62 + (lv - 30) * 2;  // Lv31=64, Lv50=102
-  if (lv <= 80) return 102 + (lv - 50) * 2; // Lv51=104, Lv80=162
-  if (lv <= 98) return 162 + (lv - 80) * 2; // Lv81=164, Lv98=198
+  if (lv <= 3) return 12 + lv * 3;           // Lv1=15, Lv2=18, Lv3=21
+  if (lv <= 10) return 21 + (lv - 3) * 3;    // Lv4=24, Lv10=42
+  if (lv <= 20) return 42 + (lv - 10) * 3;   // Lv11=45, Lv20=72
+  if (lv <= 30) return 72 + (lv - 20) * 3;   // Lv21=75, Lv30=102
+  if (lv <= 50) return 102 + (lv - 30) * 2;  // Lv31=104, Lv50=142
+  if (lv <= 80) return 142 + (lv - 50) * 2;  // Lv51=144, Lv80=202
+  if (lv <= 98) return 202 + (lv - 80) * 2;  // Lv81=204, Lv98=238
   return 9999;                              // Lv99 무제한 보상
 }
 const MAX_SYSTEM_LEN = 5000;

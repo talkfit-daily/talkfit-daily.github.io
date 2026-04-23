@@ -480,8 +480,8 @@
       var listenOpts = [listenEx.ex.korean].concat(uniqueWrong.sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
       quizzes.push({type:"listening", audio_text:listenEx.ex.english, options:listenOpts, answer:listenEx.ex.korean, verb:listenEx.verb});
 
-      // Q4: meaning quiz for lesson2 phrasal
-      var p2 = lessons[1].phrasal;
+      // Q4: meaning quiz for phrasal verb (same lesson set)
+      var p2 = lessons[0].phrasal;
       var correctM2 = p2.meaning_ko.split(",")[0].trim();
       var opts4 = [correctM2].concat(wrongMeanings.filter(function(w){return w!==correctM2;}).sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
       quizzes.push({type:"meaning", question:'"'+p2.verb+'" 의 뜻은?', options:opts4, answer:correctM2, verb:p2.verb});
@@ -498,9 +498,9 @@
       }
       quizzes.push({type:"arrange", words:shuffledWords, answer:arrangeWords.join(" "), hint:arrangeEx.ex.korean, verb:arrangeEx.verb});
 
-      // Q6: fill-blank for lesson2 basic
-      var b2 = lessons[1].basic;
-      var ex6 = b2.examples[0];
+      // Q6: fill-blank for basic verb (different example)
+      var b2 = lessons[0].basic;
+      var ex6 = b2.examples[Math.min(1, b2.examples.length-1)];
       var blank6 = ex6.english.replace(new RegExp(b2.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
       var wrongV6 = ["get","make","take","put","go","come","keep","look","work","run","call","find"].filter(function(v){return v!==b2.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
       var opts6 = [b2.verb].concat(wrongV6).sort(function(){return Math.random()-0.5;});
@@ -544,7 +544,11 @@
       var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       var cached=load("ai_remaining_data");
       if(cached&&cached.date===todayK) return cached.count;
-      return 100;
+      // 레벨 기반 기본값 (서버와 동일 공식)
+      var xp=(load("xp_state")||{xp:0}).xp;var lv=getLevel(xp).level;
+      if(lv<=3) return 12+lv*3;
+      if(lv<=10) return 21+(lv-3)*3;
+      return 42+(lv-10)*3;
     })();
     var aiRemainingListeners = [];
     function onAiRemainingChange(fn) { aiRemainingListeners.push(fn); }
@@ -604,194 +608,194 @@
         basic:{verb:"get",meaning_ko:"얻다, 되다, 이해하다",meaning_en:"one of the most versatile verbs",
           meanings:[{meaning:"얻다/받다",example:"I got your message."},{meaning:"되다",example:"It's getting cold."},{meaning:"이해하다",example:"I don't get it."}],
           examples:[{situation:"일상",english:"Did you get my text?",korean:"내 문자 받았어?"},{situation:"이해",english:"I totally get how you feel.",korean:"네 기분 완전 이해해."},{situation:"변화",english:"It's getting harder to focus.",korean:"집중하기 점점 힘드네."}],
-          bad_example:"I get hungry. Go eat.",good_example:"I got hungry, so let's go eat.",confuse_with:{verb:"take",diff_ko:"get=받다/얻다 (상대가 줌), take=가져가다/취하다 (내가 직접 행동)",example_this:"I got a gift from her.",example_other:"I took the last piece of cake."}},
+          bad_example:"I get hungry. Go eat.",bad_reason:"두 문장이 뚝 끊겨서 맥락 없이 명령조 — 원인·결과를 연결해야 자연스러워요",good_example:"I got hungry, so let's go eat.",confuse_with:{verb:"take",diff_ko:"get=받다/얻다 (상대가 줌), take=가져가다/취하다 (내가 직접 행동)",example_this:"I got a gift from her.",example_other:"I took the last piece of cake."}},
         phrasal:{verb:"get over",meaning_ko:"극복하다, 잊다",meaning_en:"to recover from or move past something",meanings:[],
           examples:[{situation:"이별",english:"It took me months to get over her.",korean:"걔 잊는 데 몇 달 걸렸어."},{situation:"감기",english:"I'm still trying to get over this cold.",korean:"아직 감기가 안 나았어."},{situation:"충격",english:"I can't get over how good that movie was.",korean:"그 영화 얼마나 좋았는지 잊을 수가 없어."}],
-          bad_example:"I get over the sadness yesterday.",good_example:"I got over the sadness yesterday."}
+          bad_example:"I get over the sadness yesterday.",bad_reason:"yesterday = 과거인데 get(현재형) 씀 → got over로 과거형 필요",good_example:"I got over the sadness yesterday."}
       },
       {
         basic:{verb:"make",meaning_ko:"만들다, ~하게 하다, 해내다",meaning_en:"to create, cause, or achieve",
           meanings:[{meaning:"만들다",example:"Can you make some coffee?"},{meaning:"~하게 하다",example:"That made me laugh."},{meaning:"해내다",example:"We made it on time."}],
           examples:[{situation:"부탁",english:"Can you make me a copy?",korean:"복사 좀 해줄래?"},{situation:"감정",english:"That honestly made my day.",korean:"그거 덕에 하루가 좋아졌어."},{situation:"성취",english:"We finally made it to the end.",korean:"드디어 끝까지 해냈다."}],
-          bad_example:"Make food. Eat together.",good_example:"Let's make some food and eat together.",confuse_with:{verb:"do",diff_ko:"make=새로운 걸 만들어냄, do=이미 있는 일을 수행함",example_this:"I made dinner.",example_other:"I did the dishes."}},
+          bad_example:"Make food. Eat together.",bad_reason:"주어 없이 명령문 나열 — Let's로 제안하고 문장을 연결해야 자연스러워요",good_example:"Let's make some food and eat together.",confuse_with:{verb:"do",diff_ko:"make=새로운 걸 만들어냄, do=이미 있는 일을 수행함",example_this:"I made dinner.",example_other:"I did the dishes."}},
         phrasal:{verb:"make up",meaning_ko:"화해하다, 만들어내다, 구성하다",meaning_en:"to reconcile, invent, or compose",meanings:[],
           examples:[{situation:"화해",english:"We had a big fight but made up the next day.",korean:"크게 싸웠는데 다음 날 화해했어."},{situation:"거짓말",english:"He totally made that story up.",korean:"걔 그 이야기 완전 지어냈어."},{situation:"비율",english:"Women make up 60% of the team.",korean:"팀의 60%가 여성이야."}],
-          bad_example:"I make up with friend yesterday.",good_example:"I made up with my friend yesterday."}
+          bad_example:"I make up with friend yesterday.",bad_reason:"yesterday인데 현재형 make + 관사 my 빠짐 → made up with my friend",good_example:"I made up with my friend yesterday."}
       },
       {
         basic:{verb:"take",meaning_ko:"가져가다, 걸리다, 받아들이다",meaning_en:"to carry, require, or accept",
           meanings:[{meaning:"가져가다",example:"Take an umbrella."},{meaning:"시간 걸리다",example:"It takes 10 minutes."},{meaning:"받아들이다",example:"Take it easy."}],
           examples:[{situation:"권유",english:"You should take a break.",korean:"좀 쉬어야겠다."},{situation:"시간",english:"It took me forever to finish.",korean:"끝내는데 영겁의 시간이 걸렸어."},{situation:"받기",english:"I'll take that as a yes.",korean:"그건 yes로 받아들일게."}],
-          bad_example:"Take rest. Feel better.",good_example:"Take a rest. You'll feel better.",confuse_with:{verb:"bring",diff_ko:"take=가져가다 (여기서 저기로), bring=가져오다 (저기서 여기로)",example_this:"Take this to the office.",example_other:"Bring me some water."}},
+          bad_example:"Take rest. Feel better.",bad_reason:"관사 a 빠짐 + 두 문장이 끊김 — Take a rest로 관사 넣고 문장 연결",good_example:"Take a rest. You'll feel better.",confuse_with:{verb:"bring",diff_ko:"take=가져가다 (여기서 저기로), bring=가져오다 (저기서 여기로)",example_this:"Take this to the office.",example_other:"Bring me some water."}},
         phrasal:{verb:"take off",meaning_ko:"벗다, 이륙하다, 뜨다",meaning_en:"to remove clothing, depart, or become popular",meanings:[],
           examples:[{situation:"옷",english:"Take off your shoes before coming in.",korean:"들어오기 전에 신발 벗어."},{situation:"비행",english:"The plane is about to take off.",korean:"비행기 곧 이륙해."},{situation:"인기",english:"Her YouTube channel really took off this year.",korean:"걔 유튜브 채널 올해 진짜 떴어."}],
-          bad_example:"I take off shoe and enter.",good_example:"I took off my shoes and went in."}
+          bad_example:"I take off shoe and enter.",bad_reason:"shoe → shoes (복수), enter → went in (과거+자연스러운 표현)",good_example:"I took off my shoes and went in."}
       },
       {
         basic:{verb:"put",meaning_ko:"놓다, 넣다, 표현하다",meaning_en:"to place, insert, or express",
           meanings:[{meaning:"놓다",example:"Put it there."},{meaning:"넣다",example:"Put sugar in it."},{meaning:"표현하다",example:"How do I put this?"}],
           examples:[{situation:"위치",english:"Where did I put my keys?",korean:"열쇠 어디다 뒀지?"},{situation:"압박",english:"Don't put too much pressure on yourself.",korean:"너무 부담 갖지 마."},{situation:"표현",english:"Let me put it this way.",korean:"이렇게 말할게."}],
-          bad_example:"Put thing on table.",good_example:"Put the thing on the table.",confuse_with:{verb:"place",diff_ko:"put=일상적으로 놓다 (구어), place=조심스럽게/정확한 위치에 놓다 (격식)",example_this:"Put your bag on the chair.",example_other:"Place the vase carefully on the shelf."}},
+          bad_example:"Put thing on table.",bad_reason:"관사 the 빠짐 — 영어는 명사 앞에 관사(the/a)가 필요해요",good_example:"Put the thing on the table.",confuse_with:{verb:"place",diff_ko:"put=일상적으로 놓다 (구어), place=조심스럽게/정확한 위치에 놓다 (격식)",example_this:"Put your bag on the chair.",example_other:"Place the vase carefully on the shelf."}},
         phrasal:{verb:"put off",meaning_ko:"미루다",meaning_en:"to postpone or delay",meanings:[],
           examples:[{situation:"미루기",english:"I keep putting off my homework.",korean:"숙제 계속 미루고 있어."},{situation:"결정",english:"You can't put it off forever.",korean:"영원히 미룰 순 없어."},{situation:"약속",english:"Can we put off the meeting until Friday?",korean:"회의 금요일로 미룰 수 있을까?"}],
-          bad_example:"I put off to do homework.",good_example:"I put off doing my homework."}
+          bad_example:"I put off to do homework.",bad_reason:"put off 뒤에는 동명사(-ing) — to do가 아니라 doing이 와야 해요",good_example:"I put off doing my homework."}
       },
       {
         basic:{verb:"go",meaning_ko:"가다, ~되다, 진행되다",meaning_en:"to move, become, or progress",
           meanings:[{meaning:"가다",example:"Let's go."},{meaning:"진행되다",example:"How's it going?"},{meaning:"~되다",example:"My phone went dead."}],
           examples:[{situation:"안부",english:"How's everything going?",korean:"다 잘 되고 있어?"},{situation:"결과",english:"The interview went really well.",korean:"면접 잘 봤어."},{situation:"상태변화",english:"My laptop just went black.",korean:"노트북이 갑자기 꺼졌어."}],
-          bad_example:"I go school every day.",good_example:"I go to school every day.",confuse_with:{verb:"come",diff_ko:"go=듣는 사람에게서 멀어지는 방향, come=듣는 사람 쪽으로 다가오는 방향",example_this:"I'll go to your place.",example_other:"Can you come to my place?"}},
+          bad_example:"I go school every day.",bad_reason:"go + 장소에는 전치사 to 필요 — go to school",good_example:"I go to school every day.",confuse_with:{verb:"come",diff_ko:"go=듣는 사람에게서 멀어지는 방향, come=듣는 사람 쪽으로 다가오는 방향",example_this:"I'll go to your place.",example_other:"Can you come to my place?"}},
         phrasal:{verb:"go through",meaning_ko:"겪다, 경험하다, 살펴보다",meaning_en:"to experience or examine",meanings:[],
           examples:[{situation:"경험",english:"She's going through a tough time.",korean:"걔 요즘 힘든 시간을 보내고 있어."},{situation:"검토",english:"Let me go through these emails first.",korean:"이 이메일들 먼저 살펴볼게."},{situation:"과정",english:"We all go through that phase.",korean:"우리 다 그런 시기를 겪잖아."}],
-          bad_example:"I go through hard time yesterday.",good_example:"I went through a hard time yesterday."}
+          bad_example:"I go through hard time yesterday.",bad_reason:"yesterday인데 현재형 + 관사 a 빠짐 → went through a hard time",good_example:"I went through a hard time yesterday."}
       },
       {
         basic:{verb:"come",meaning_ko:"오다, 되다, 나오다",meaning_en:"to move toward, become available, or happen",
           meanings:[{meaning:"오다",example:"Come here."},{meaning:"되다/나오다",example:"The answer came to me."},{meaning:"~하게 되다",example:"How come?"}],
           examples:[{situation:"질문",english:"How come you didn't tell me?",korean:"왜 나한테 안 말했어?"},{situation:"결과",english:"It came out really well.",korean:"결과가 진짜 잘 나왔어."},{situation:"일상",english:"The food hasn't come yet.",korean:"음식 아직 안 나왔어."}],
-          bad_example:"Come to eat dinner.",good_example:"Come eat dinner."},
+          bad_example:"Come to eat dinner.",bad_reason:"come 뒤에 동사원형 바로 OK — to 불필요",good_example:"Come eat dinner."},
         phrasal:{verb:"come up",meaning_ko:"생기다, 다가오다, 언급되다",meaning_en:"to arise or be mentioned",meanings:[],
           examples:[{situation:"갑작스런일",english:"Sorry, something came up.",korean:"미안, 일이 좀 생겼어."},{situation:"이벤트",english:"My birthday's coming up next week.",korean:"다음 주에 생일이야."},{situation:"대화",english:"Your name came up in the meeting.",korean:"회의에서 네 이름이 나왔어."}],
-          bad_example:"Problem come up. I busy.",good_example:"A problem came up. I'm busy."}
+          bad_example:"Problem come up. I busy.",bad_reason:"관사 A 빠짐 + 과거형 came + be동사 I'm 빠짐",good_example:"A problem came up. I'm busy."}
       },
       {
         basic:{verb:"keep",meaning_ko:"유지하다, 계속하다, 보관하다",meaning_en:"to maintain, continue, or hold",
           meanings:[{meaning:"계속하다",example:"Keep going."},{meaning:"유지하다",example:"Keep it quiet."},{meaning:"보관하다",example:"I'll keep this."}],
           examples:[{situation:"격려",english:"Keep up the good work!",korean:"계속 잘 해!"},{situation:"약속",english:"I'll keep it short.",korean:"짧게 할게."},{situation:"반복",english:"I keep forgetting her name.",korean:"자꾸 그녀 이름을 까먹어."}],
-          bad_example:"I keep study hard.",good_example:"I keep studying hard."},
+          bad_example:"I keep study hard.",bad_reason:"keep 뒤에는 동명사(-ing) — keep studying",good_example:"I keep studying hard."},
         phrasal:{verb:"keep up",meaning_ko:"따라가다, 유지하다",meaning_en:"to maintain pace or continue at the same level",meanings:[],
           examples:[{situation:"속도",english:"I can't keep up with the class.",korean:"수업을 못 따라가겠어."},{situation:"격려",english:"Keep up the great work!",korean:"계속 이렇게 잘 해!"},{situation:"트렌드",english:"It's hard to keep up with all the new slang.",korean:"새로운 은어를 다 따라가기 힘들어."}],
-          bad_example:"I keep up study every day.",good_example:"I keep up with my studies every day."}
+          bad_example:"I keep up study every day.",bad_reason:"keep up 뒤에 전치사 with 필요 + studies(복수)",good_example:"I keep up with my studies every day."}
       },
       {
         basic:{verb:"look",meaning_ko:"보다, ~처럼 보이다",meaning_en:"to see, appear, or seem",
           meanings:[{meaning:"보다",example:"Look at this."},{meaning:"~처럼 보이다",example:"You look tired."},{meaning:"찾다",example:"I'm looking for my keys."}],
           examples:[{situation:"외모",english:"You look really nice today.",korean:"오늘 진짜 멋지다."},{situation:"검색",english:"I'm looking for a good restaurant.",korean:"괜찮은 식당 찾고 있어."},{situation:"상황",english:"It looks like it's going to rain.",korean:"비 올 것 같은데."}],
-          bad_example:"I look the movie.",good_example:"I watched the movie.",confuse_with:{verb:"see/watch",diff_ko:"look=의식적으로 시선을 보냄, see=자연스럽게 눈에 들어옴, watch=움직이는 것을 지켜봄",example_this:"Look at that sign!",example_other:"I saw him at the cafe. / I watched a movie."}},
+          bad_example:"I look the movie.",bad_reason:"영화는 look이 아니라 watch — look은 시선을 '보내는' 동작",good_example:"I watched the movie.",confuse_with:{verb:"see/watch",diff_ko:"look=의식적으로 시선을 보냄, see=자연스럽게 눈에 들어옴, watch=움직이는 것을 지켜봄",example_this:"Look at that sign!",example_other:"I saw him at the cafe. / I watched a movie."}},
         phrasal:{verb:"look up",meaning_ko:"찾아보다, 검색하다",meaning_en:"to search for information",meanings:[],
           examples:[{situation:"검색",english:"Let me look that up.",korean:"내가 찾아볼게."},{situation:"단어",english:"I had to look up that word.",korean:"그 단어 찾아봐야 했어."},{situation:"정보",english:"You can look up the address online.",korean:"주소는 온라인으로 찾으면 돼."}],
-          bad_example:"I look up word dictionary.",good_example:"I looked up the word in the dictionary."}
+          bad_example:"I look up word dictionary.",bad_reason:"과거형 looked + 전치사 in 필요 — looked up the word in the dictionary",good_example:"I looked up the word in the dictionary."}
       },
       {
         basic:{verb:"work",meaning_ko:"일하다, 작동하다, 효과있다",meaning_en:"to function, operate, or have a job",
           meanings:[{meaning:"일하다",example:"I work from home."},{meaning:"작동하다",example:"It's not working."},{meaning:"효과있다",example:"This method works."}],
           examples:[{situation:"직장",english:"I've been working here for 3 years.",korean:"여기서 3년째 일하고 있어."},{situation:"기기",english:"My phone isn't working properly.",korean:"폰이 제대로 안 돼."},{situation:"방법",english:"That actually worked!",korean:"그거 진짜 효과 있었어!"}],
-          bad_example:"I work in home.",good_example:"I work from home."},
+          bad_example:"I work in home.",bad_reason:"집에서 일하다 = work from home — in이 아니라 from",good_example:"I work from home."},
         phrasal:{verb:"work out",meaning_ko:"운동하다, 해결되다, 잘 되다",meaning_en:"to exercise or to turn out well",meanings:[],
           examples:[{situation:"운동",english:"I work out three times a week.",korean:"일주일에 세 번 운동해."},{situation:"해결",english:"Everything worked out in the end.",korean:"결국 다 잘 됐어."},{situation:"계획",english:"I hope things work out for you.",korean:"다 잘 되길 바라."}],
-          bad_example:"I work out the problem solve.",good_example:"I worked out the problem."}
+          bad_example:"I work out the problem solve.",bad_reason:"work out 자체가 '해결하다' — solve 중복 + 과거형 필요",good_example:"I worked out the problem."}
       },
       {
         basic:{verb:"turn",meaning_ko:"돌다, 변하다, ~이 되다",meaning_en:"to rotate, change direction, or become",
           meanings:[{meaning:"돌다",example:"Turn left here."},{meaning:"변하다",example:"The leaves are turning red."},{meaning:"~이 되다",example:"She just turned 30."}],
           examples:[{situation:"길안내",english:"Turn right at the next light.",korean:"다음 신호에서 우회전해."},{situation:"나이",english:"I just turned 25 last week.",korean:"저번 주에 25살 됐어."},{situation:"변화",english:"Things really turned around after that.",korean:"그 후로 상황이 정말 바뀌었어."}],
-          bad_example:"I turn age 25.",good_example:"I'm turning 25."},
+          bad_example:"I turn age 25.",bad_reason:"나이를 말할 때 turn + 숫자 — age 불필요, 진행형이 자연스러움",good_example:"I'm turning 25."},
         phrasal:{verb:"turn out",meaning_ko:"결과가 ~이다, 드러나다",meaning_en:"to result or be revealed",meanings:[],
           examples:[{situation:"결과",english:"It turned out better than I expected.",korean:"생각보다 잘 됐어."},{situation:"사실",english:"Turns out she was right all along.",korean:"알고 보니 걔가 계속 맞았어."},{situation:"걱정후",english:"Everything turned out fine.",korean:"다 잘 해결됐어."}],
-          bad_example:"Result turn out good.",good_example:"The result turned out good."}
+          bad_example:"Result turn out good.",bad_reason:"관사 The 빠짐 + 과거형 turned out 필요",good_example:"The result turned out good."}
       },
       {
         basic:{verb:"run",meaning_ko:"달리다, 운영하다, 작동하다",meaning_en:"to move quickly, manage, or operate",
           meanings:[{meaning:"달리다",example:"I run every morning."},{meaning:"운영하다",example:"She runs a small business."},{meaning:"작동하다",example:"Is the app running?"}],
           examples:[{situation:"운동",english:"I've been running a lot lately.",korean:"요즘 많이 뛰고 있어."},{situation:"사업",english:"He runs a coffee shop downtown.",korean:"걔 시내에서 카페 운영해."},{situation:"시간",english:"I'm running late!",korean:"나 늦었어!"}],
-          bad_example:"I run to school yesterday.",good_example:"I ran to school yesterday."},
+          bad_example:"I run to school yesterday.",bad_reason:"yesterday = 과거 → ran (run의 과거형)",good_example:"I ran to school yesterday."},
         phrasal:{verb:"run into",meaning_ko:"우연히 마주치다, 부딪히다",meaning_en:"to meet by chance or encounter a problem",meanings:[],
           examples:[{situation:"우연",english:"I ran into an old friend at the store.",korean:"가게에서 옛 친구 만났어."},{situation:"문제",english:"We ran into some issues with the code.",korean:"코드에서 문제가 좀 생겼어."},{situation:"반복",english:"I keep running into her lately.",korean:"요즘 자꾸 그녀랑 마주쳐."}],
-          bad_example:"I run into my friend yesterday.",good_example:"I ran into my friend yesterday."}
+          bad_example:"I run into my friend yesterday.",bad_reason:"yesterday인데 현재형 run → ran into",good_example:"I ran into my friend yesterday."}
       },
       {
         basic:{verb:"call",meaning_ko:"전화하다, 부르다, 이름짓다",meaning_en:"to phone, summon, or name",
           meanings:[{meaning:"전화하다",example:"Call me later."},{meaning:"부르다",example:"They called a taxi."},{meaning:"이름짓다",example:"What do you call this?"}],
           examples:[{situation:"전화",english:"I'll call you back in 5.",korean:"5분 후에 다시 전화할게."},{situation:"택시",english:"Should we call an Uber?",korean:"우버 부를까?"},{situation:"별명",english:"Everyone calls me Jay.",korean:"다들 나를 Jay라고 불러."}],
-          bad_example:"I call to him yesterday.",good_example:"I called him yesterday."},
+          bad_example:"I call to him yesterday.",bad_reason:"call은 직접 목적어 — 전치사 to 불필요 + 과거형 called",good_example:"I called him yesterday."},
         phrasal:{verb:"call off",meaning_ko:"취소하다",meaning_en:"to cancel something that was planned",meanings:[],
           examples:[{situation:"약속",english:"They called off the wedding.",korean:"걔네 결혼식 취소했어."},{situation:"행사",english:"The game was called off because of rain.",korean:"비 때문에 경기가 취소됐어."},{situation:"계획",english:"Should we call off the trip?",korean:"여행 취소할까?"}],
-          bad_example:"I call off the meet yesterday.",good_example:"I called off the meeting yesterday."}
+          bad_example:"I call off the meet yesterday.",bad_reason:"과거형 called + meet → meeting (명사형)",good_example:"I called off the meeting yesterday."}
       },
       {
         basic:{verb:"give",meaning_ko:"주다, 전하다",meaning_en:"to hand over or provide",
           meanings:[{meaning:"주다",example:"Give me a second."},{meaning:"전하다",example:"Give her my regards."},{meaning:"양보하다",example:"I'll give you that."}],
           examples:[{situation:"부탁",english:"Can you give me a hand?",korean:"좀 도와줄래?"},{situation:"시간",english:"Give me a minute, I'm almost done.",korean:"잠깐만, 거의 다 했어."},{situation:"인정",english:"I'll give you that — it was a good idea.",korean:"인정할게 — 좋은 생각이었어."}],
-          bad_example:"Give to me the book.",good_example:"Give me the book.",confuse_with:{verb:"tell",diff_ko:"give=물건/기회 등을 줌, tell=정보/이야기를 전함",example_this:"Give me your number.",example_other:"Tell me your number."}},
+          bad_example:"Give to me the book.",bad_reason:"give + 간접목적어 + 직접목적어 순서 — give me the book",good_example:"Give me the book.",confuse_with:{verb:"tell",diff_ko:"give=물건/기회 등을 줌, tell=정보/이야기를 전함",example_this:"Give me your number.",example_other:"Tell me your number."}},
         phrasal:{verb:"give up",meaning_ko:"포기하다",meaning_en:"to stop trying",meanings:[],
           examples:[{situation:"격려",english:"Don't give up!",korean:"포기하지 마!"},{situation:"경험",english:"I almost gave up on learning English.",korean:"영어 배우기 거의 포기할 뻔했어."},{situation:"습관",english:"I gave up coffee last month.",korean:"지난달에 커피 끊었어."}],
-          bad_example:"I give up to study.",good_example:"I gave up studying."}
+          bad_example:"I give up to study.",bad_reason:"give up 뒤에는 동명사(-ing) — to study가 아니라 studying + 과거형 gave",good_example:"I gave up studying."}
       },
       {
         basic:{verb:"set",meaning_ko:"설정하다, 놓다, 정하다",meaning_en:"to place, establish, or adjust",
           meanings:[{meaning:"설정하다",example:"Set the alarm."},{meaning:"정하다",example:"Let's set a date."},{meaning:"놓다",example:"Set it down here."}],
           examples:[{situation:"알람",english:"I forgot to set my alarm.",korean:"알람 설정하는 걸 깜빡했어."},{situation:"목표",english:"I set a goal to read 20 books this year.",korean:"올해 책 20권 읽기 목표 세웠어."},{situation:"약속",english:"Let's set up a time to meet.",korean:"만날 시간 정하자."}],
-          bad_example:"I set the goal for study.",good_example:"I set a goal for studying."},
+          bad_example:"I set the goal for study.",bad_reason:"관사 a + 동명사 studying — set a goal for studying",good_example:"I set a goal for studying."},
         phrasal:{verb:"set up",meaning_ko:"준비하다, 설치하다, 마련하다",meaning_en:"to arrange, install, or prepare",meanings:[],
           examples:[{situation:"준비",english:"Can you help me set up for the party?",korean:"파티 준비 좀 도와줄래?"},{situation:"설치",english:"I need to set up my new laptop.",korean:"새 노트북 설정해야 해."},{situation:"약속",english:"Let me set up a meeting with the team.",korean:"팀 회의 잡을게."}],
-          bad_example:"I set up the computer yesterday work.",good_example:"I set up the computer for work yesterday."}
+          bad_example:"I set up the computer yesterday work.",bad_reason:"어순 꼬임 — for work yesterday로 전치사구+시간 순서",good_example:"I set up the computer for work yesterday."}
       },
       {
         basic:{verb:"feel",meaning_ko:"느끼다, ~한 기분이다",meaning_en:"to experience an emotion or sensation",
           meanings:[{meaning:"느끼다",example:"I feel cold."},{meaning:"기분이 ~하다",example:"I feel great."},{meaning:"~인 것 같다",example:"I feel like pizza."}],
           examples:[{situation:"감정",english:"I feel like I'm not good enough.",korean:"나 뭔가 부족한 것 같아."},{situation:"제안",english:"I feel like eating something spicy.",korean:"매운 거 먹고 싶어."},{situation:"공감",english:"I know how you feel.",korean:"네 기분 알아."}],
-          bad_example:"I feel very exciting.",good_example:"I feel very excited."},
+          bad_example:"I feel very exciting.",bad_reason:"사람 감정은 -ed(excited) — -ing(exciting)는 대상이 흥미로울 때",good_example:"I feel very excited."},
         phrasal:{verb:"feel like",meaning_ko:"~하고 싶다, ~인 것 같다",meaning_en:"to want to do something or to have a sense of",meanings:[],
           examples:[{situation:"욕구",english:"I don't feel like cooking tonight.",korean:"오늘 저녁 요리하기 싫어."},{situation:"감정",english:"I feel like I'm falling behind.",korean:"뒤처지는 것 같아."},{situation:"제안",english:"Do you feel like grabbing coffee?",korean:"커피 마시러 갈래?"}],
-          bad_example:"I feel like to go home.",good_example:"I feel like going home."}
+          bad_example:"I feel like to go home.",bad_reason:"feel like 뒤에는 동명사(-ing) — to go가 아니라 going",good_example:"I feel like going home."}
       },
       {
         basic:{verb:"check",meaning_ko:"확인하다, 검사하다",meaning_en:"to verify, inspect, or examine",
           meanings:[{meaning:"확인하다",example:"Let me check."},{meaning:"검사하다",example:"Check your email."},{meaning:"살펴보다",example:"I'll check it out."}],
           examples:[{situation:"확인",english:"Can you check if the door is locked?",korean:"문 잠겼는지 확인해줄래?"},{situation:"이메일",english:"I need to check my messages.",korean:"메시지 확인해야 해."},{situation:"시간",english:"Let me check my schedule.",korean:"스케줄 확인해볼게."}],
-          bad_example:"I check the email yesterday.",good_example:"I checked the email yesterday."},
+          bad_example:"I check the email yesterday.",bad_reason:"yesterday = 과거 → checked",good_example:"I checked the email yesterday."},
         phrasal:{verb:"check out",meaning_ko:"확인하다, 구경하다, 퇴실하다",meaning_en:"to look at, examine, or leave a hotel",meanings:[],
           examples:[{situation:"추천",english:"You should check out this new cafe.",korean:"이 새 카페 한번 가봐."},{situation:"관심",english:"Check out this video, it's hilarious.",korean:"이 영상 봐봐, 개웃겨."},{situation:"호텔",english:"What time do we check out?",korean:"체크아웃 몇 시야?"}],
-          bad_example:"I check out the place yesterday.",good_example:"I checked out the place yesterday."}
+          bad_example:"I check out the place yesterday.",bad_reason:"yesterday인데 현재형 → checked out",good_example:"I checked out the place yesterday."}
       },
       {
         basic:{verb:"find",meaning_ko:"찾다, 발견하다, 알게 되다",meaning_en:"to discover, locate, or realize",
           meanings:[{meaning:"찾다",example:"I can't find my phone."},{meaning:"발견하다",example:"I found a great place."},{meaning:"알게 되다",example:"I found it interesting."}],
           examples:[{situation:"분실",english:"I can't find my wallet anywhere.",korean:"지갑을 어디서도 못 찾겠어."},{situation:"발견",english:"I found this amazing app.",korean:"이 대박 앱을 발견했어."},{situation:"감상",english:"I find it hard to focus after lunch.",korean:"점심 후에 집중하기 어려워."}],
-          bad_example:"I find the book in table.",good_example:"I found the book on the table."},
+          bad_example:"I find the book in table.",bad_reason:"과거형 found + 전치사 on(위에) — in(안에)이 아님 + 관사 the",good_example:"I found the book on the table."},
         phrasal:{verb:"find out",meaning_ko:"알아내다, 발견하다",meaning_en:"to discover information",meanings:[],
           examples:[{situation:"발견",english:"I just found out she's leaving.",korean:"걔 떠난다는 거 방금 알았어."},{situation:"조사",english:"Let me find out what happened.",korean:"무슨 일인지 알아볼게."},{situation:"놀람",english:"I found out the hard way.",korean:"힘들게 알았어."}],
-          bad_example:"I find out the answer yesterday.",good_example:"I found out the answer yesterday."}
+          bad_example:"I find out the answer yesterday.",bad_reason:"yesterday = 과거 → found out",good_example:"I found out the answer yesterday."}
       },
       {
         basic:{verb:"pick",meaning_ko:"고르다, 뽑다, 따다",meaning_en:"to choose, select, or pluck",
           meanings:[{meaning:"고르다",example:"Pick one."},{meaning:"뽑다",example:"They picked me for the team."},{meaning:"따다",example:"We picked apples."}],
           examples:[{situation:"선택",english:"You can pick whatever you want.",korean:"원하는 거 아무거나 골라."},{situation:"지명",english:"The teacher picked me to present.",korean:"선생님이 나를 발표자로 뽑았어."},{situation:"식당",english:"Let me pick the restaurant this time.",korean:"이번엔 내가 식당 고를게."}],
-          bad_example:"I pick the food eat.",good_example:"I picked the food to eat."},
+          bad_example:"I pick the food eat.",bad_reason:"과거형 picked + to eat(목적) 필요 — 동사 나열 불가",good_example:"I picked the food to eat."},
         phrasal:{verb:"pick up",meaning_ko:"줍다, 데리러 가다, 배우다",meaning_en:"to lift, collect someone, or learn casually",meanings:[],
           examples:[{situation:"부탁",english:"Can you pick me up at 3?",korean:"3시에 데리러 와줄래?"},{situation:"학습",english:"I picked up some Korean from K-dramas.",korean:"한드로 한국어 좀 배웠어."},{situation:"전화",english:"He's not picking up.",korean:"전화 안 받네."}],
-          bad_example:"I pick up Korean language.",good_example:"I picked up Korean quickly."}
+          bad_example:"I pick up Korean language.",bad_reason:"과거형 picked up + language 불필요(Korean만으로 충분) + 부사 추가",good_example:"I picked up Korean quickly."}
       },
       {
         basic:{verb:"let",meaning_ko:"~하게 해주다, 허락하다",meaning_en:"to allow or permit",
           meanings:[{meaning:"~하게 해주다",example:"Let me help."},{meaning:"허락하다",example:"Let him go."},{meaning:"~하자",example:"Let's go!"}],
           examples:[{situation:"제안",english:"Let me know if you need anything.",korean:"뭐 필요하면 말해."},{situation:"부탁",english:"Let me think about it.",korean:"좀 생각해볼게."},{situation:"허락",english:"My parents won't let me go.",korean:"부모님이 안 보내줘."}],
-          bad_example:"Let me to help you.",good_example:"Let me help you."},
+          bad_example:"Let me to help you.",bad_reason:"let 뒤에는 동사원형 바로 — to 불필요 (let me help)",good_example:"Let me help you."},
         phrasal:{verb:"let down",meaning_ko:"실망시키다",meaning_en:"to disappoint someone",meanings:[],
           examples:[{situation:"실망",english:"I don't want to let you down.",korean:"널 실망시키고 싶지 않아."},{situation:"약속",english:"He really let me down this time.",korean:"이번에 걔한테 정말 실망했어."},{situation:"격려",english:"Don't let yourself down.",korean:"스스로를 실망시키지 마."}],
-          bad_example:"He let down me very much.",good_example:"He let me down so much."}
+          bad_example:"He let down me very much.",bad_reason:"대명사는 중간에 — let me down (let down me X) + very much → so much",good_example:"He let me down so much."}
       },
       {
         basic:{verb:"leave",meaning_ko:"떠나다, 남기다, 놔두다",meaning_en:"to go away, remain behind, or let stay",
           meanings:[{meaning:"떠나다",example:"I'm leaving now."},{meaning:"남기다",example:"Leave a message."},{meaning:"놔두다",example:"Leave it alone."}],
           examples:[{situation:"출발",english:"What time are you leaving?",korean:"몇 시에 출발해?"},{situation:"메시지",english:"I left you a voicemail.",korean:"음성 메시지 남겼어."},{situation:"조언",english:"Just leave it — it's not worth fighting about.",korean:"그냥 놔둬 — 싸울 가치도 없어."}],
-          bad_example:"I leave from home 8am.",good_example:"I leave home at 8am."},
+          bad_example:"I leave from home 8am.",bad_reason:"leave는 직접 목적어 — from 불필요 + 시간 앞에 at 필요",good_example:"I leave home at 8am."},
         phrasal:{verb:"leave out",meaning_ko:"빼놓다, 제외하다",meaning_en:"to omit or exclude",meanings:[],
           examples:[{situation:"제외",english:"They left me out of the group chat.",korean:"걔네가 단톡에서 나를 빼놨어."},{situation:"요리",english:"You can leave out the onions.",korean:"양파는 빼도 돼."},{situation:"실수",english:"I accidentally left out an important detail.",korean:"중요한 내용을 실수로 빼먹었어."}],
-          bad_example:"I leave out the homework part.",good_example:"I left out the homework part."}
+          bad_example:"I leave out the homework part.",bad_reason:"과거 사실이면 left out (과거형)",good_example:"I left out the homework part."}
       },
       {
         basic:{verb:"hold",meaning_ko:"잡다, 들고 있다, 열다",meaning_en:"to grip, keep in hand, or conduct",
           meanings:[{meaning:"잡다",example:"Hold my hand."},{meaning:"들고 있다",example:"Can you hold this?"},{meaning:"열다/개최하다",example:"They held a meeting."}],
           examples:[{situation:"부탁",english:"Can you hold this for a sec?",korean:"이거 잠깐 들고 있어줄래?"},{situation:"전화",english:"Please hold, I'll transfer you.",korean:"잠시만 기다려주세요, 연결해드릴게요."},{situation:"감정",english:"I couldn't hold back my tears.",korean:"눈물을 참을 수가 없었어."}],
-          bad_example:"I hold the meeting yesterday.",good_example:"I held the meeting yesterday."},
+          bad_example:"I hold the meeting yesterday.",bad_reason:"yesterday = 과거 → held (hold의 과거형)",good_example:"I held the meeting yesterday."},
         phrasal:{verb:"hold on",meaning_ko:"잠깐만, 기다리다, 견디다",meaning_en:"to wait or endure",meanings:[],
           examples:[{situation:"전화",english:"Hold on, let me check.",korean:"잠깐만, 확인해볼게."},{situation:"놀람",english:"Hold on — are you serious?",korean:"잠깐 — 진심이야?"},{situation:"인내",english:"Just hold on a little longer.",korean:"조금만 더 버텨."}],
-          bad_example:"Hold on me please.",good_example:"Hold on, please."}
+          bad_example:"Hold on me please.",bad_reason:"hold on은 자동사 — me 불필요, 쉼표로 구분",good_example:"Hold on, please."}
       }
     ];
 
-    // ── getTodayLesson: returns array of 2 lesson sets ─────────────
+    // ── getTodayLesson: returns array of 1 lesson set (basic + phrasal) ──
     function getTodayLesson() {
       // 로그인한 사용자는 AI 생성 동사 풀도 포함
       var isLoggedIn = !!load("tk_state"); // tk_state는 로그인 시 저장됨
@@ -805,7 +809,7 @@
       // 이미 오늘 정해진 레슨이 있으면 그대로
       if (learnedDates[todayKey]) {
         var lessons = learnedDates[todayKey].map(function(idx){return POOL[idx];}).filter(Boolean);
-        if (lessons.length === 2) return lessons;
+        if (lessons.length >= 1) return [lessons[0]];
       }
 
       // 회화에서 본 동사 중 POOL에 있는 것 찾기
@@ -848,13 +852,13 @@
         }
       }
 
-      learnedDates[todayKey] = [idx1, idx2];
+      learnedDates[todayKey] = [idx1];
       save("learned_lesson_dates", learnedDates);
-      return [POOL[idx1], POOL[idx2]];
+      return [POOL[idx1]];
     }
 
     async function generateNewLesson(completedVerbs) {
-      var system = 'You help Korean students learn American English. Generate a lesson with a basic verb AND a phrasal verb that shares the same root (e.g., get -> get over). NEVER use these already-learned verbs: ' + completedVerbs.join(", ") + '. Return ONLY valid JSON: {"basic":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[{"meaning":"","example":""}],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","good_example":"","practice_hint":""},"phrasal":{"verb":"... (must share same root as basic verb)","meaning_ko":"...","meaning_en":"...","meanings":[],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","good_example":"","practice_hint":""}}';
+      var system = 'You help Korean students learn American English. Generate a lesson with a basic verb AND a phrasal verb that shares the same root (e.g., get -> get over). NEVER use these already-learned verbs: ' + completedVerbs.join(", ") + '. Return ONLY valid JSON: {"basic":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[{"meaning":"","example":""}],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","bad_reason":"왜 어색한지 한국어 1문장","good_example":"","practice_hint":""},"phrasal":{"verb":"... (must share same root as basic verb)","meaning_ko":"...","meaning_en":"...","meanings":[],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","bad_reason":"왜 어색한지 한국어 1문장","good_example":"","practice_hint":""}}';
       var raw = await callClaude(system, "Generate today's lesson. Pick a common English verb not yet learned. The phrasal verb MUST share the same root verb. Focus on daily American English usage.");
       return JSON.parse(raw.replace(/```json|```/g,"").trim());
     }
@@ -886,12 +890,28 @@
 
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
-      var streak=props.streak, todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat;
+      var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat;
       var days = ["S","M","T","W","T","F","S"];
       var today = new Date().getDay();
       // 이번 주 실제 학습한 요일 계산
       var att=load("attendance")||{};
       var daysLog=att.daysLog||[];
+      // streak을 daysLog 기반 연속일로 직접 계산 → 체크마크와 항상 일치
+      var streak=(function(){
+        if(!daysLog.length) return 0;
+        var sorted=daysLog.slice().sort().reverse();
+        var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+        var yesterdayK=(function(){var d=new Date();d.setHours(d.getHours()+9);d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
+        if(sorted[0]!==todayK && sorted[0]!==yesterdayK) return 0;
+        var count=0;
+        var check=new Date(sorted[0]+"T00:00:00");
+        for(var i=0;i<sorted.length;i++){
+          var expected=new Date(check);expected.setDate(expected.getDate()-i);
+          var ek=expected.toISOString().slice(0,10);
+          if(sorted[i]===ek) count++; else break;
+        }
+        return count;
+      })();
       var weekDone={};
       (function(){
         var now=new Date();
@@ -911,7 +931,7 @@
 
       // Extract all 4 verbs from the 2 lesson sets
       var allVerbTags = [];
-      if (lessons && lessons.length >= 2) {
+      if (lessons && lessons.length >= 1) {
         for (var li = 0; li < lessons.length; li++) {
           if (lessons[li].basic) allVerbTags.push({verb: lessons[li].basic.verb, color: C.yellow});
           if (lessons[li].phrasal) allVerbTags.push({verb: lessons[li].phrasal.verb, color: C.accent});
@@ -993,7 +1013,7 @@
                 </div>
                 {[
                   {k:"verbDone",label:"동사 레슨 완료",reward:"+10 XP"},
-                  {k:"speakDone",label:"내 대화 영어로 변환",reward:"+15 XP"},
+                  {k:"speakDone",label:"회화 탭에서 대화 분석 1회",reward:"+15 XP"},
                   {k:"combo3",label:"3연속 정답",reward:"+5 XP"}
                 ].map(function(m,i){return(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",opacity:missions[m.k]?0.5:1}}>
@@ -1265,6 +1285,7 @@
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
                 <div style={{fontSize:12,color:C.red,marginBottom:8}}>{"❌ 어색해요"}</div>
                 <div style={{fontSize:14,color:C.red,padding:"10px 12px",background:C.red+"10",borderRadius:8,fontStyle:"italic"}}>"{current.bad_example}"</div>
+                {current.bad_reason&&<div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>{"→ "}{current.bad_reason}</div>}
               </div>
               <div style={{background:C.surface,border:"1px solid "+color+"40",borderRadius:12,padding:16,marginBottom:16}}>
                 <div style={{fontSize:12,color:color,marginBottom:8}}>{"✅ 자연스러워요"}</div>
@@ -1641,7 +1662,7 @@
         if (!filled.length) return;
         setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[tabId]=true; return n;});
         var v = lessons[tab.lessonIdx][tab.type];
-        var system = 'You are a strict but encouraging American English tutor.\n\nJudge if the student\'s sentences correctly use the given verb. Be strict:\n- If the sentence is gibberish, random letters, or doesn\'t make sense → verdict: "retry"\n- If the verb is not used or used completely wrong → verdict: "retry"\n- If the sentence has errors but shows effort and uses the verb → verdict: "pass"\n- If the sentence is good → verdict: "pass"\n\nIMPORTANT RULES for corrections:\n- "corrected" must use the SAME given verb. Do NOT replace it with a different verb or expression.\n- "more_natural" must also use the SAME given verb. Keep the sentence short and similar in structure to the original.\n\nReturn ONLY valid JSON:\n{"verdict":"pass or retry","overall":"전체 피드백(한국어,2문장). retry면 왜 다시 써야하는지 설명","corrections":[{"original":"...","corrected":"...","explanation":"왜(한국어)"}],"bonus":"해당 동사를 사용한 짧은 예문 1개(영어, pass일때만, 15단어 이내)"}';
+        var system = 'You are a strict but encouraging American English tutor.\n\nJudge if the student\'s sentences correctly use the given verb. Be strict:\n- If the sentence is gibberish, random letters, or doesn\'t make sense → verdict: "retry"\n- If the verb is not used or used completely wrong → verdict: "retry"\n- If the sentence has errors but shows effort and uses the verb → verdict: "pass"\n- If the sentence is good → verdict: "pass"\n\nCRITICAL RULES:\n- "corrected" MUST use the EXACT SAME given verb. NEVER replace it with a synonym (e.g. don\'t change "check out" to "grab", don\'t change "feel like" to "be in the mood"). Fix grammar/phrasing but KEEP the verb.\n- Keep corrected sentences short and close to the original structure.\n\nReturn ONLY valid JSON:\n{"verdict":"pass or retry","overall":"전체 피드백(한국어,2문장). retry면 왜 다시 써야하는지 설명","corrections":[{"original":"...","corrected":"...","explanation":"왜 이렇게 고쳤는지(한국어,1문장)"}],"bonus":"해당 동사를 활용한 실생활 예문 1개(영어, pass일때만, 12단어 이내)"}';
         callClaude(system, 'Verb: "'+v.verb+'" ('+v.meaning_ko+')\nSentences:\n'+filled.map(function(s,i){return (i+1)+". "+s;}).join("\n"))
         .then(function(raw){
           var pJson = raw;
@@ -1735,7 +1756,7 @@
               );})}
               {fb.bonus&&fb.verdict!=="retry"&&(
                 <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:12,padding:14,marginBottom:16}}>
-                  <div style={{fontSize:11,color:C.orange,letterSpacing:2,marginBottom:6}}>BONUS</div>
+                  <div style={{fontSize:11,color:C.orange,letterSpacing:2,marginBottom:6}}>{"💡 이 동사 활용 예문"}</div>
                   <div style={{fontSize:14,color:C.text,fontStyle:"italic"}}>"{fb.bonus}"</div>
                 </div>
               )}
@@ -1808,8 +1829,8 @@
       };
 
       return (
-        <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 60px)"}}>
-          <div style={{padding:"16px 20px",borderBottom:"1px solid "+C.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",flexDirection:"column",height:"calc(100dvh - 60px)",maxHeight:"calc(100vh - 60px)"}}>
+          <div style={{padding:"16px 20px",borderBottom:"1px solid "+C.border,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
             <div>
               <div style={{fontSize:11,color:C.blue,letterSpacing:3}}>AI CHAT</div>
               <div style={{fontSize:18,fontWeight:800}}>영어 대화 연습</div>
@@ -1820,7 +1841,7 @@
             </div>
           </div>
 
-          <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
+          <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
             {messages.map(function(m,i){
               var isAi = m.role==="ai";
               return(
@@ -1848,6 +1869,7 @@
 
           <div style={{padding:"12px 20px 24px",borderTop:"1px solid "+C.border,display:"flex",gap:8}}>
             <textarea value={input} onChange={function(e){setInput(e.target.value);}} onKeyDown={handleKeyDown}
+              onFocus={function(){setTimeout(function(){if(chatEndRef.current)chatEndRef.current.scrollIntoView({behavior:"smooth"});},300);}}
               rows={1} placeholder="Type in English..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px",color:C.text,fontSize:14,lineHeight:1.4,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}
             />
             <button onClick={sendMessage} disabled={isLoading||!input.trim()} style={{background:input.trim()?C.blue:C.border,color:input.trim()?"#08090d":C.muted,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>
@@ -1939,7 +1961,8 @@
       var _ytCurrentMin = useState(0); var ytCurrentMin = _ytCurrentMin[0]; var setYtCurrentMin = _ytCurrentMin[1];
       var _ytTotalChunks = useState(0); var ytTotalChunks = _ytTotalChunks[0]; var setYtTotalChunks = _ytTotalChunks[1];
       var _ytDuration = useState(0); var ytDuration = _ytDuration[0]; var setYtDuration = _ytDuration[1];
-      var _myChannels = useState(function(){return load("yt_channels")||[];}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
+      var BBC_DEFAULT = {id:"UCQjEfnSBuJPtMo3lsxRJiig",name:"BBC Learning English",thumbnail:""};
+      var _myChannels = useState(function(){var ch=load("yt_channels"); if(!ch||ch.length===0){ch=[BBC_DEFAULT];save("yt_channels",ch);} return ch;}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
       var _chSearch = useState(""); var chSearch = _chSearch[0]; var setChSearch = _chSearch[1];
       var _chResults = useState([]); var chResults = _chResults[0]; var setChResults = _chResults[1];
       var _chSearching = useState(false); var chSearching = _chSearching[0]; var setChSearching = _chSearching[1];
@@ -2147,7 +2170,7 @@
               if (!inPool && !inMyPool) {
                 // AI에게 레슨 생성 요청 (백그라운드)
                 setTimeout(function(){
-                  var sys='Generate a TalkFit-style lesson for the verb "'+kv.verb+'" (Korean meaning: '+(kv.meaning||"")+'). Include 1 basic verb form and 1 phrasal verb form (must share root with this verb if possible). Return ONLY valid JSON: {"basic":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[{"meaning":"","example":""}],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","good_example":"","practice_hint":"","confuse_with":{"verb":"","diff_ko":"","example_this":"","example_other":""}},"phrasal":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","good_example":"","practice_hint":""}}';
+                  var sys='Generate a TalkFit-style lesson for the verb "'+kv.verb+'" (Korean meaning: '+(kv.meaning||"")+'). Include 1 basic verb form and 1 phrasal verb form (must share root with this verb if possible). Return ONLY valid JSON: {"basic":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[{"meaning":"","example":""}],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","bad_reason":"왜 어색한지 한국어 1문장","good_example":"","practice_hint":"","confuse_with":{"verb":"","diff_ko":"","example_this":"","example_other":""}},"phrasal":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","bad_reason":"왜 어색한지 한국어 1문장","good_example":"","practice_hint":""}}';
                   callClaude(sys,'Create lesson for: '+kv.verb).then(function(r){
                     try{
                       var j=r;var fm=r.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -3420,7 +3443,7 @@
             {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
             {screen==="review"&&<ReviewScreen lessons={lessons} speakHistory={speakHistory} setSpeakHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}}/>}
             {screen==="history"&&<HistoryScreen history={verbHistory}/>}
-            {screen==="speak"&&<SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/>}
+            <div style={{display:screen==="speak"?"block":"none"}}><SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/></div>
             {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
             {screen==="admin"&&<AdminScreen/>}
             {screen==="settings"&&<SettingsScreen onClose={function(){setScreen("home");setTab("home");}} user={user} onLogout={function(){signOutUser();setIsGuest(false);saveLocal("is_guest",false);setScreen("home");}}/>}
