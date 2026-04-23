@@ -2486,7 +2486,7 @@
               <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
                 <div className="tf-press" onClick={function(){
                   var allClosed=!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper;
-                  if(allClosed){setExpanded({verbs:true,nouns:false,compare:false,tip:true,alt:false,deeper:false});}
+                  if(allClosed){setExpanded({verbs:true,nouns:true,compare:true,tip:true,alt:true,deeper:true});}
                   else{setExpanded({verbs:false,nouns:false,compare:false,tip:false,alt:false,deeper:false});}
                 }} style={{cursor:"pointer",fontSize:11,color:C.muted,background:C.surface,border:"1px solid "+C.border,borderRadius:8,padding:"4px 10px"}}>
                   {(!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper)?"전체 펼치기 ▼":"전체 접기 ▲"}
