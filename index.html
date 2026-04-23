@@ -1027,7 +1027,9 @@
                 <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
                   {lbData&&lbData.length>0&&userId?(function(){
                     var rank=lbData.findIndex(function(u){return u.id===userId;})+1;
-                    return rank>0?React.createElement("div",{style:{fontSize:10,color:C.yellow,fontWeight:700}},"🏆 "+lbData.length+"명 중 "+rank+"등"):null;
+                    if(!rank) return null;
+                    var txt=lbData.length>=100?("🏆 "+lbData.length+"명 중 "+rank+"등"):("🏆 "+rank+"등");
+                    return React.createElement("div",{style:{fontSize:10,color:C.yellow,fontWeight:700}},txt);
                   })():null}
                   <div style={{fontSize:10,color:C.muted,marginLeft:"auto"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
                 </div>
@@ -3167,25 +3169,28 @@
                 <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🏆 순위"}</div>
                 <div style={{background:C.surface,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:showBoard?10:0}}>
                   <div style={{fontSize:14,fontWeight:800,color:C.text,textAlign:"center"}}>
-                    {myRank>0?("전체 "+lbData.length+"명 중 "+myRank+"등"):("전체 "+lbData.length+"명 참여 중")}
+                    {showBoard?(myRank>0?("전체 "+lbData.length+"명 중 "+myRank+"등"):("전체 "+lbData.length+"명 참여 중")):(myRank>0?(myRank+"등"):("참여 중"))}
                   </div>
                 </div>
-                {showBoard&&(
+                {showBoard&&lbData.length>=3&&(function(){
+                  var showCount=Math.max(3,Math.floor(lbData.length*0.01));
+                  return(
                   <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,overflow:"hidden"}}>
-                    {lbData.slice(0,20).map(function(u,i){
+                    {lbData.slice(0,showCount).map(function(u,i){
                       var isMe=userId&&u.id===userId;
-                      var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+                      var medal=i<3?["🥇","🥈","🥉"][i]:"";
+                      var medalColor=i<3?[C.yellow,C.muted,C.orange][i]:C.text;
                       return(
-                        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<19?"1px solid "+C.border:"none",background:isMe?C.accent+"10":"transparent"}}>
-                          <span style={{fontSize:12,color:C.muted,minWidth:24,fontWeight:700}}>{medal||(i+1)}</span>
-                          <span style={{flex:1,fontSize:13,fontWeight:isMe?800:600,color:isMe?C.accent:C.text}}>{u.name}{isMe?" (나)":""}</span>
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderBottom:i<showCount-1?"1px solid "+C.border:"none",background:isMe?C.accent+"10":"transparent"}}>
+                          <span style={{fontSize:i<3?16:12,minWidth:24,textAlign:"center",color:C.muted,fontWeight:700}}>{medal||(i+1)}</span>
+                          <span style={{flex:1,fontSize:i<3?14:13,fontWeight:isMe?800:i<3?700:600,color:isMe?C.accent:C.text}}>{u.name}{isMe?" (나)":""}</span>
                           <span style={{fontSize:11,color:C.muted}}>Lv.{u.level}</span>
-                          <span style={{fontSize:11,color:C.yellow,fontWeight:700}}>{(u.xp||0).toLocaleString()} XP</span>
+                          <span style={{fontSize:i<3?12:11,color:medalColor,fontWeight:700}}>{(u.xp||0).toLocaleString()} XP</span>
                         </div>
                       );
                     })}
-                  </div>
-                )}
+                  </div>);
+                })()}
               </div>
             );
           })()}
