@@ -405,7 +405,7 @@
         basic:{verb:"put",meaning_ko:"놓다, 넣다, 표현하다",meaning_en:"to place, insert, or express",
           meanings:[{meaning:"놓다",example:"Put it there."},{meaning:"넣다",example:"Put sugar in it."},{meaning:"표현하다",example:"How do I put this?"}],
           examples:[{situation:"위치",english:"Where did I put my keys?",korean:"열쇠 어디다 뒀지?"},{situation:"압박",english:"Don't put too much pressure on yourself.",korean:"너무 부담 갖지 마."},{situation:"표현",english:"Let me put it this way.",korean:"이렇게 말할게."}],
-          bad_example:"Put thing on table.",good_example:"I don't know how to put this, but I think we need to talk.",practice_hint:"뭔가를 놓거나, 표현하기 어려운 상황으로 써보세요."},
+          bad_example:"Put thing on table.",good_example:"I don't know how to put this, but I think we need to talk.",practice_hint:"뭔가를 놓거나, 표현하기 어려운 상황으로 써보세요.",confuse_with:{verb:"place",diff_ko:"put=일상적으로 놓다 (구어), place=조심스럽게/정확한 위치에 놓다 (격식)",example_this:"Put your bag on the chair.",example_other:"Place the vase carefully on the shelf."}},
         phrasal:{verb:"put off",meaning_ko:"미루다",meaning_en:"to postpone or delay",meanings:[],
           examples:[{situation:"미루기",english:"I keep putting off my homework.",korean:"숙제 계속 미루고 있어."},{situation:"결정",english:"You can't put it off forever.",korean:"영원히 미룰 순 없어."},{situation:"약속",english:"Can we put off the meeting until Friday?",korean:"회의 금요일로 미룰 수 있을까?"}],
           bad_example:"I put off to do homework.",good_example:"I've been putting off going to the dentist for months.",practice_hint:"미루고 있는 일이나 미뤘던 경험으로 써보세요."}
@@ -1875,7 +1875,7 @@
                     <div style={{marginTop:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                         <div style={{fontSize:11,color:C.red,letterSpacing:2,fontWeight:700}}>{"🔥 내 채널에서 추천"}</div>
-                        <button onClick={function(){setShowChMgr(!showChMgr);}} style={{background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:8,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{showChMgr?"닫기":"채널 관리"}</button>
+                        <button onClick={function(){setShowChMgr(!showChMgr);}} style={{background:showChMgr?C.red+"20":C.accent+"20",border:"1px solid "+(showChMgr?C.red:C.accent)+"40",color:showChMgr?C.red:C.accent,borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{showChMgr?"닫기":"+ 채널 추가"}</button>
                       </div>
 
                       {showChMgr&&(
@@ -2263,9 +2263,9 @@
 
                       {v.examples&&v.examples.map(function(ex,ei){return(
                         <div key={ei} style={{background:color+"10",border:"1px solid "+color+"20",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-                          <div style={{fontSize:14,color:C.text,fontWeight:600,marginBottom:3}}>{ex.en}</div>
-                          <div style={{fontSize:12,color:C.muted}}>{ex.ko}</div>
-                          <button onClick={function(e){e.stopPropagation();speakEnglish(ex.en);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <div style={{fontSize:14,color:C.text,fontWeight:600,marginBottom:3}}>{ex.english||ex.en}</div>
+                          <div style={{fontSize:12,color:C.muted}}>{ex.korean||ex.ko}</div>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(ex.english||ex.en);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       );})}
 
