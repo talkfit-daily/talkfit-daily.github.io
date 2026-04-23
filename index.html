@@ -326,7 +326,7 @@
     }
 
     // ── CLAUDE API (via server proxy) ──────────────────────────────
-    var aiRemaining = 30;
+    var aiRemaining = 100;
     var aiRemainingListeners = [];
     function onAiRemainingChange(fn) { aiRemainingListeners.push(fn); }
     function setAiRemaining(v) { aiRemaining = v; aiRemainingListeners.forEach(function(fn){fn(v);}); }
@@ -2454,8 +2454,13 @@
       var onLogin = props.onLogin; var loading = props.loading;
       return (
         <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 20px",textAlign:"center"}}>
-          <div style={{fontSize:64,marginBottom:20}}>{"💪"}</div>
-          <div style={{fontSize:28,fontWeight:900,marginBottom:8}}>TalkFit</div>
+          {React.createElement("svg",{width:80,height:80,viewBox:"0 0 512 512",style:{marginBottom:20}},
+            React.createElement("rect",{width:512,height:512,rx:112,fill:"#111827"}),
+            React.createElement("path",{d:"M140 140 h232 a40 40 0 0 1 40 40 v140 a40 40 0 0 1 -40 40 h-140 l-60 50 v-50 h-32 a40 40 0 0 1 -40 -40 v-140 a40 40 0 0 1 40 -40z",fill:"none",stroke:"#7ee8a2",strokeWidth:16,strokeLinejoin:"round"}),
+            React.createElement("text",{x:256,y:300,textAnchor:"middle",fontFamily:"Arial",fontWeight:900,fontSize:160,fill:"#7ee8a2"},"T"),
+            React.createElement("circle",{cx:370,cy:170,r:14,fill:"#fbbf24"})
+          )}
+          <div style={{fontSize:28,fontWeight:900,marginBottom:8,color:C.accent}}>TalkFit</div>
           <div style={{fontSize:14,color:C.muted,marginBottom:8}}>{"쉬운 동사로 다 말한다"}</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:40,lineHeight:1.7}}>{"매일 15분, 미국인이 실제 쓰는"}<br/>{"영어 표현 트레이닝"}</div>
           <button onClick={onLogin} disabled={loading} style={{background:"#fff",color:"#333",border:"none",borderRadius:12,padding:"14px 32px",fontSize:15,fontWeight:700,cursor:loading?"wait":"pointer",display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 20px rgba(0,0,0,0.3)"}}>
@@ -2639,7 +2644,7 @@
             {screen==="home"&&user&&(
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
-                <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft+"/30"}</div>
+                <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft+"/100"}</div>
                 <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
                 {user.photoURL && <img src={user.photoURL} style={{width:24,height:24,borderRadius:"50%",cursor:"pointer"}} onClick={function(){if(confirm("로그아웃 하시겠어요?"))signOutUser();}} title="로그아웃" referrerPolicy="no-referrer"/>}
               </div>
