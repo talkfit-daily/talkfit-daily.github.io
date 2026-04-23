@@ -1,0 +1,5 @@
+node_modules/
+.gstack/
+.vercel/
+.DS_Store
+.env
