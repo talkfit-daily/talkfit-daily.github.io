@@ -1730,7 +1730,7 @@
           {!result && (
             <div>
               <div style={{display:"flex",gap:8,marginBottom:20}}>
-                {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"▶️ YouTube",desc:"영상 자막"}].map(function(t){return(
+                {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"📺 YouTube",desc:"영상 학습"}].map(function(t){return(
                   <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
                     <div style={{fontSize:13,fontWeight:700,color:mode===t.id?C.accent:C.text}}>{t.label}</div>
                     <div style={{fontSize:10,color:C.muted,marginTop:3}}>{t.desc}</div>
@@ -1821,8 +1821,20 @@
                           setYtHasMore(data.hasMore||false);
                           setYtCurrentMin(data.startMin||0);
                           saveYtProgress(data.videoId||"", data.title||"", segs, 0, data.hasMore, data.startMin||0);
-                        } else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요. 다른 영상을 시도해주세요."));}
-                      }).catch(function(){setYtTitle("⚠️ 시간 초과예요. 짧은 영상으로 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
+                        } else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
+                      }).catch(function(){
+                        // 타임아웃 — 자동 재시도 1회
+                        fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:ytUrl.trim(),startMin:0})})
+                        .then(function(r){return r.json();}).then(function(data){
+                          if(data.transcript){
+                            setYtTitle(data.title||"");setYtVideoId(data.videoId||"");
+                            var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);
+                            setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);
+                            saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);
+                          } else{setYtTitle("⚠️ 이 영상은 처리할 수 없어요. 다른 영상을 시도해주세요.");}
+                        }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 잠시 후 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
+                        return;
+                      }).finally(function(){if(!ytLoading)return;setYtLoading(false);});
                     }} style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
                       {ytLoading?"AI가 듣는 중...":"자막 가져오기"}
                     </button>
@@ -1929,7 +1941,17 @@
                           </div>
                           <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
                           {recVideos.map(function(rv){return(
-                            <div key={rv.id} onClick={function(){setYtUrl("https://youtu.be/"+rv.id);}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
+                            <div key={rv.id} onClick={function(){
+                              setYtUrl("https://youtu.be/"+rv.id);
+                              // 자동으로 자막 가져오기 시작
+                              setYtLoading(true);setYtTitle("");setYtTranscript("");
+                              fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+rv.id,startMin:0})})
+                              .then(function(r){return r.json();}).then(function(data){
+                                if(data.transcript){setYtTitle(data.title||"");setYtVideoId(data.videoId||"");var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);}
+                                else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
+                              }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
+                              window.scrollTo({top:0,behavior:"smooth"});
+                            }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
                               <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                               <div style={{flex:1}}>
                                 <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
@@ -2015,7 +2037,7 @@
                       <div style={{fontSize:12,color:C.muted,marginBottom:8,fontStyle:"italic"}}>"{renderHighlight(t.korean,t.verbs_used)}"</div>
                       <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:8}}>{renderHighlight(t.english,t.verbs_used)}</div>
                       {t.verbs_used?.length>0&&(
-                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                           {t.verbs_used.map(function(v,j){
                             var vc=(v.type==="phrasal"||v.verb.indexOf(" ")!==-1)?C.accent:C.yellow;
                             return(
@@ -2023,6 +2045,7 @@
                           );})}
                         </div>
                       )}
+                      <button onClick={function(){speakEnglish((t.english||"").replace(/\*\*/g,""));}} style={{background:"none",border:"1px solid "+color+"40",color:color,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>{"🔊 원문 듣기"}</button>
                     </div>
                   </div>
                 );
