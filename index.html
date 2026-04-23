@@ -613,6 +613,27 @@
         idx2 = (dayIndex * 2 + 1) % LESSON_POOL.length;
       }
 
+      // 모든 풀 다 학습했는지 체크 (한 번씩 다 봤으면 복습 모드)
+      var allLearnedIndices = {};
+      Object.values(learnedDates).forEach(function(arr){arr.forEach(function(i){allLearnedIndices[i]=true;});});
+      var totalLearned = Object.keys(allLearnedIndices).length;
+
+      if (totalLearned >= LESSON_POOL.length) {
+        // 풀 다 학습 → 약점 동사 우선 복습 (회화 빈도 높은 것)
+        var weakIndices = [];
+        encountered.sort(function(a,b){return (b.count||1)-(a.count||1);}).forEach(function(e){
+          LESSON_POOL.forEach(function(lp,i){
+            if (lp.basic && lp.basic.verb === e.verb.toLowerCase()) weakIndices.push(i);
+            if (lp.phrasal && lp.phrasal.verb === e.verb.toLowerCase()) weakIndices.push(i);
+          });
+        });
+        if (weakIndices.length >= 2) {
+          idx1 = weakIndices[dayIndex % weakIndices.length];
+          idx2 = weakIndices[(dayIndex+1) % weakIndices.length];
+          if (idx1 === idx2) idx2 = (idx2+1) % LESSON_POOL.length;
+        }
+      }
+
       learnedDates[todayKey] = [idx1, idx2];
       save("learned_lesson_dates", learnedDates);
       return [LESSON_POOL[idx1], LESSON_POOL[idx2]];
