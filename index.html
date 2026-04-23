@@ -297,6 +297,30 @@
     // ── TTS HELPER ─────────────────────────────────────────────────
     // **verb** 마크다운을 하이라이트로 변환하는 공용 함수
     function stripStars(t) { return (t||"").replace(/\*\*/g, ""); }
+
+    // ── 전역 백그라운드 작업 매니저 ─────────────────────────────────
+    // 컴포넌트가 언마운트돼도 작업은 계속 돌도록
+    window.__bgTasks = window.__bgTasks || {
+      // analyze: { status: "running"|"done"|"error", result: {...}, mode: "speak"|"file"|"youtube" }
+      analyze: null,
+      transcribe: null,
+      youtube: null,
+    };
+    window.__bgListeners = window.__bgListeners || {};
+
+    function setBgTask(name, value) {
+      window.__bgTasks[name] = value;
+      // 등록된 리스너 호출
+      (window.__bgListeners[name]||[]).forEach(function(fn){try{fn(value);}catch{}});
+    }
+    function getBgTask(name) { return window.__bgTasks[name]; }
+    function subscribeBgTask(name, fn) {
+      if (!window.__bgListeners[name]) window.__bgListeners[name] = [];
+      window.__bgListeners[name].push(fn);
+      return function(){
+        window.__bgListeners[name] = (window.__bgListeners[name]||[]).filter(function(f){return f!==fn;});
+      };
+    }
     function renderHighlight(text, verbsUsed, opts) {
       if (!text) return text;
       if (text.indexOf("**") === -1) return text;
@@ -2707,8 +2731,7 @@
                 </div>);
               })()}
 
-              <button onClick={function(){setPracticeMode(false);setResult(null);}} style={{width:"100%",background:"none",border:"1px solid "+C.muted,color:C.text,borderRadius:14,padding:14,fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:10}}>{"← 입력 화면으로"}</button>
-              <button onClick={function(){setPracticeMode(false);reset();}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>새 대화 분석</button>
+              <button onClick={function(){setPracticeMode(false);reset();}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"+ 새 대화 분석하기"}</button>
               <button onClick={function(){setPracticeMode(false);reset();if(onHome)onHome();}} style={{width:"100%",background:"none",border:"1px solid "+C.border,color:C.muted,borderRadius:12,padding:12,fontSize:13,cursor:"pointer"}}>홈으로</button>
             </div>
           )}
