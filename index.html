@@ -288,6 +288,7 @@
 
     // ── TTS HELPER ─────────────────────────────────────────────────
     // **verb** 마크다운을 하이라이트로 변환하는 공용 함수
+    function stripStars(t) { return (t||"").replace(/\*\*/g, ""); }
     function renderHighlight(text, verbsUsed, opts) {
       if (!text) return text;
       if (text.indexOf("**") === -1) return text;
@@ -2458,7 +2459,7 @@
                           <span key={vi} style={{color:C.orange,fontWeight:800,fontSize:15}}>{v}{vi<vc.verbs.length-1?" vs":""}</span>
                         );})}
                       </div>
-                      <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{vc.diff_ko}</div>
+                      <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{stripStars(vc.diff_ko)}</div>
                       {vc.examples&&vc.examples.map(function(ex,ei){return(
                         <div key={ei} onClick={function(){speakEnglish(ex);}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{ex}</div>
                       );})}
@@ -2470,7 +2471,7 @@
               {result.coach_tip&&(
                 <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:20}}>
                   <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:6}}>{"COACH'S TIP"}</div>
-                  <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{result.coach_tip}</div>
+                  <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{stripStars(result.coach_tip)}</div>
                 </div>
               )}
 
@@ -2812,7 +2813,7 @@
                                   <span key={vvi} style={{color:C.orange,fontWeight:800,fontSize:13}}>{v}{vvi<vc.verbs.length-1?" vs":""}</span>
                                 );})}
                               </div>
-                              <div style={{fontSize:11,color:C.text,lineHeight:1.5}}>{vc.diff_ko}</div>
+                              <div style={{fontSize:11,color:C.text,lineHeight:1.5}}>{stripStars(vc.diff_ko)}</div>
                             </div>
                           );})}
                         </div>
@@ -2820,7 +2821,7 @@
                       {sp.coach_tip&&(
                         <div style={{marginTop:12,background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:10,padding:12}}>
                           <div style={{fontSize:10,color:C.yellow,letterSpacing:1,marginBottom:6,fontWeight:700}}>COACH'S TIP</div>
-                          <div style={{fontSize:12,color:C.text,lineHeight:1.6}}>{sp.coach_tip}</div>
+                          <div style={{fontSize:12,color:C.text,lineHeight:1.6}}>{stripStars(sp.coach_tip)}</div>
                         </div>
                       )}
                     </div>
