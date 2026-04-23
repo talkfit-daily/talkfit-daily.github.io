@@ -42,9 +42,26 @@
     @keyframes levelUp{0%{transform:scale(0.5);opacity:0}50%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
     @keyframes xpPop{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-30px);opacity:0}}
     ::-webkit-scrollbar{width:0}
-    button:active,.tf-press:active,[style*="cursor: pointer"]:active,[onclick]:active{transform:scale(0.92)!important;opacity:0.7!important;background-color:rgba(126,232,162,0.15)!important;transition:transform 0.06s ease,opacity 0.06s ease,background-color 0.06s ease!important}
-    button,.tf-press,[style*="cursor: pointer"],[onclick]{transition:transform 0.12s ease,opacity 0.12s ease,background-color 0.12s ease;-webkit-tap-highlight-color:rgba(126,232,162,0.15)}
+    .tf-pressing{transform:scale(0.93)!important;opacity:0.65!important;transition:transform 0.06s ease,opacity 0.06s ease!important}
+    button,img,[role="button"]{transition:transform 0.12s ease,opacity 0.12s ease;-webkit-tap-highlight-color:transparent}
   </style>
+  <script>
+  // 모든 클릭 가능한 요소에 누름 피드백 (이벤트 위임)
+  document.addEventListener("touchstart",function(e){
+    var el=e.target.closest("button,[style*='cursor'],.tf-press,img[style]");
+    if(!el)return;
+    // cursor:pointer 체크
+    var cs=getComputedStyle(el);
+    if(cs.cursor!=="pointer"&&!el.tagName.match(/BUTTON/i))return;
+    el.classList.add("tf-pressing");
+  },{passive:true});
+  document.addEventListener("touchend",function(){
+    document.querySelectorAll(".tf-pressing").forEach(function(el){el.classList.remove("tf-pressing");});
+  },{passive:true});
+  document.addEventListener("touchcancel",function(){
+    document.querySelectorAll(".tf-pressing").forEach(function(el){el.classList.remove("tf-pressing");});
+  },{passive:true});
+  </script>
 </head>
 <body>
   <div id="splash">
