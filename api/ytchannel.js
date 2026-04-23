@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     // 채널에서 랜덤 영상 가져오기
     if (action === "random") {
       if (!channelId) return res.status(400).json({ error: "channelId가 필요해요." });
-      const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=20&videoDuration=medium&key=${ytKey}`);
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=20&key=${ytKey}`);
       const d = await r.json();
       const videos = (d.items || []).map(function(item) {
         return { id: item.id.videoId, title: item.snippet.title, thumbnail: item.snippet.thumbnails.medium.url, date: item.snippet.publishedAt.slice(0, 10) };
