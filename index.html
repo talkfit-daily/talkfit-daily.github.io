@@ -1642,16 +1642,22 @@
       function splitSegments(text) {
         var lines = text.split("\n").filter(function(l){return l.trim();});
         if (lines.length <= 1) {
-          // 줄바꿈 없으면 문장 단위로 분리
           var sentences = text.split(/(?<=[.!?])\s+/).filter(function(s){return s.trim();});
           lines = sentences.length > 1 ? sentences : [text];
         }
+        // 짧으면 1개로
+        if (lines.length <= 5) return [lines.join("\n")];
+        // 균등 분할: 4-6줄씩, 마지막이 너무 짧으면 합침
         var segs = []; var cur = [];
         for (var i=0;i<lines.length;i++) {
           cur.push(lines[i]);
-          if (cur.length >= 4) { segs.push(cur.join("\n")); cur=[]; }
+          if (cur.length >= 5) { segs.push(cur.join("\n")); cur=[]; }
         }
-        if (cur.length) segs.push(cur.join("\n"));
+        if (cur.length) {
+          // 마지막이 2줄 이하면 이전 구간에 합침
+          if (cur.length <= 2 && segs.length > 0) segs[segs.length-1] += "\n" + cur.join("\n");
+          else segs.push(cur.join("\n"));
+        }
         return segs;
       }
 
