@@ -386,7 +386,7 @@
     }
 
     // ── LESSON POOL ─────────────────────────────────────────────────
-    var LESSON_POOL = [
+    var LESSON_POOL = window.LESSON_POOL_REF = [
       {
         basic:{verb:"get",meaning_ko:"얻다, 되다, 이해하다",meaning_en:"one of the most versatile verbs",
           meanings:[{meaning:"얻다/받다",example:"I got your message."},{meaning:"되다",example:"It's getting cold."},{meaning:"이해하다",example:"I don't get it."}],
@@ -2339,6 +2339,43 @@
                       )}
                     </div>
                   )}
+                </div>);
+              })()}
+
+              {result.key_verbs&&result.key_verbs.length>0&&(function(){
+                var matchedLessons=[];
+                if(window.LESSON_POOL_REF){
+                  result.key_verbs.forEach(function(kv){
+                    var v=kv.verb.toLowerCase();
+                    window.LESSON_POOL_REF.forEach(function(lp){
+                      if(lp.basic&&lp.basic.verb===v) matchedLessons.push(lp.basic);
+                      if(lp.phrasal&&lp.phrasal.verb===v) matchedLessons.push(lp.phrasal);
+                    });
+                  });
+                }
+                if(matchedLessons.length===0) return null;
+                return(
+                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",borderRadius:14,padding:16,marginBottom:12}}>
+                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"📚 이 동사들 더 깊게 배워요"}</div>
+                  <div style={{fontSize:12,color:C.muted,marginBottom:10}}>이 대화에 나온 동사로 정식 레슨이 준비돼 있어요</div>
+                  {matchedLessons.slice(0,4).map(function(lesson,li){
+                    var isPh=lesson.verb.indexOf(" ")!==-1;
+                    var lc=isPh?C.accent:C.yellow;
+                    return(
+                    <div key={li} style={{background:C.bg,borderRadius:10,padding:12,marginBottom:6}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{color:lc,fontWeight:800,fontSize:15}}>{lesson.verb}</span>
+                        <span style={{fontSize:10,color:lc,background:lc+"20",padding:"2px 6px",borderRadius:4}}>{isPh?"구동사":"기본"}</span>
+                        <span style={{fontSize:12,color:C.muted}}>{lesson.meaning_ko}</span>
+                      </div>
+                      {lesson.examples&&lesson.examples[0]&&(
+                        <div onClick={function(){speakEnglish(lesson.examples[0].english);}} style={{fontSize:12,color:C.text,marginTop:6,cursor:"pointer"}}>{"🔊 \""}{lesson.examples[0].english}{"\""}</div>
+                      )}
+                      {lesson.examples&&lesson.examples[0]&&(
+                        <div style={{fontSize:11,color:C.muted,marginTop:2}}>{lesson.examples[0].korean}</div>
+                      )}
+                    </div>
+                  );})}
                 </div>);
               })()}
 
