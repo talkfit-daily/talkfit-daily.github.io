@@ -42,9 +42,8 @@
     @keyframes levelUp{0%{transform:scale(0.5);opacity:0}50%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
     @keyframes xpPop{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-30px);opacity:0}}
     ::-webkit-scrollbar{width:0}
-    button:active,.tf-press:active,[onclick]:active{transform:scale(0.92)!important;opacity:0.7!important;background-color:rgba(126,232,162,0.15)!important;transition:transform 0.06s ease,opacity 0.06s ease,background-color 0.06s ease!important}
-    button,.tf-press,[onclick]{transition:transform 0.12s ease,opacity 0.12s ease,background-color 0.12s ease;-webkit-tap-highlight-color:rgba(126,232,162,0.15)}
-    img[style*="cursor: pointer"]:active{transform:scale(0.85)!important;opacity:0.6!important}
+    button:active,.tf-press:active,[style*="cursor: pointer"]:active,[onclick]:active{transform:scale(0.92)!important;opacity:0.7!important;background-color:rgba(126,232,162,0.15)!important;transition:transform 0.06s ease,opacity 0.06s ease,background-color 0.06s ease!important}
+    button,.tf-press,[style*="cursor: pointer"],[onclick]{transition:transform 0.12s ease,opacity 0.12s ease,background-color 0.12s ease;-webkit-tap-highlight-color:rgba(126,232,162,0.15)}
   </style>
 </head>
 <body>
