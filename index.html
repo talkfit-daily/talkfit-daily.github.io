@@ -1708,7 +1708,7 @@
           }
           var parsed = JSON.parse(jsonStr.trim());
           setResult(parsed);
-          var entry = {id:Date.now(),date:new Date().toISOString().slice(0,10),scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs};
+          var entry = {id:Date.now(),date:new Date().toISOString().slice(0,10),scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs,key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip};
           var next=[entry].concat(history).slice(0,50);
           setHistory(next);
           fetchAltSituations(parsed);
@@ -2359,12 +2359,12 @@
                           <button onClick={function(){speakEnglish(t.english);}} style={{marginTop:6,background:"none",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       );})}
-                      {sp.key_verbs&&(
-                        <div style={{marginTop:4}}>
+                      {sp.key_verbs&&sp.key_verbs.length>0&&(
+                        <div style={{marginTop:8}}>
                           <div style={{fontSize:10,color:C.muted,letterSpacing:1,marginBottom:6}}>KEY VERBS</div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                             {sp.key_verbs.map(function(kv,ki){
-                              var isPh=kv.verb.indexOf(" ")!==-1;
+                              var isPh=(kv.type==="phrasal"||kv.verb.indexOf(" ")!==-1);
                               var vc=isPh?C.accent:C.yellow;
                               return(
                               <div key={ki} style={{background:vc+"15",border:"1px solid "+vc+"30",padding:"6px 10px",borderRadius:8}}>
@@ -2373,6 +2373,40 @@
                               </div>
                             );})}
                           </div>
+                        </div>
+                      )}
+                      {sp.key_nouns&&sp.key_nouns.length>0&&(
+                        <div style={{marginTop:12}}>
+                          <div style={{fontSize:10,color:C.blue,letterSpacing:1,marginBottom:6,fontWeight:700}}>📝 KEY NOUNS</div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                            {sp.key_nouns.map(function(n,ni){return(
+                              <div key={ni} style={{background:C.blue+"15",border:"1px solid "+C.blue+"30",padding:"6px 10px",borderRadius:8}}>
+                                <div style={{fontSize:13,fontWeight:800,color:C.blue}}>{n.noun}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{n.meaning_ko}</div>
+                              </div>
+                            );})}
+                          </div>
+                        </div>
+                      )}
+                      {sp.verb_compare&&sp.verb_compare.length>0&&(
+                        <div style={{marginTop:12,background:C.orange+"10",border:"1px solid "+C.orange+"30",borderRadius:10,padding:12}}>
+                          <div style={{fontSize:10,color:C.orange,letterSpacing:1,marginBottom:8,fontWeight:700}}>🔍 헷갈리는 동사 비교</div>
+                          {sp.verb_compare.map(function(vc,vi){return(
+                            <div key={vi} style={{marginBottom:vi<sp.verb_compare.length-1?10:0}}>
+                              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
+                                {vc.verbs.map(function(v,vvi){return(
+                                  <span key={vvi} style={{color:C.orange,fontWeight:800,fontSize:13}}>{v}{vvi<vc.verbs.length-1?" vs":""}</span>
+                                );})}
+                              </div>
+                              <div style={{fontSize:11,color:C.text,lineHeight:1.5}}>{vc.diff_ko}</div>
+                            </div>
+                          );})}
+                        </div>
+                      )}
+                      {sp.coach_tip&&(
+                        <div style={{marginTop:12,background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:10,padding:12}}>
+                          <div style={{fontSize:10,color:C.yellow,letterSpacing:1,marginBottom:6,fontWeight:700}}>COACH'S TIP</div>
+                          <div style={{fontSize:12,color:C.text,lineHeight:1.6}}>{sp.coach_tip}</div>
                         </div>
                       )}
                     </div>
