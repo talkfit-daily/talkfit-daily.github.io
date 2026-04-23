@@ -3495,23 +3495,21 @@
                 {"홈"}
               </button>
             )}
-            {screen==="home"&&isGuest&&!user&&(
-              <button onClick={function(){setIsGuest(false);saveLocal("is_guest",false);}} style={{background:C.accent+"20",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"로그인"}</button>
-            )}
             {screen==="home"&&(
-              <button onClick={function(){setScreen("settings");}} style={{background:"none",border:"none",color:C.muted,padding:"6px",cursor:"pointer",marginLeft:6}}>
-                {React.createElement("svg",{width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},
-                  React.createElement("circle",{cx:12,cy:12,r:3}),
-                  React.createElement("path",{d:"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"})
-                )}
-              </button>
-            )}
-            {screen==="home"&&user&&(
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
+                {isGuest&&!user&&(
+                  <button onClick={function(){setIsGuest(false);saveLocal("is_guest",false);}} style={{background:C.accent+"20",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"로그인"}</button>
+                )}
+                <button onClick={function(){setScreen("settings");}} style={{background:"none",border:"none",color:C.muted,padding:"6px",cursor:"pointer"}}>
+                  {React.createElement("svg",{width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},
+                    React.createElement("circle",{cx:12,cy:12,r:3}),
+                    React.createElement("path",{d:"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"})
+                  )}
+                </button>
                 <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft}</div>
                 <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
-                {user.photoURL && <img src={user.photoURL} style={{width:24,height:24,borderRadius:"50%",cursor:"pointer"}} onClick={function(){if(confirm("로그아웃 하시겠어요?"))signOutUser();}} title="로그아웃" referrerPolicy="no-referrer"/>}
+                {user&&user.photoURL&&<img src={user.photoURL} style={{width:24,height:24,borderRadius:"50%"}} referrerPolicy="no-referrer"/>}
+                {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
               </div>
             )}
           </div>
