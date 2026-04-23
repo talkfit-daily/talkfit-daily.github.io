@@ -37,12 +37,16 @@ export default async function handler(req, res) {
     // 채널에서 랜덤 영상 가져오기
     if (action === "random") {
       if (!channelId) return res.status(400).json({ error: "channelId가 필요해요." });
-      const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=5&videoDuration=medium&key=${ytKey}`);
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=20&videoDuration=medium&key=${ytKey}`);
       const d = await r.json();
       const videos = (d.items || []).map(function(item) {
         return { id: item.id.videoId, title: item.snippet.title, thumbnail: item.snippet.thumbnails.medium.url, date: item.snippet.publishedAt.slice(0, 10) };
       });
-      // 최신순 그대로, 상위 3개만
+      // 최신 20개 중 랜덤 3개
+      for (var i = videos.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = videos[i]; videos[i] = videos[j]; videos[j] = temp;
+      }
       return res.status(200).json({ videos: videos.slice(0, 3) });
     }
 
