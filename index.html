@@ -3504,7 +3504,6 @@
                 {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
                 <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft}</div>
                 <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
-                {user&&user.photoURL&&<img src={user.photoURL} onClick={function(){setScreen("history");setTab("history");}} style={{width:24,height:24,borderRadius:"50%",cursor:"pointer"}} referrerPolicy="no-referrer"/>}
                 <button onClick={function(){setScreen("settings");}} style={{background:"none",border:"none",color:C.muted,padding:"6px",cursor:"pointer"}}>
                   {React.createElement("svg",{width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},
                     React.createElement("circle",{cx:12,cy:12,r:3}),
