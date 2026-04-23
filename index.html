@@ -575,7 +575,7 @@
       var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       var cached=load("ai_remaining_data");
       if(cached&&cached.date===todayK) return cached.count;
-      return 20;
+      return 30;
     })();
     var aiRemainingListeners = [];
     function onAiRemainingChange(fn) { aiRemainingListeners.push(fn); }

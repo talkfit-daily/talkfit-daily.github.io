@@ -10,7 +10,7 @@ const ALLOWED_ORIGINS = [
 
 // 일일 AI 한도 — 무료: 20회 고정, 프리미엄: 추후 확장
 function getDailyLimit(level) {
-  return 20;
+  return 30;
 }
 const MAX_SYSTEM_LEN = 5000;
 const MAX_USER_LEN = 3000;
