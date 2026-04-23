@@ -1,0 +1,20 @@
+{
+  "name": "TalkFit",
+  "short_name": "TalkFit",
+  "description": "쉬운 동사로 다 말한다 - 매일 15분 미국식 영어",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08090d",
+  "theme_color": "#7ee8a2",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "lang": "ko-KR",
+  "categories": ["education", "productivity"]
+}

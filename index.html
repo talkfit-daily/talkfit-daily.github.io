@@ -17,6 +17,10 @@
   <meta name="theme-color" content="#08090d"/>
   <link rel="icon" href="/icon.svg" type="image/svg+xml"/>
   <link rel="apple-touch-icon" href="/icon.svg"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="TalkFit"/>
   <style>
     @keyframes splashFade{0%{opacity:1}80%{opacity:1}100%{opacity:0}}
     #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#08090d;animation:splashFade 2s forwards}
@@ -811,7 +815,7 @@
       return JSON.parse(raw.replace(/```json|```/g,"").trim());
     }
 
-    var C = {
+    var C_DARK = {
       bg:"#08090d",surface:"#10121a",border:"#1e2130",
       accent:"#7ee8a2",accentDim:"#7ee8a215",
       blue:"#60a5fa",blueDim:"#60a5fa15",
@@ -819,6 +823,21 @@
       orange:"#fb923c",red:"#f87171",
       text:"#e8eaf0",muted:"#4a5068",
     };
+    var C_LIGHT = {
+      bg:"#ffffff",surface:"#f5f6fa",border:"#e0e3eb",
+      accent:"#10b981",accentDim:"#10b98115",
+      blue:"#3b82f6",blueDim:"#3b82f615",
+      yellow:"#d97706",yellowDim:"#d9770615",
+      orange:"#ea580c",red:"#dc2626",
+      text:"#0f172a",muted:"#64748b",
+    };
+    var C = (load("theme")==="light") ? C_LIGHT : C_DARK;
+    // 폰트 크기 적용
+    (function(){
+      var fs = load("font_size") || "normal";
+      var scale = fs==="large" ? 1.15 : (fs==="small" ? 0.9 : 1);
+      document.documentElement.style.fontSize = (16*scale)+"px";
+    })();
 
 
     // ── HOME ────────────────────────────────────────────────────────
@@ -2964,6 +2983,63 @@
       );
     }
 
+    // ── SETTINGS ────────────────────────────────────────────────────
+    function SettingsScreen(props){
+      var _t=useState(load("theme")||"dark"); var theme=_t[0]; var setTheme=_t[1];
+      var _f=useState(load("font_size")||"normal"); var fontSize=_f[0]; var setFontSize=_f[1];
+      function changeTheme(v){setTheme(v);save("theme",v);setTimeout(function(){location.reload();},300);}
+      function changeFont(v){setFontSize(v);save("font_size",v);setTimeout(function(){location.reload();},300);}
+      return(
+        <div style={{padding:"24px 20px"}}>
+          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>SETTINGS</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:24}}>설정</div>
+
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
+            <div style={{display:"flex",gap:8}}>
+              {[{v:"dark",l:"다크"},{v:"light",l:"라이트"}].map(function(o){return(
+                <button key={o.v} onClick={function(){changeTheme(o.v);}} style={{flex:1,background:theme===o.v?C.accent+"20":C.bg,border:"1px solid "+(theme===o.v?C.accent:C.border),color:theme===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
+              );})}
+            </div>
+          </div>
+
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🔤 글자 크기"}</div>
+            <div style={{display:"flex",gap:8}}>
+              {[{v:"small",l:"작게"},{v:"normal",l:"보통"},{v:"large",l:"크게"}].map(function(o){return(
+                <button key={o.v} onClick={function(){changeFont(o.v);}} style={{flex:1,background:fontSize===o.v?C.accent+"20":C.bg,border:"1px solid "+(fontSize===o.v?C.accent:C.border),color:fontSize===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:o.v==="small"?12:o.v==="large"?16:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
+              );})}
+            </div>
+          </div>
+
+          {props.user&&(
+            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"👤 계정"}</div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                {props.user.photoURL&&<img src={props.user.photoURL} style={{width:36,height:36,borderRadius:"50%"}} referrerPolicy="no-referrer"/>}
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,color:C.text,fontWeight:600}}>{props.user.displayName||"사용자"}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{props.user.email}</div>
+                </div>
+              </div>
+              <button onClick={function(){if(confirm("로그아웃 하시겠어요?"))props.onLogout();}} style={{width:"100%",background:"none",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:12,fontSize:13,fontWeight:600,cursor:"pointer"}}>로그아웃</button>
+            </div>
+          )}
+
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
+            <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+              {"TalkFit v1.0"}<br/>
+              {"© 2026 TalkFit. All rights reserved."}<br/>
+              {"문의: krave.official.team@gmail.com"}
+            </div>
+          </div>
+
+          <button onClick={props.onClose} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>홈으로</button>
+        </div>
+      );
+    }
+
     // ── ADMIN ───────────────────────────────────────────────────────
     function AdminScreen() {
       var stats = fetchStats();
@@ -3210,7 +3286,7 @@
               )}
               <span style={{color:C.accent}}>{"TalkFit"}</span>
             </div>
-            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak"||screen==="roleplay"||screen==="chat")&&(
+            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak"||screen==="roleplay"||screen==="chat"||screen==="settings")&&(
               <button onClick={function(){setScreen("home");setTab("home");}} style={{background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
                 {React.createElement("svg",{width:14,height:14,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2.5,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("polyline",{points:"15 18 9 12 15 6"}))}
                 {"홈"}
@@ -3218,6 +3294,14 @@
             )}
             {screen==="home"&&isGuest&&!user&&(
               <button onClick={function(){setIsGuest(false);saveLocal("is_guest",false);}} style={{background:C.accent+"20",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"로그인"}</button>
+            )}
+            {screen==="home"&&(
+              <button onClick={function(){setScreen("settings");}} style={{background:"none",border:"none",color:C.muted,padding:"6px",cursor:"pointer",marginLeft:6}}>
+                {React.createElement("svg",{width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},
+                  React.createElement("circle",{cx:12,cy:12,r:3}),
+                  React.createElement("path",{d:"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"})
+                )}
+              </button>
             )}
             {screen==="home"&&user&&(
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -3239,6 +3323,7 @@
             {screen==="speak"&&<SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/>}
             {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
             {screen==="admin"&&<AdminScreen/>}
+            {screen==="settings"&&<SettingsScreen onClose={function(){setScreen("home");setTab("home");}} user={user} onLogout={function(){signOutUser();setIsGuest(false);saveLocal("is_guest",false);setScreen("home");}}/>}
           </div>
 
           {screen!=="practice"&&screen!=="admin"&&screen!=="chat"&&(
