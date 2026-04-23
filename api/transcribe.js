@@ -41,11 +41,11 @@ export default async function handler(req, res) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: "You are a Korean speech transcriber. Transcribe the audio exactly as spoken in Korean. Output ONLY the transcription text, nothing else. If multiple speakers, separate with line breaks." }] },
+          systemInstruction: { parts: [{ text: "You are a Korean speech transcriber with speaker diarization. Listen to the audio and identify different speakers by their voice. Transcribe in Korean exactly as spoken. Format: '화자1: 발화내용' on each line. If only one speaker, just write the text without speaker labels. Number speakers as 화자1, 화자2, 화자3 etc. consistently throughout. Output ONLY the formatted transcription." }] },
           contents: [{
             role: "user",
             parts: [
-              { text: "이 오디오를 한국어로 정확하게 받아적어줘. 텍스트만 출력해." },
+              { text: "이 오디오를 받아적어줘. 여러 명이면 목소리로 화자를 구별해서 '화자1: ', '화자2: ' 형식으로. 한 명이면 그냥 텍스트만." },
               { inline_data: { mime_type: mimeType, data: audio } }
             ]
           }],
