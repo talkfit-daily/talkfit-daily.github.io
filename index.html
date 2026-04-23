@@ -898,6 +898,38 @@
             );
           })()}
 
+          {/* 일일 미션 */}
+          {(function(){
+            var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+            var missions=load("daily_missions_"+todayK)||{verbDone:false,speakDone:false,quiz3:0,combo3:false};
+            // 자동 업데이트
+            if(loadLocal("verb_done_"+todayK))missions.verbDone=true;
+            if(loadLocal("speak_done_"+todayK))missions.speakDone=true;
+            var st=load("xp_state")||{};
+            if((st.combo||0)>=3)missions.combo3=true;
+            save("daily_missions_"+todayK,missions);
+            var done=(missions.verbDone?1:0)+(missions.speakDone?1:0)+(missions.combo3?1:0);
+            return(
+              <div style={{background:C.surface,border:"1px solid "+C.orange+"30",borderRadius:12,padding:14,marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div style={{fontSize:11,color:C.orange,letterSpacing:2,fontWeight:700}}>{"🎯 오늘의 미션"}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{done}/3</div>
+                </div>
+                {[
+                  {k:"verbDone",label:"동사 레슨 완료",reward:"+10 XP"},
+                  {k:"speakDone",label:"회화 1번 분석",reward:"+15 XP"},
+                  {k:"combo3",label:"3연속 정답",reward:"+5 XP"}
+                ].map(function(m,i){return(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",opacity:missions[m.k]?0.5:1}}>
+                    <span style={{fontSize:14}}>{missions[m.k]?"✅":"⬜"}</span>
+                    <span style={{flex:1,fontSize:13,color:C.text,textDecoration:missions[m.k]?"line-through":"none"}}>{m.label}</span>
+                    <span style={{fontSize:11,color:C.orange,fontWeight:700}}>{m.reward}</span>
+                  </div>
+                );})}
+              </div>
+            );
+          })()}
+
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:10}}>{"오늘의 15분"}</div>
 
           {todayDone?(
@@ -2853,7 +2885,11 @@
 
     function HistoryScreen(props) {
       var history = props.history;
-      if (!history.length) return (
+      var att = load("attendance")||{};
+      var st = load("xp_state")||{};
+      var encountered = load("my_encountered_verbs")||[];
+      var topVerbs = encountered.slice().sort(function(a,b){return (b.count||1)-(a.count||1);}).slice(0,10);
+      if (!history.length && !att.totalDays && !encountered.length) return (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",color:C.muted,gap:12}}>
           <div style={{fontSize:36}}>{"📚"}</div><div style={{fontSize:14}}>아직 학습 기록이 없어요</div>
         </div>
@@ -2861,7 +2897,47 @@
       return (
         <div style={{padding:"24px 20px"}}>
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:8}}>HISTORY</div>
-          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>학습 기록</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>나의 통계</div>
+
+          {/* 통계 카드 */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
+            <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:12,padding:14}}>
+              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"누적 학습일"}</div>
+              <div style={{fontSize:22,fontWeight:900,color:C.accent}}>{att.totalDays||0}{"일"}</div>
+            </div>
+            <div style={{background:C.surface,border:"1px solid "+C.orange+"30",borderRadius:12,padding:14}}>
+              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"최장 연속"}</div>
+              <div style={{fontSize:22,fontWeight:900,color:C.orange}}>{att.longestStreak||0}{"일"}</div>
+            </div>
+            <div style={{background:C.surface,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14}}>
+              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"총 획득 XP"}</div>
+              <div style={{fontSize:22,fontWeight:900,color:C.yellow}}>{(st.totalEarned||st.xp||0).toLocaleString()}</div>
+            </div>
+            <div style={{background:C.surface,border:"1px solid "+C.blue+"30",borderRadius:12,padding:14}}>
+              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"학습한 동사"}</div>
+              <div style={{fontSize:22,fontWeight:900,color:C.blue}}>{encountered.length}{"개"}</div>
+            </div>
+          </div>
+
+          {/* 자주 만난 동사 TOP 10 */}
+          {topVerbs.length>0&&(
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🔥 내가 자주 쓰는 동사 TOP 10"}</div>
+              {topVerbs.map(function(v,i){
+                var isPh=(v.type==="phrasal"||v.verb.indexOf(" ")!==-1);
+                var vc=isPh?C.accent:C.yellow;
+                return(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:C.surface,borderRadius:10,marginBottom:6}}>
+                  <span style={{fontSize:11,color:C.muted,minWidth:20}}>{i+1}</span>
+                  <span style={{color:vc,fontWeight:800,fontSize:14,flex:1}}>{v.verb}</span>
+                  <span style={{fontSize:11,color:C.muted}}>{v.meaning}</span>
+                  <span style={{fontSize:10,color:vc,fontWeight:700,background:vc+"15",padding:"2px 6px",borderRadius:4}}>{v.count||1}{"회"}</span>
+                </div>
+              );})}
+            </div>
+          )}
+
+          {history.length>0&&(<div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"📚 학습 기록"}</div>)}
           {[].concat(history).reverse().map(function(item,i){return(
             <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:10}}>
               <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{item.date}</div>
