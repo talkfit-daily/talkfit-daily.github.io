@@ -1575,6 +1575,21 @@
       var formatTime=function(s){return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
 
       var _fileLoading = useState(false); var fileLoading = _fileLoading[0]; var setFileLoading = _fileLoading[1];
+      var _speakerNames = useState({}); var speakerNames = _speakerNames[0]; var setSpeakerNames = _speakerNames[1];
+      // 텍스트에서 화자 추출
+      function extractSpeakers(text){
+        var matches = (text||"").match(/화자\d+/g) || [];
+        var unique = []; matches.forEach(function(m){if(unique.indexOf(m)===-1)unique.push(m);});
+        return unique;
+      }
+      // 화자명 치환된 텍스트 반환
+      function applySpeakerNames(text){
+        var result = text || "";
+        Object.keys(speakerNames).forEach(function(orig){
+          if(speakerNames[orig]) result = result.split(orig).join(speakerNames[orig]);
+        });
+        return result;
+      }
       var _ytUrl = useState(""); var ytUrl = _ytUrl[0]; var setYtUrl = _ytUrl[1];
       var _ytLoading = useState(false); var ytLoading = _ytLoading[0]; var setYtLoading = _ytLoading[1];
       var _ytTitle = useState(""); var ytTitle = _ytTitle[0]; var setYtTitle = _ytTitle[1];
@@ -1732,7 +1747,7 @@
       };
 
       var analyze = function() {
-        var text = mode === "youtube" ? ytTranscript.trim() : mode === "file" ? fileTranscript.trim() : (transcript || textInput).trim();
+        var text = mode === "youtube" ? ytTranscript.trim() : mode === "file" ? applySpeakerNames(fileTranscript).trim() : (transcript || textInput).trim();
         if (!text) return;
         var wasTrimmed = false;
         if (text.length > 1500) {
@@ -1858,7 +1873,19 @@
                         <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>인식된 텍스트</div>
                         <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
                       </div>
-                      <textarea value={fileTranscript} onChange={function(e){setFileTranscript(e.target.value);}} rows={4} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:14,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                      {extractSpeakers(fileTranscript).length>0&&(
+                        <div style={{background:C.bg,borderRadius:10,padding:10,marginBottom:8}}>
+                          <div style={{fontSize:10,color:C.muted,marginBottom:6,letterSpacing:1}}>화자 이름 바꾸기</div>
+                          {extractSpeakers(fileTranscript).map(function(sp){return(
+                            <div key={sp} style={{display:"flex",gap:8,alignItems:"center",marginBottom:4}}>
+                              <span style={{fontSize:12,color:C.muted,minWidth:48}}>{sp}</span>
+                              <span style={{fontSize:11,color:C.muted}}>→</span>
+                              <input value={speakerNames[sp]||""} onChange={function(e){var n={};for(var k in speakerNames)n[k]=speakerNames[k];n[sp]=e.target.value;setSpeakerNames(n);}} placeholder={sp==="화자1"?"나":"친구/상대"} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:6,padding:"4px 8px",color:C.text,fontSize:12,outline:"none"}}/>
+                            </div>
+                          );})}
+                        </div>
+                      )}
+                      <textarea value={applySpeakerNames(fileTranscript)} onChange={function(e){setFileTranscript(e.target.value);setSpeakerNames({});}} rows={4} style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:14,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
                     </div>
                   )}
                 </div>
