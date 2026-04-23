@@ -382,10 +382,12 @@
     function setAiRemaining(v) { aiRemaining = v; aiRemainingListeners.forEach(function(fn){fn(v);}); }
 
     async function callClaude(system, user) {
+      var xp = (load("xp_state")||{xp:0}).xp;
+      var lv = getLevel(xp);
       var res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ system: system, user: user }),
+        body: JSON.stringify({ system: system, user: user, level: lv.level }),
       });
       var data = await res.json();
       if (!res.ok) {
@@ -2466,6 +2468,11 @@
                             // 회화 완료 마크 (연습까지 다 풀었을 때)
                             var tk=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
                             saveLocal("speak_done_"+tk,true);
+                            // 동사 레슨도 완료했으면 오늘 완전 완료
+                            if(loadLocal("verb_done_"+tk)){
+                              var st=loadLocal("tk_state")||{};
+                              if(!st.todayDone){st.todayDone=true;st.streak=(st.streak||0)+1;st.todayKey=tk;saveLocal("tk_state",st);}
+                            }
                           }
                           else{setPracticeIdx(practiceIdx+1);setPracticeAnswer("");setPracticeCheck(null);}
                         }} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>{isLast?"연습 완료! 🎉":"다음 →"}</button>
@@ -2916,7 +2923,6 @@
 
       var handleComplete = function() {
         track("lesson_done");
-        var newStreak = streak+1;
         var allVerbs = [];
         if (lessons) {
           for (var li = 0; li < lessons.length; li++) {
@@ -2925,8 +2931,14 @@
           }
         }
         var newHistory = [].concat(verbHistory,[{verbs:allVerbs,date:todayKey()}]);
-        setStreak(newStreak); setTodayDone(true); setVerbHistory(newHistory);
-        persist({streak:newStreak,todayDone:true,history:newHistory,lessons:lessons});
+        // 동사 레슨 완료 마크
+        saveLocal("verb_done_"+todayKey(), true);
+        // 회화도 완료했으면 오늘 완료
+        var speakDone = loadLocal("speak_done_"+todayKey());
+        var fullyDone = !!speakDone;
+        var newStreak = fullyDone ? streak+1 : streak;
+        setStreak(newStreak); setTodayDone(fullyDone); setVerbHistory(newHistory);
+        persist({streak:newStreak,todayDone:fullyDone,history:newHistory,lessons:lessons});
         if (user) {
           var xpState = loadLocal("xp_state");
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
@@ -2984,7 +2996,7 @@
             {screen==="home"&&user&&(
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
-                <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft+"/100"}</div>
+                <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft}</div>
                 <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
                 {user.photoURL && <img src={user.photoURL} style={{width:24,height:24,borderRadius:"50%",cursor:"pointer"}} onClick={function(){if(confirm("로그아웃 하시겠어요?"))signOutUser();}} title="로그아웃" referrerPolicy="no-referrer"/>}
               </div>

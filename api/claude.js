@@ -8,7 +8,9 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
 ];
 
-const DAILY_LIMIT = 100;
+// 레벨별 일일 한도 (level: 1=Beginner ~ 8=Master)
+const LIMIT_BY_LEVEL = { 1: 20, 2: 30, 3: 50, 4: 70, 5: 100, 6: 150, 7: 200, 8: 999 };
+function getDailyLimit(level) { return LIMIT_BY_LEVEL[level] || 20; }
 const MAX_SYSTEM_LEN = 5000;
 const MAX_USER_LEN = 3000;
 
@@ -34,18 +36,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "입력이 너무 길어요. 짧게 줄여주세요." });
   }
 
-  // ── Rate Limiting ────────────────────────────────────────────────
+  // ── Rate Limiting (레벨별 차등) ──────────────────────────────────
   const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
   const today = new Date().toISOString().slice(0, 10);
   const rlKey = `rl:${ip}:${today}`;
+  const userLevel = parseInt(req.body?.level) || 1;
+  const dailyLimit = getDailyLimit(userLevel);
 
   if (!global._rlStore) global._rlStore = {};
   if (global._rlDate !== today) { global._rlStore = {}; global._rlDate = today; }
 
   const count = global._rlStore[rlKey] || 0;
-  if (count >= DAILY_LIMIT) {
+  if (count >= dailyLimit) {
     return res.status(429).json({
-      error: `오늘 AI 사용 횟수(${DAILY_LIMIT}회)를 모두 사용했어요. 내일 다시 만나요!`,
+      error: `오늘 AI 사용 횟수(${dailyLimit}회)를 모두 사용했어요. 레벨업하면 더 많이 쓸 수 있어요!`,
       remaining: 0,
     });
   }
@@ -82,7 +86,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       text,
-      remaining: DAILY_LIMIT - count - 1,
+      remaining: dailyLimit - count - 1,
+      dailyLimit: dailyLimit,
     });
   } catch (err) {
     return res.status(500).json({ error: "서버 오류가 발생했어요. 잠시 후 다시 시도해주세요." });
