@@ -8,9 +8,18 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
 ];
 
-// 레벨별 일일 한도 (level: 1=Beginner ~ 8=Master)
-const LIMIT_BY_LEVEL = { 1: 20, 2: 30, 3: 50, 4: 70, 5: 100, 6: 150, 7: 200, 8: 999 };
-function getDailyLimit(level) { return LIMIT_BY_LEVEL[level] || 20; }
+// 레벨별 일일 AI 한도 (1~99) — 박하게
+function getDailyLimit(level) {
+  var lv = parseInt(level) || 1;
+  if (lv <= 3) return 5 + lv;               // Lv1=6, Lv3=8
+  if (lv <= 10) return 8 + (lv - 3) * 2;    // Lv4=10, Lv10=22
+  if (lv <= 20) return 22 + (lv - 10) * 2;  // Lv11=24, Lv20=42
+  if (lv <= 30) return 42 + (lv - 20) * 2;  // Lv21=44, Lv30=62
+  if (lv <= 50) return 62 + (lv - 30) * 2;  // Lv31=64, Lv50=102
+  if (lv <= 80) return 102 + (lv - 50) * 2; // Lv51=104, Lv80=162
+  if (lv <= 98) return 162 + (lv - 80) * 2; // Lv81=164, Lv98=198
+  return 9999;                              // Lv99 무제한 보상
+}
 const MAX_SYSTEM_LEN = 5000;
 const MAX_USER_LEN = 3000;
 

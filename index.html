@@ -118,16 +118,35 @@
     }
 
     // ── XP + LEVEL SYSTEM ──────────────────────────────────────────
-    var LEVELS = [
-      {level:1,name:"Beginner",min:0,max:100},
-      {level:2,name:"Starter",min:100,max:300},
-      {level:3,name:"Learner",min:300,max:600},
-      {level:4,name:"Speaker",min:600,max:1000},
-      {level:5,name:"Talker",min:1000,max:1500},
-      {level:6,name:"Fluent",min:1500,max:2200},
-      {level:7,name:"Native-like",min:2200,max:3000},
-      {level:8,name:"Master",min:3000,max:999999},
-    ];
+    // 99레벨까지 — RPG 스타일 (지수 곡선)
+    function levelName(lv) {
+      if (lv <= 5) return "Beginner";
+      if (lv <= 10) return "Starter";
+      if (lv <= 20) return "Learner";
+      if (lv <= 30) return "Speaker";
+      if (lv <= 45) return "Talker";
+      if (lv <= 60) return "Fluent";
+      if (lv <= 80) return "Native-like";
+      if (lv <= 98) return "Expert";
+      return "Master";
+    }
+    function xpForLevel(lv) {
+      // Lv1=0, Lv2=100, Lv3=250, Lv4=450, ... 점점 가파르게
+      if (lv <= 1) return 0;
+      return Math.floor(50 * lv * (lv - 1) + 50 * Math.pow(lv - 1, 1.5));
+    }
+    var LEVELS = (function(){
+      var arr = [];
+      for (var i = 1; i <= 99; i++) {
+        arr.push({
+          level: i,
+          name: levelName(i),
+          min: xpForLevel(i),
+          max: i === 99 ? 9999999 : xpForLevel(i + 1)
+        });
+      }
+      return arr;
+    })();
     function getLevel(xp) {
       for (var i=LEVELS.length-1;i>=0;i--) { if (xp>=LEVELS[i].min) return LEVELS[i]; }
       return LEVELS[0];
