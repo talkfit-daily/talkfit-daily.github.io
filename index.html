@@ -1028,8 +1028,7 @@
                   {lbData&&lbData.length>0&&userId?(function(){
                     var rank=lbData.findIndex(function(u){return u.id===userId;})+1;
                     if(!rank) return null;
-                    var txt=lbData.length>=100?("🏆 "+lbData.length+"명 중 "+rank+"등"):("🏆 "+rank+"등");
-                    return React.createElement("div",{style:{fontSize:10,color:C.yellow,fontWeight:700}},txt);
+                    return React.createElement("div",{style:{fontSize:10,color:C.yellow,fontWeight:700}},"🏆 "+lbData.length+"명 중 "+rank+"등");
                   })():null}
                   <div style={{fontSize:10,color:C.muted,marginLeft:"auto"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
                 </div>
@@ -3169,7 +3168,7 @@
                 <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🏆 순위"}</div>
                 <div style={{background:C.surface,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:showBoard?10:0}}>
                   <div style={{fontSize:14,fontWeight:800,color:C.text,textAlign:"center"}}>
-                    {showBoard?(myRank>0?("전체 "+lbData.length+"명 중 "+myRank+"등"):("전체 "+lbData.length+"명 참여 중")):(myRank>0?(myRank+"등"):("참여 중"))}
+                    {myRank>0?(lbData.length+"명 중 "+myRank+"등"):(lbData.length+"명 참여 중")}
                   </div>
                 </div>
                 {showBoard&&lbData.length>=3&&(function(){
