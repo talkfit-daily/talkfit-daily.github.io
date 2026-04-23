@@ -3183,17 +3183,7 @@
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>SETTINGS</div>
           <div style={{fontSize:22,fontWeight:800,marginBottom:24}}>설정</div>
 
-          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
-            <div style={{display:"flex",gap:8}}>
-              {[{v:"dark",l:"다크"},{v:"light",l:"라이트"}].map(function(o){return(
-                <button key={o.v} onClick={function(){changeTheme(o.v);}} style={{flex:1,background:theme===o.v?C.accent+"20":C.bg,border:"1px solid "+(theme===o.v?C.accent:C.border),color:theme===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
-              );})}
-            </div>
-          </div>
-
-
-{props.user&&(
+          {props.user&&(
             <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
               <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"👤 계정"}</div>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
@@ -3225,11 +3215,20 @@
           </div>
 
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
+            <div style={{display:"flex",gap:8}}>
+              {[{v:"dark",l:"다크"},{v:"light",l:"라이트"}].map(function(o){return(
+                <button key={o.v} onClick={function(){changeTheme(o.v);}} style={{flex:1,background:theme===o.v?C.accent+"20":C.bg,border:"1px solid "+(theme===o.v?C.accent:C.border),color:theme===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
+              );})}
+            </div>
+          </div>
+
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
               {"TalkFit v1.0.0 (Beta)"}<br/>
               {"© 2026 TalkFit. All rights reserved."}<br/>
-              {"문의: krave.official.team@gmail.com"}
+              {"문의: talkfit.daily@gmail.com"}
             </div>
           </div>
 
