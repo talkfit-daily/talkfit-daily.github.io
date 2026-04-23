@@ -1972,7 +1972,7 @@
         setBbcLoading(true);
         fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:BBC_DEFAULT.id})})
         .then(function(r){return r.json();}).then(function(d){
-          var vids=(d.videos||[]).map(function(v){v.channel="BBC Learning English";return v;});
+          var vids=(d.videos||[]).filter(function(v){return !v.duration||v.duration>=60;}).map(function(v){v.channel="BBC Learning English";return v;});
           setBbcRecs(vids);save("bbc_cached_recs",vids);
         }).catch(function(){}).finally(function(){setBbcLoading(false);});
       },[]);
