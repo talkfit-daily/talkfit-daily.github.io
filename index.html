@@ -169,22 +169,33 @@
       return {xp:state.xp, leveledUp:newLevel.level>oldLevel.level, level:newLevel, gained:actualXP};
     }
 
-    // 출석 보너스 (하루 1번)
+    // 연속 출석 보너스
     function claimAttendanceBonus() {
       var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-      var lastDate = load("last_attendance") || "";
-      if (lastDate === todayK) return null; // 이미 받음
+      var att = load("attendance") || { lastDate: "", streak: 0 };
+      if (att.lastDate === todayK) return null; // 오늘 이미 받음
 
-      // 연속 출석 보너스
-      var streak = (load("xp_state")||{}).streak || 1;
-      var bonus = 10; // 기본
-      if (streak >= 7) bonus = 30;
-      if (streak >= 30) bonus = 50;
-      if (streak >= 100) bonus = 100;
+      // 어제와 연속인지 체크
+      var yesterday = (function(){var d=new Date();d.setHours(d.getHours()+9);d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
+      if (att.lastDate === yesterday) {
+        att.streak += 1; // 연속 출석
+      } else {
+        att.streak = 1; // 끊겼으니 리셋
+      }
+      att.lastDate = todayK;
+      save("attendance", att);
 
-      save("last_attendance", todayK);
+      // 연속 일수에 따른 보너스
+      var bonus = 5; // 기본 (1일)
+      if (att.streak >= 3) bonus = 10;
+      if (att.streak >= 7) bonus = 25;
+      if (att.streak >= 14) bonus = 40;
+      if (att.streak >= 30) bonus = 70;
+      if (att.streak >= 100) bonus = 150;
+      if (att.streak >= 365) bonus = 500;
+
       var r = addXP(bonus);
-      return { bonus: bonus, ...r };
+      return { bonus: bonus, streak: att.streak, ...r };
     }
     function getXP() { return (load("xp_state")||{xp:0}).xp; }
 
@@ -942,8 +953,7 @@
           if (quizzes[quizIdx].isReview) removeWeakVerb(quizzes[quizIdx].verb);
         } else {
           addWeakVerb(quizzes[quizIdx].verb);
-          // 틀리면 -2XP (실수도 평가)
-          var r=addXP(-2); if(onXP)onXP(r);
+          // 틀리면 XP 없음 — 다시 풀어야 함
         }
       };
 
@@ -954,12 +964,11 @@
         setAnswered(true);
         if (isCorrect) {
           setCorrectCount(function(c){return c+1;});
-          // 문장 배열 정답 = 15XP (어려움)
           var r=addXP(15); showXpGain(15); if(onXP)onXP(r);
           if (quizzes[quizIdx].isReview) removeWeakVerb(quizzes[quizIdx].verb);
         } else {
           addWeakVerb(quizzes[quizIdx].verb);
-          var r=addXP(-3); if(onXP)onXP(r);
+          // 틀리면 XP 없음 — 다시 풀어야 함
         }
       };
 
@@ -2506,13 +2515,15 @@
                         <button onClick={function(){
                           if(isLast){
                             setPracticeMode(false);
-                            // 회화 완료 마크 (연습까지 다 풀었을 때)
                             var tk=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
                             saveLocal("speak_done_"+tk,true);
-                            // 동사 레슨도 완료했으면 오늘 완전 완료
                             if(loadLocal("verb_done_"+tk)){
                               var st=loadLocal("tk_state")||{};
-                              if(!st.todayDone){st.todayDone=true;st.streak=(st.streak||0)+1;st.todayKey=tk;saveLocal("tk_state",st);}
+                              if(!st.todayDone){st.todayDone=true;st.streak=(st.streak||0)+1;st.todayKey=tk;saveLocal("tk_state",st);
+                                // 출석 보너스
+                                var bonus=claimAttendanceBonus();
+                                if(bonus){setTimeout(function(){alert("🔥 "+bonus.streak+"일 연속 훈련! 출석 보너스 +"+bonus.bonus+" XP");},800);}
+                              }
                             }
                           }
                           else{setPracticeIdx(practiceIdx+1);setPracticeAnswer("");setPracticeCheck(null);}
@@ -2929,11 +2940,7 @@
 
       useEffect(function(){
         track("visit");
-        // 매일 출석 보너스 자동 지급
-        var bonus = claimAttendanceBonus();
-        if (bonus) {
-          setTimeout(function(){ alert("🎉 출석 보너스 +" + bonus.bonus + " XP!"); }, 1500);
-        }
+        // 출석 보너스는 훈련 완료 시에만 (handleComplete 또는 회화 완료 시)
         var s = loadLocal("tk_state");
         if (s) {
           setStreak(s.streak||0);
@@ -2977,14 +2984,19 @@
           }
         }
         var newHistory = [].concat(verbHistory,[{verbs:allVerbs,date:todayKey()}]);
-        // 동사 레슨 완료 마크
         saveLocal("verb_done_"+todayKey(), true);
-        // 회화도 완료했으면 오늘 완료
         var speakDone = loadLocal("speak_done_"+todayKey());
         var fullyDone = !!speakDone;
         var newStreak = fullyDone ? streak+1 : streak;
         setStreak(newStreak); setTodayDone(fullyDone); setVerbHistory(newHistory);
         persist({streak:newStreak,todayDone:fullyDone,history:newHistory,lessons:lessons});
+        // 둘 다 완료 시 출석 보너스
+        if (fullyDone) {
+          var bonus = claimAttendanceBonus();
+          if (bonus) {
+            setTimeout(function(){ alert("🔥 "+bonus.streak+"일 연속 훈련! 출석 보너스 +" + bonus.bonus + " XP"); }, 800);
+          }
+        }
         if (user) {
           var xpState = loadLocal("xp_state");
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
