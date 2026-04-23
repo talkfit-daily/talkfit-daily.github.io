@@ -1730,9 +1730,9 @@
           {!result && (
             <div>
               <div style={{display:"flex",gap:8,marginBottom:20}}>
-                {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"📺 YouTube",desc:"영상 학습"}].map(function(t){return(
+                {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"▶ YouTube",desc:"영상 학습",labelColor:"#FF0000"}].map(function(t){return(
                   <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
-                    <div style={{fontSize:13,fontWeight:700,color:mode===t.id?C.accent:C.text}}>{t.label}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:mode===t.id?C.accent:(t.labelColor||C.text)}}>{t.label}</div>
                     <div style={{fontSize:10,color:C.muted,marginTop:3}}>{t.desc}</div>
                   </div>
                 );})}
