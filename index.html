@@ -1645,6 +1645,33 @@
         setResult(null);
       }
 
+      // 백그라운드로 다음 구간 자동 가져오기
+      var _bgLoading = useState(false); var bgLoading = _bgLoading[0]; var setBgLoading = _bgLoading[1];
+      function fetchNextChunkInBackground(videoId, title, currentMin, currentSegs) {
+        if (!videoId) return;
+        setBgLoading(true);
+        var nextMin = currentMin + 5;
+        fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+videoId,startMin:nextMin})})
+        .then(function(r){return r.json();}).then(function(data){
+          if(data.transcript){
+            var newSegs = splitSegments(data.transcript);
+            setYtSegments(function(prev){
+              var combined = prev.concat(newSegs);
+              saveYtProgress(videoId, title, combined, 0, data.hasMore, 0);
+              // hasMore면 다시 백그라운드로
+              if(data.hasMore && nextMin < 60) {
+                setTimeout(function(){fetchNextChunkInBackground(videoId, title, nextMin, combined);}, 500);
+              } else {
+                setBgLoading(false);
+              }
+              return combined;
+            });
+          } else {
+            setBgLoading(false);
+          }
+        }).catch(function(){setBgLoading(false);});
+      }
+
       var handleFileUpload = function(e) {
         var file = e.target.files && e.target.files[0];
         if (!file) return;
@@ -1841,6 +1868,8 @@
                           setYtHasMore(data.hasMore||false);
                           setYtCurrentMin(data.startMin||0);
                           saveYtProgress(data.videoId||"", data.title||"", segs, 0, data.hasMore, data.startMin||0);
+                          // 백그라운드로 다음 구간 자동 로드
+                          if(data.hasMore){setTimeout(function(){fetchNextChunkInBackground(data.videoId||"",data.title||"",0,segs);},1000);}
                         } else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
                       }).catch(function(){
                         // 타임아웃 — 자동 재시도 1회
@@ -1878,7 +1907,7 @@
                   {ytSegments.length>0 && !result && (
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>구간 {ytSegIdx+1} / {ytSegments.length}</div>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>구간 {ytSegIdx+1} / {ytSegments.length}{bgLoading?" (다음 구간 준비 중...)":""}</div>
                         <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
                       </div>
                       <div style={{height:4,background:C.border,borderRadius:99,marginBottom:12,overflow:"hidden"}}>
@@ -1967,7 +1996,7 @@
                               setYtLoading(true);setYtTitle("");setYtTranscript("");
                               fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+rv.id,startMin:0})})
                               .then(function(r){return r.json();}).then(function(data){
-                                if(data.transcript){setYtTitle(data.title||"");setYtVideoId(data.videoId||"");var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);}
+                                if(data.transcript){setYtTitle(data.title||"");setYtVideoId(data.videoId||"");var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);if(data.hasMore){setTimeout(function(){fetchNextChunkInBackground(data.videoId||"",data.title||"",0,segs);},1000);}}
                                 else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
                               }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
                               window.scrollTo({top:0,behavior:"smooth"});
