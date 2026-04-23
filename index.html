@@ -42,6 +42,8 @@
     @keyframes levelUp{0%{transform:scale(0.5);opacity:0}50%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
     @keyframes xpPop{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-30px);opacity:0}}
     ::-webkit-scrollbar{width:0}
+    button:active,.tf-press:active{transform:scale(0.94);opacity:0.8;transition:transform 0.08s ease,opacity 0.08s ease}
+    button,.tf-press{transition:transform 0.15s ease,opacity 0.15s ease}
   </style>
 </head>
 <body>
@@ -327,20 +329,26 @@
       var phrasalList = (verbsUsed||[]).filter(function(v){return v.type==="phrasal"||v.verb.indexOf(" ")!==-1;}).map(function(v){return v.verb.toLowerCase();});
       var dim = opts && opts.dim;
       var fontSize = opts && opts.fontSize;
-      // 한국어용: 영어 verbs_used 순서대로 매핑 (구동사/기본 판별)
       var koreanMode = opts && opts.korean;
       var verbIdx = 0;
       return text.split(/(\*\*[^*]+\*\*)/).map(function(part, i) {
         if (part.startsWith("**") && part.endsWith("**")) {
           var word = part.slice(2, -2);
           var isPhrasal;
-          if (koreanMode && verbsUsed && verbsUsed[verbIdx]) {
+          // 영어인 경우: 공백 포함 = 무조건 구동사
+          if (!koreanMode && word.indexOf(" ") !== -1) {
+            isPhrasal = true;
+          } else if (koreanMode && verbsUsed && verbsUsed[verbIdx]) {
             // 한국어는 순서대로 매핑
             var v = verbsUsed[verbIdx];
             isPhrasal = (v.type === "phrasal" || v.verb.indexOf(" ") !== -1);
             verbIdx++;
           } else {
-            isPhrasal = word.indexOf(" ") !== -1 || phrasalList.some(function(p){return p.indexOf(word.toLowerCase())!==-1 || word.toLowerCase().indexOf(p)!==-1;});
+            // verbs_used 매칭 시도
+            isPhrasal = phrasalList.some(function(p){
+              var pl=p.toLowerCase(),wl=word.toLowerCase();
+              return pl===wl || pl.indexOf(wl)!==-1 || wl.indexOf(pl)!==-1;
+            });
           }
           var vc = isPhrasal ? C.accent : C.yellow;
           var style = {color: vc, fontWeight: dim ? 600 : 800};
@@ -2475,6 +2483,16 @@
                 </div>
               )}
 
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+                <div className="tf-press" onClick={function(){
+                  var allClosed=!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper;
+                  if(allClosed){setExpanded({verbs:true,nouns:false,compare:false,tip:true,alt:false,deeper:false});}
+                  else{setExpanded({verbs:false,nouns:false,compare:false,tip:false,alt:false,deeper:false});}
+                }} style={{cursor:"pointer",fontSize:11,color:C.muted,background:C.surface,border:"1px solid "+C.border,borderRadius:8,padding:"4px 10px"}}>
+                  {(!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper)?"전체 펼치기 ▼":"전체 접기 ▲"}
+                </div>
+              </div>
+
               {result.turns?.map(function(t,i){
                 var colors = [C.accent,C.blue,C.yellow,C.orange];
                 var color = colors[i % colors.length];
@@ -2499,7 +2517,7 @@
                           {t.verbs_used.map(function(v,j){
                             var vc=(v.type==="phrasal"||v.verb.indexOf(" ")!==-1)?C.accent:C.yellow;
                             return(
-                            <span key={j} style={{background:vc+"20",color:vc,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:700}}>{v.verb} <span style={{opacity:0.7}}>{v.usage}</span></span>
+                            <span key={j} style={{background:vc+"20",color:vc,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:700}}>{v.verb} <span style={{opacity:0.7}}>{stripStars(v.usage)}</span></span>
                           );})}
                         </div>
                       )}
@@ -2526,7 +2544,7 @@
                         <span style={{fontSize:10,color:vColor,fontWeight:700}}>{isPhrasal?"구동사":"기본"}</span>
                         <span style={{fontSize:13,color:C.muted}}>{v.meaning}</span>
                       </div>
-                      {v.example&&<div onClick={function(){speakEnglish(v.example);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{v.example}{"\""}</div>}
+                      {v.example&&<div onClick={function(){speakEnglish(stripStars(v.example));}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(v.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -2546,7 +2564,7 @@
                         <span style={{color:C.blue,fontWeight:800,fontSize:16}}>{n.noun}</span>
                         <span style={{fontSize:13,color:C.muted}}>{n.meaning_ko}</span>
                       </div>
-                      {n.example&&<div onClick={function(){speakEnglish(n.example);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{n.example}{"\""}</div>}
+                      {n.example&&<div onClick={function(){speakEnglish(stripStars(n.example));}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(n.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -2569,7 +2587,7 @@
                       </div>
                       <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{stripStars(vc.diff_ko)}</div>
                       {vc.examples&&vc.examples.map(function(ex,ei){return(
-                        <div key={ei} onClick={function(){speakEnglish(ex);}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{ex}</div>
+                        <div key={ei} onClick={function(){speakEnglish(stripStars(ex));}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{stripStars(ex)}</div>
                       );})}
                     </div>
                   );})}
@@ -2887,8 +2905,11 @@
                           <div style={{fontSize:12,color:C.muted,marginTop:4,opacity:0.85}}>{renderHighlight(t.korean,t.verbs_used,{dim:true,korean:true})}</div>
                           {t.verbs_used&&(
                             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:6}}>
-                              {t.verbs_used.map(function(vu,vi){return(
-                                <span key={vi} style={{background:C.accent+"20",color:C.accent,padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:700}}>{vu.verb}: {vu.usage}</span>
+                              {t.verbs_used.map(function(vu,vi){
+                                var isPh=(vu.type==="phrasal"||vu.verb.indexOf(" ")!==-1);
+                                var vc=isPh?C.accent:C.yellow;
+                                return(
+                                <span key={vi} style={{background:vc+"20",color:vc,padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:700}}>{vu.verb}: {stripStars(vu.usage)}</span>
                               );})}
                             </div>
                           )}
