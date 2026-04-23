@@ -1967,6 +1967,8 @@
       // BBC 추천 영상 — 첫 방문 시 API로 가져와 캐시
       var _bbcRecs = useState(function(){return load("bbc_cached_recs")||[];}); var bbcRecs = _bbcRecs[0]; var setBbcRecs = _bbcRecs[1];
       var _bbcLoading = useState(false); var bbcLoading = _bbcLoading[0]; var setBbcLoading = _bbcLoading[1];
+      // BBC 자막 캐시
+      var _bbcTranscripts = useState(function(){return load("bbc_cached_transcripts")||{};}); var bbcTranscripts = _bbcTranscripts[0]; var setBbcTranscripts = _bbcTranscripts[1];
       useEffect(function(){
         if(bbcRecs.length>0) return;
         setBbcLoading(true);
@@ -1974,6 +1976,16 @@
         .then(function(r){return r.json();}).then(function(d){
           var vids=(d.videos||[]).filter(function(v){return !v.duration||v.duration>=60;}).map(function(v){v.channel="BBC Learning English";return v;});
           setBbcRecs(vids);save("bbc_cached_recs",vids);
+          // 백그라운드로 자막 미리 가져오기
+          vids.forEach(function(v){
+            if(bbcTranscripts[v.id]) return;
+            fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+v.id,startMin:0})})
+            .then(function(r){return r.json();}).then(function(data){
+              if(data.transcript){
+                setBbcTranscripts(function(prev){var n={};for(var k in prev)n[k]=prev[k];n[v.id]={title:data.title||v.title,transcript:data.transcript,videoId:data.videoId||v.id,hasMore:data.hasMore||false,startMin:data.startMin||0};save("bbc_cached_transcripts",n);return n;});
+              }
+            }).catch(function(){});
+          });
         }).catch(function(){}).finally(function(){setBbcLoading(false);});
       },[]);
       var _chSearch = useState(""); var chSearch = _chSearch[0]; var setChSearch = _chSearch[1];
@@ -2465,13 +2477,24 @@
                               <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ BBC 추천 영상"}</div>
                               {bbcRecs.map(function(rv){return(
                                 <div key={rv.id} onClick={function(){
-                                  setYtUrl("https://youtu.be/"+rv.id);
-                                  setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
+                                  // 캐시된 자막이 있으면 바로 로드
+                                  var cached = bbcTranscripts[rv.id];
+                                  if(cached&&cached.transcript){
+                                    setYtUrl("https://youtu.be/"+rv.id);
+                                    setYtTitle(cached.title||rv.title);setYtVideoId(cached.videoId||rv.id);
+                                    var segs=splitSegments(cached.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||cached.transcript);
+                                    setYtHasMore(cached.hasMore||false);setYtCurrentMin(cached.startMin||0);
+                                    saveYtProgress(cached.videoId||rv.id,cached.title||rv.title,segs,0,cached.hasMore,cached.startMin||0);
+                                    window.scrollTo({top:0,behavior:"smooth"});
+                                  } else {
+                                    setYtUrl("https://youtu.be/"+rv.id);
+                                    setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
+                                  }
                                 }} style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
                                   <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                                   <div style={{flex:1}}>
                                     <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{(rv.title||"").replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}</div>
+                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{bbcTranscripts[rv.id]?" · ⚡ 바로 시작":""}</div>
                                   </div>
                                 </div>
                               );})}
