@@ -1845,6 +1845,8 @@
       var _s11f=useState(""); var fileTranscript=_s11f[0]; var setFileTranscript=_s11f[1];
       var _altSit=useState(null); var altSituations=_altSit[0]; var setAltSituations=_altSit[1];
       var _altLoad=useState(false); var altLoading=_altLoad[0]; var setAltLoading=_altLoad[1];
+      var _expanded=useState({verbs:true,nouns:false,compare:false,tip:true,alt:false,deeper:false}); var expanded=_expanded[0]; var setExpanded=_expanded[1];
+      function toggleSection(k){setExpanded(function(e){var n={};for(var x in e)n[x]=e[x];n[k]=!n[k];return n;});}
       var _practiceMode=useState(false); var practiceMode=_practiceMode[0]; var setPracticeMode=_practiceMode[1];
       var _practiceIdx=useState(0); var practiceIdx=_practiceIdx[0]; var setPracticeIdx=_practiceIdx[1];
       var _practiceAnswer=useState(""); var practiceAnswer=_practiceAnswer[0]; var setPracticeAnswer=_practiceAnswer[1];
@@ -2508,8 +2510,12 @@
               })}
 
               {result.key_verbs?.length>0&&(
-                <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,padding:16,marginBottom:14}}>
-                  <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:12}}>이 대화에 쓰인 기본동사</div>
+                <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
+                  <div onClick={function(){toggleSection("verbs");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"📌 KEY VERBS · "+result.key_verbs.length+"개"}</div>
+                    <div style={{fontSize:14,color:C.muted}}>{expanded.verbs?"▲":"▼"}</div>
+                  </div>
+                  {expanded.verbs&&<div style={{padding:"0 16px 16px"}}>
                   {result.key_verbs.map(function(v,i){
                     var isPhrasal=(v.type==="phrasal"||v.verb.indexOf(" ")!==-1);
                     var vColor=isPhrasal?C.accent:C.yellow;
@@ -2523,12 +2529,17 @@
                       {v.example&&<div onClick={function(){speakEnglish(v.example);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{v.example}{"\""}</div>}
                     </div>
                   );})}
+                  </div>}
                 </div>
               )}
 
               {result.key_nouns&&result.key_nouns.length>0&&(
-                <div style={{background:C.blueDim,border:"1px solid "+C.blue+"30",borderRadius:12,padding:14,marginBottom:16}}>
-                  <div style={{fontSize:11,color:C.blue,letterSpacing:2,marginBottom:10}}>{"📝 KEY NOUNS"}</div>
+                <div style={{background:C.blueDim,border:"1px solid "+C.blue+"30",borderRadius:12,marginBottom:12,overflow:"hidden"}}>
+                  <div onClick={function(){toggleSection("nouns");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.blue,letterSpacing:2,fontWeight:700}}>{"📝 KEY NOUNS · "+result.key_nouns.length+"개"}</div>
+                    <div style={{fontSize:14,color:C.muted}}>{expanded.nouns?"▲":"▼"}</div>
+                  </div>
+                  {expanded.nouns&&<div style={{padding:"0 16px 16px"}}>
                   {result.key_nouns.map(function(n,i){return(
                     <div key={i} style={{marginBottom:8,paddingBottom:8,borderBottom:i<result.key_nouns.length-1?"1px solid "+C.border:"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
@@ -2538,12 +2549,17 @@
                       {n.example&&<div onClick={function(){speakEnglish(n.example);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{n.example}{"\""}</div>}
                     </div>
                   );})}
+                  </div>}
                 </div>
               )}
 
               {result.verb_compare&&result.verb_compare.length>0&&(
-                <div style={{background:C.orange+"10",border:"1px solid "+C.orange+"30",borderRadius:12,padding:14,marginBottom:16}}>
-                  <div style={{fontSize:11,color:C.orange,letterSpacing:2,marginBottom:10}}>{"🔍 헷갈리는 동사 비교"}</div>
+                <div style={{background:C.orange+"10",border:"1px solid "+C.orange+"30",borderRadius:12,marginBottom:12,overflow:"hidden"}}>
+                  <div onClick={function(){toggleSection("compare");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.orange,letterSpacing:2,fontWeight:700}}>{"🔍 헷갈리는 동사 비교"}</div>
+                    <div style={{fontSize:14,color:C.muted}}>{expanded.compare?"▲":"▼"}</div>
+                  </div>
+                  {expanded.compare&&<div style={{padding:"0 16px 16px"}}>
                   {result.verb_compare.map(function(vc,i){return(
                     <div key={i} style={{marginBottom:i<result.verb_compare.length-1?12:0}}>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
@@ -2557,13 +2573,17 @@
                       );})}
                     </div>
                   );})}
+                  </div>}
                 </div>
               )}
 
               {result.coach_tip&&(
-                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:20}}>
-                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:6}}>{"COACH'S TIP"}</div>
-                  <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{stripStars(result.coach_tip)}</div>
+                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"30",borderRadius:12,marginBottom:12,overflow:"hidden"}}>
+                  <div onClick={function(){toggleSection("tip");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"💡 COACH'S TIP"}</div>
+                    <div style={{fontSize:14,color:C.muted}}>{expanded.tip?"▲":"▼"}</div>
+                  </div>
+                  {expanded.tip&&<div style={{padding:"0 16px 16px",fontSize:13,color:C.text,lineHeight:1.7}}>{stripStars(result.coach_tip)}</div>}
                 </div>
               )}
 
@@ -2575,8 +2595,12 @@
               )}
 
               {altSituations && altSituations.expressions && (
-                <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,padding:16,marginBottom:20}}>
-                  <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:12}}>{"🌍 다른 상황에서도 이렇게 써요"}</div>
+                <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
+                  <div onClick={function(){toggleSection("alt");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"🌍 다른 상황에서도"}</div>
+                    <div style={{fontSize:14,color:C.muted}}>{expanded.alt?"▲":"▼"}</div>
+                  </div>
+                  {expanded.alt&&<div style={{padding:"0 16px 16px"}}>
                   {altSituations.expressions.map(function(expr, i) {
                     return (
                       <div key={i} style={{marginBottom:16}}>
@@ -2594,6 +2618,7 @@
                       </div>
                     );
                   })}
+                  </div>}
                 </div>
               )}
 
@@ -2707,8 +2732,12 @@
                 }
                 if(matchedLessons.length===0) return null;
                 return(
-                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",borderRadius:14,padding:16,marginBottom:12}}>
-                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"📚 이 동사들 더 깊게 배워요"}</div>
+                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
+                  <div onClick={function(){toggleSection("deeper");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"📚 더 깊게 배워요 ("+matchedLessons.length+")"}</div>
+                    <div style={{fontSize:14,color:C.muted}}>{expanded.deeper?"▲":"▼"}</div>
+                  </div>
+                  {expanded.deeper&&<div style={{padding:"0 16px 16px"}}>
                   <div style={{fontSize:12,color:C.muted,marginBottom:10}}>이 대화에 나온 동사로 정식 레슨이 준비돼 있어요</div>
                   {matchedLessons.slice(0,4).map(function(lesson,li){
                     var isPh=lesson.verb.indexOf(" ")!==-1;
@@ -2728,6 +2757,7 @@
                       )}
                     </div>
                   );})}
+                  </div>}
                 </div>);
               })()}
 
