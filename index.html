@@ -151,42 +151,80 @@
       for (var i=LEVELS.length-1;i>=0;i--) { if (xp>=LEVELS[i].min) return LEVELS[i]; }
       return LEVELS[0];
     }
-    function addXP(amount) {
-      var state = load("xp_state") || {xp:0};
+    // ── XP 시스템 v2 (디테일) ─────────────────────────────────────
+    function addXP(amount, reason) {
+      var state = load("xp_state") || {xp:0,totalEarned:0,history:[]};
       var oldLevel = getLevel(state.xp);
       var lv = oldLevel.level;
-      // 레벨 높을수록 같은 양도 효율 떨어짐 (양수일 때만)
-      var multiplier = 1;
+
+      // 1. 콤보 보너스 (5분 내 연속 정답)
+      var now = Date.now();
+      var lastCorrect = state.lastCorrectTime || 0;
+      var combo = state.combo || 0;
       if (amount > 0) {
-        if (lv >= 30) multiplier = 0.7;
-        if (lv >= 50) multiplier = 0.5;
-        if (lv >= 70) multiplier = 0.3;
+        if (now - lastCorrect < 5*60*1000) combo += 1;
+        else combo = 1;
+        state.lastCorrectTime = now;
+        state.combo = combo;
       }
-      var actualXP = amount > 0 ? Math.max(1, Math.round(amount * multiplier)) : amount;
-      state.xp = Math.max(0, state.xp + actualXP); // 0 이하로 안 떨어짐
+      var comboBonus = 1;
+      if (combo >= 3) comboBonus = 1.2;  // x1.2
+      if (combo >= 5) comboBonus = 1.5;  // x1.5
+      if (combo >= 10) comboBonus = 2;   // x2
+
+      // 2. 더블 XP 위켄드 (토/일)
+      var day = new Date().getDay();
+      var weekendBonus = (day === 0 || day === 6) ? 1.5 : 1;
+
+      // 3. 고레벨 페널티 (실력 곡선)
+      var lvPenalty = 1;
+      if (lv >= 20) lvPenalty = 0.85;
+      if (lv >= 40) lvPenalty = 0.65;
+      if (lv >= 60) lvPenalty = 0.45;
+      if (lv >= 80) lvPenalty = 0.25;
+
+      var actualXP = amount > 0 ? Math.max(1, Math.round(amount * comboBonus * weekendBonus * lvPenalty)) : amount;
+      state.xp = Math.max(0, state.xp + actualXP);
+      state.totalEarned = (state.totalEarned||0) + Math.max(0, actualXP);
+
+      // 히스토리 (최근 50개)
+      state.history = (state.history||[]).slice(-49);
+      state.history.push({t:now, amount:actualXP, reason:reason||"", combo:combo});
+
       var newLevel = getLevel(state.xp);
       save("xp_state", state);
-      return {xp:state.xp, leveledUp:newLevel.level>oldLevel.level, level:newLevel, gained:actualXP};
+      return {
+        xp: state.xp,
+        leveledUp: newLevel.level > oldLevel.level,
+        level: newLevel,
+        gained: actualXP,
+        base: amount,
+        combo: combo,
+        comboBonus: comboBonus,
+        weekendBonus: weekendBonus !== 1 ? weekendBonus : null,
+        lvPenalty: lvPenalty !== 1 ? lvPenalty : null
+      };
     }
 
-    // 연속 출석 보너스
+    // 연속 출석 (훈련 완료 시)
     function claimAttendanceBonus() {
       var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-      var att = load("attendance") || { lastDate: "", streak: 0 };
-      if (att.lastDate === todayK) return null; // 오늘 이미 받음
+      var att = load("attendance") || { lastDate: "", streak: 0, longestStreak: 0, totalDays: 0 };
+      if (att.lastDate === todayK) return null;
 
-      // 어제와 연속인지 체크
       var yesterday = (function(){var d=new Date();d.setHours(d.getHours()+9);d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
       if (att.lastDate === yesterday) {
-        att.streak += 1; // 연속 출석
+        att.streak += 1;
       } else {
-        att.streak = 1; // 끊겼으니 리셋
+        att.streak = 1;
       }
       att.lastDate = todayK;
+      att.totalDays = (att.totalDays||0) + 1;
+      att.longestStreak = Math.max(att.longestStreak||0, att.streak);
       save("attendance", att);
 
-      // 연속 일수에 따른 보너스
-      var bonus = 5; // 기본 (1일)
+      // 일일 보너스
+      var bonus = 5;
       if (att.streak >= 3) bonus = 10;
       if (att.streak >= 7) bonus = 25;
       if (att.streak >= 14) bonus = 40;
@@ -194,8 +232,34 @@
       if (att.streak >= 100) bonus = 150;
       if (att.streak >= 365) bonus = 500;
 
-      var r = addXP(bonus);
-      return { bonus: bonus, streak: att.streak, ...r };
+      // 마일스톤 보너스 (특정 일수 달성)
+      var milestoneBonus = 0;
+      var milestoneText = "";
+      if (att.streak === 7)  { milestoneBonus = 50;  milestoneText = "🥉 7일 달성!"; }
+      if (att.streak === 30) { milestoneBonus = 200; milestoneText = "🥈 30일 달성!"; }
+      if (att.streak === 100){ milestoneBonus = 500; milestoneText = "🥇 100일 달성!"; }
+      if (att.streak === 365){ milestoneBonus = 2000;milestoneText = "🏆 1년 달성!"; }
+      if (att.totalDays === 50){milestoneBonus += 100; milestoneText = "📅 누적 50일!"; }
+      if (att.totalDays === 200){milestoneBonus += 500; milestoneText = "📅 누적 200일!"; }
+
+      var totalBonus = bonus + milestoneBonus;
+      var r = addXP(totalBonus, "출석 "+att.streak+"일");
+      return { bonus: bonus, milestoneBonus: milestoneBonus, milestoneText: milestoneText, streak: att.streak, totalDays: att.totalDays, ...r };
+    }
+
+    // 정확도 보너스 (퀴즈 100% 정답 시)
+    function claimAccuracyBonus(correctCount, totalCount) {
+      if (correctCount === totalCount && totalCount >= 5) {
+        var bonus = totalCount * 5; // 5문제 100% = +25, 10문제 100% = +50
+        return addXP(bonus, "퍼펙트!");
+      }
+      return null;
+    }
+
+    // 빠른 응답 보너스 (3초 안에 정답)
+    function claimSpeedBonus(answeredInMs) {
+      if (answeredInMs < 3000) return addXP(2, "⚡ 빠른 응답");
+      return null;
     }
     function getXP() { return (load("xp_state")||{xp:0}).xp; }
 
@@ -984,8 +1048,9 @@
           setArrangeSelected([]); setArrangeChecked(false);
         } else {
           setQuizDone(true);
-          var bonus = correctCount === quizzes.length ? 30 : 0;
-          if (bonus) { var r=addXP(bonus); showXpGain(bonus); if(onXP)onXP(r); showConfetti(); }
+          // 퍼펙트 보너스
+          var perfectR = claimAccuracyBonus(correctCount, quizzes.length);
+          if (perfectR) { showXpGain("✨ 퍼펙트 +"+perfectR.gained); if(onXP)onXP(perfectR); showConfetti(); }
           else { showConfetti(); }
         }
       };
