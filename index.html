@@ -198,24 +198,34 @@
       });
     }
 
-    var ttsCache = {}; // 같은 문장 캐싱
+    var ttsCache = {};
     var currentAudio = null;
+    var ttsAbortController = null;
+    var ttsRequestId = 0;
     function speakEnglish(text) {
       if (!text) return;
       var clean = text.replace(/\*\*/g, "").trim();
-      if (currentAudio) { try { currentAudio.pause(); } catch{} currentAudio = null; }
-      // 캐시에 있으면 즉시 재생
+      // 이전 요청 취소
+      if (ttsAbortController) { try { ttsAbortController.abort(); } catch{} }
+      if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch{} currentAudio = null; }
+      if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch{}
+
+      var myReq = ++ttsRequestId;
+
       if (ttsCache[clean]) {
         currentAudio = new Audio("data:audio/wav;base64," + ttsCache[clean]);
         currentAudio.play().catch(function(){fallbackSpeak(clean);});
         return;
       }
-      // Gemini TTS 호출
+
+      ttsAbortController = new AbortController();
       fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: clean })
+        body: JSON.stringify({ text: clean }),
+        signal: ttsAbortController.signal
       }).then(function(r){return r.json();}).then(function(d){
+        if (myReq !== ttsRequestId) return; // 더 새 요청이 들어왔으면 무시
         if (d.audio) {
           ttsCache[clean] = d.audio;
           currentAudio = new Audio("data:audio/wav;base64," + d.audio);
@@ -223,7 +233,7 @@
         } else {
           fallbackSpeak(clean);
         }
-      }).catch(function(){ fallbackSpeak(clean); });
+      }).catch(function(e){ if(e.name!=="AbortError") fallbackSpeak(clean); });
     }
     function fallbackSpeak(text) {
       if (!window.speechSynthesis) return;
