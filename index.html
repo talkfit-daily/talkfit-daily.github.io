@@ -2338,6 +2338,7 @@
     function ReviewScreen(props) {
       var lessons = props.lessons;
       var speakHistory = props.speakHistory;
+      var setSpeakHistory = props.setSpeakHistory;
       var todayKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       var _revealed = useState({}); var revealed = _revealed[0]; var setRevealed = _revealed[1];
       var toggleReveal = function(key){setRevealed(function(r){var n={};for(var k in r)n[k]=r[k];n[key]=!n[key];return n;});};
@@ -2423,13 +2424,21 @@
 
           {todaySpeak.length>0&&(
             <div>
-              <div style={{fontSize:11,color:C.accent,letterSpacing:2,marginBottom:12,fontWeight:700}}>{"💬 회화 복습"}</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"💬 회화 복습"}</div>
+                {setSpeakHistory&&(
+                  <button onClick={function(){if(confirm("오늘 회화 기록을 모두 지울까요?")){var rest=(speakHistory||[]).filter(function(s){return s.date!==todayKey;});setSpeakHistory(rest);}}} style={{background:"none",border:"1px solid "+C.red+"40",color:C.red,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"전체 삭제"}</button>
+                )}
+              </div>
               {todaySpeak.map(function(sp,i){
                 var sKey = "s"+i;
                 var isOpen = revealed[sKey];
                 return(
-                <div key={i} style={{background:C.surface,border:"1px solid "+(isOpen?C.accent+"60":C.border),borderRadius:16,padding:16,marginBottom:12}}>
-                  <div onClick={function(){toggleReveal(sKey);}} style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:isOpen?12:0}}>
+                <div key={i} style={{background:C.surface,border:"1px solid "+(isOpen?C.accent+"60":C.border),borderRadius:16,padding:16,marginBottom:12,position:"relative"}}>
+                  {setSpeakHistory&&(
+                    <button onClick={function(e){e.stopPropagation();if(confirm("이 기록을 지울까요?")){var rest=(speakHistory||[]).filter(function(s){return s.id!==sp.id;});setSpeakHistory(rest);}}} style={{position:"absolute",top:10,right:10,background:"none",border:"none",color:C.red,fontSize:14,cursor:"pointer",padding:"4px 8px",zIndex:2}}>{"✕"}</button>
+                  )}
+                  <div onClick={function(){toggleReveal(sKey);}} style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:isOpen?12:0,paddingRight:30}}>
                     <div style={{fontSize:14,fontWeight:600,color:C.text}}>{sp.scenario}</div>
                     <div style={{fontSize:16,color:C.muted}}>{isOpen?"▲":"▼"}</div>
                   </div>
@@ -2797,7 +2806,7 @@
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
             {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
-            {screen==="review"&&<ReviewScreen lessons={lessons} speakHistory={speakHistory}/>}
+            {screen==="review"&&<ReviewScreen lessons={lessons} speakHistory={speakHistory} setSpeakHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}}/>}
             {screen==="history"&&<HistoryScreen history={verbHistory}/>}
             {screen==="speak"&&<SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/>}
             {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
