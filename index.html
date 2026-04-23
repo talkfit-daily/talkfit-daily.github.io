@@ -1692,7 +1692,14 @@
       var analyze = function() {
         var text = mode === "youtube" ? ytTranscript.trim() : mode === "file" ? fileTranscript.trim() : (transcript || textInput).trim();
         if (!text) return;
-        if (text.length > 800) text = text.slice(0, 800) + "\n...(이하 생략)";
+        var wasTrimmed = false;
+        if (text.length > 1500) {
+          text = text.slice(0, 1500);
+          // 마지막 문장 끝나는 위치까지 자르기
+          var lastEnd = Math.max(text.lastIndexOf("."),text.lastIndexOf("?"),text.lastIndexOf("!"),text.lastIndexOf("\n"));
+          if (lastEnd > 800) text = text.slice(0, lastEnd+1);
+          wasTrimmed = true;
+        }
         setIsLoading(true);
         setAltSituations(null);
         var system='You are an American English coach for Korean speakers. Analyze this Korean conversation/monologue.\n\nRules:\n- Detect how many speakers there are from context (1-4 people)\n- Split into turns if multiple speakers\n- Translate each turn to natural American English using ONLY simple/basic verbs (get, make, take, put, go, have, keep, come, run, look, turn, end up, figure out, hang out, etc.)\n- NEVER use difficult/formal vocabulary. Americans use simple verbs for everything.\n- In the english field, wrap verbs with ** markers. IMPORTANT: phrasal verbs must be wrapped as ONE unit like **give up**, **take out**, **get over**, NOT as separate words. Basic verbs: **get**, **put**, **make**. Phrasal verbs: **take out**, **give up**, **get over**.\n- In verbs_used, set type to \"basic\" or \"phrasal\"\n- IMPORTANT: original = the original input sentence as-is. english = converted to easy basic verbs. korean = natural Korean translation of english. All 3 fields are required for every turn.\n- IMPORTANT: key_verbs MUST include EVERY unique verb that appears in any turns.verbs_used. Do not skip any. Deduplicate by verb name.\n- Pick 3-5 useful nouns\n\nReturn ONLY valid JSON:\n{"scenario":"상황 한줄 요약 (한국어)","speakers":1,"turns":[{"speaker":"화자1","original":"원래 문장 (입력이 영어면 영어, 한국어면 한국어 그대로)","english":"I **got** your text and **gave up** waiting.","korean":"문자 받고 기다리는 거 포기했어.","verbs_used":[{"verb":"get","type":"basic","usage":"받다"},{"verb":"give up","type":"phrasal","usage":"포기하다"}]}],"key_verbs":[{"verb":"get","type":"basic","meaning":"의미","example":"I got your text"},{"verb":"give up","type":"phrasal","meaning":"의미","example":"I gave up"}],"key_nouns":[{"noun":"deadline","meaning_ko":"마감 기한","example":"The deadline is tomorrow."}],"verb_compare":[{"verbs":["say","tell","talk"],"diff_ko":"say=말하다(내용), tell=전하다(대상 필요), talk=대화하다(상호)","examples":["I said sorry","I told him sorry","We talked about it"]}],"coach_tip":"핵심 포인트 한국어 2문장"}\n\nFor verb_compare: pick 1-2 groups of similar verbs that appeared in this conversation and explain the difference in Korean. Only include verbs that Korean speakers commonly confuse.';
@@ -1777,6 +1784,10 @@
                 <div style={{marginBottom:16}}>
                   <div style={{fontSize:12,color:C.muted,marginBottom:8}}>오늘 했던 대화를 적어보세요</div>
                   <textarea value={textInput} onChange={function(e){setTextInput(e.target.value);}} rows={6} placeholder={"예시:\n야 오늘 점심 뭐 먹을래?\n나 어제 먹은 데 또 가자\n거기 줄 길지 않을까?"} style={{width:"100%",background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:textInput.length>1500?C.red:C.muted,marginTop:6,padding:"0 4px"}}>
+                    <span>{textInput.length>1500?"⚠️ 1500자까지만 분석돼요":"길면 자동으로 잘라서 분석해요"}</span>
+                    <span>{textInput.length}/1500</span>
+                  </div>
                 </div>
               )}
 
