@@ -193,6 +193,10 @@
 
       var newLevel = getLevel(state.xp);
       save("xp_state", state);
+      // 레벨업 셀러브레이션 트리거
+      if (newLevel.level > oldLevel.level && window.__onLevelUp) {
+        try { window.__onLevelUp(newLevel); } catch{}
+      }
       return {
         xp: state.xp,
         leveledUp: newLevel.level > oldLevel.level,
@@ -864,6 +868,11 @@
 
           {(function(){
             var xp=getXP();var lv=getLevel(xp);var progress=Math.min(100,((xp-lv.min)/(lv.max-lv.min))*100);
+            var st=load("xp_state")||{};
+            var combo=st.combo||0;
+            var lastCorrect=st.lastCorrectTime||0;
+            var comboActive=(Date.now()-lastCorrect<5*60*1000)&&combo>=3;
+            var att=load("attendance")||{};
             return (
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 16px",marginBottom:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -871,12 +880,20 @@
                     <span style={{background:C.accent+"20",color:C.accent,padding:"2px 8px",borderRadius:6,fontSize:12,fontWeight:800}}>Lv.{lv.level}</span>
                     <span style={{fontSize:13,fontWeight:700,color:C.text}}>{lv.name}</span>
                   </div>
-                  <div style={{fontSize:12,color:C.accent,fontWeight:700}}>{xp} XP</div>
+                  <div style={{fontSize:12,color:C.accent,fontWeight:700}}>{xp.toLocaleString()} XP</div>
                 </div>
                 <div style={{height:6,background:C.border,borderRadius:99,overflow:"hidden"}}>
                   <div style={{height:"100%",width:progress+"%",background:"linear-gradient(90deg,"+C.accent+","+C.blue+")",borderRadius:99,transition:"width 0.5s"}}/>
                 </div>
-                <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>{lv.max-xp} XP to Lv.{lv.level+1}</div>
+                <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
+                {(comboActive||att.totalDays>0)&&(
+                  <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                    {comboActive&&<span style={{background:C.orange+"20",color:C.orange,padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>{"🔥 "+combo+"콤보"}</span>}
+                    {att.longestStreak>0&&<span style={{background:C.blue+"15",color:C.blue,padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>{"최장 "+att.longestStreak+"일"}</span>}
+                    {att.totalDays>0&&<span style={{background:C.muted+"20",color:C.muted,padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>{"누적 "+att.totalDays+"일"}</span>}
+                    {((new Date()).getDay()===0||(new Date()).getDay()===6)&&<span style={{background:C.yellow+"20",color:C.yellow,padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>{"⭐ 주말 ×1.5"}</span>}
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -2950,6 +2967,15 @@
       var _authLoading = useState(true); var authLoading = _authLoading[0]; var setAuthLoading = _authLoading[1];
       var _loginLoading = useState(false); var loginLoading = _loginLoading[0]; var setLoginLoading = _loginLoading[1];
       var _aiLeft = useState(aiRemaining); var aiLeft = _aiLeft[0]; var setAiLeft = _aiLeft[1];
+      var _levelUp = useState(null); var levelUpData = _levelUp[0]; var setLevelUpData = _levelUp[1];
+
+      // 레벨업 감지 (전역 hook)
+      useEffect(function(){
+        window.__onLevelUp = function(newLevel){
+          setLevelUpData(newLevel);
+          setTimeout(function(){setLevelUpData(null);}, 5000);
+        };
+      }, []);
       var _isGuest = useState(function(){return loadLocal("is_guest")||false;}); var isGuest = _isGuest[0]; var setIsGuest = _isGuest[1];
 
       useEffect(function(){ onAiRemainingChange(setAiLeft); }, []);
@@ -3156,6 +3182,18 @@
                   {!t.action&&tab===t.id&&<div style={{width:4,height:4,borderRadius:"50%",background:C.accent}}/>}
                 </button>
               );})}
+            </div>
+          )}
+          {levelUpData&&(
+            <div onClick={function(){setLevelUpData(null);}} style={{position:"fixed",inset:0,background:"#000d",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",animation:"splashFade 0.3s",cursor:"pointer"}}>
+              <div style={{background:"linear-gradient(135deg,"+C.accent+"30,"+C.blue+"30)",border:"2px solid "+C.accent,borderRadius:24,padding:"40px 32px",textAlign:"center",maxWidth:340,animation:"levelUp 0.6s"}}>
+                <div style={{fontSize:60,marginBottom:12}}>{"🎉"}</div>
+                <div style={{fontSize:14,color:C.accent,letterSpacing:3,marginBottom:8,fontWeight:700}}>{"LEVEL UP!"}</div>
+                <div style={{fontSize:36,fontWeight:900,color:C.accent,marginBottom:6}}>{"Lv."+levelUpData.level}</div>
+                <div style={{fontSize:18,color:C.text,fontWeight:700,marginBottom:20}}>{levelUpData.name}</div>
+                <div style={{fontSize:13,color:C.muted,marginBottom:8}}>{"AI 사용 한도 증가!"}</div>
+                <div style={{fontSize:11,color:C.muted}}>탭하면 닫혀요</div>
+              </div>
             </div>
           )}
         </div>
