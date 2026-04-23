@@ -1853,7 +1853,7 @@
       var _s11f=useState(""); var fileTranscript=_s11f[0]; var setFileTranscript=_s11f[1];
       var _altSit=useState(null); var altSituations=_altSit[0]; var setAltSituations=_altSit[1];
       var _altLoad=useState(false); var altLoading=_altLoad[0]; var setAltLoading=_altLoad[1];
-      var _expanded=useState({verbs:true,nouns:false,compare:false,tip:true,alt:false,deeper:false}); var expanded=_expanded[0]; var setExpanded=_expanded[1];
+      var _expanded=useState({turns:true,verbs:true,nouns:false,compare:false,tip:true,alt:false,deeper:false}); var expanded=_expanded[0]; var setExpanded=_expanded[1];
       function toggleSection(k){setExpanded(function(e){var n={};for(var x in e)n[x]=e[x];n[k]=!n[k];return n;});}
       var _practiceMode=useState(false); var practiceMode=_practiceMode[0]; var setPracticeMode=_practiceMode[1];
       var _practiceIdx=useState(0); var practiceIdx=_practiceIdx[0]; var setPracticeIdx=_practiceIdx[1];
@@ -2485,15 +2485,15 @@
 
               <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
                 <div className="tf-press" onClick={function(){
-                  var allClosed=!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper;
-                  if(allClosed){setExpanded({verbs:true,nouns:true,compare:true,tip:true,alt:true,deeper:true});}
-                  else{setExpanded({verbs:false,nouns:false,compare:false,tip:false,alt:false,deeper:false});}
+                  var allClosed=!expanded.turns&&!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper;
+                  if(allClosed){setExpanded({turns:true,verbs:true,nouns:true,compare:true,tip:true,alt:true,deeper:true});}
+                  else{setExpanded({turns:false,verbs:false,nouns:false,compare:false,tip:false,alt:false,deeper:false});}
                 }} style={{cursor:"pointer",fontSize:11,color:C.muted,background:C.surface,border:"1px solid "+C.border,borderRadius:8,padding:"4px 10px"}}>
-                  {(!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper)?"전체 펼치기 ▼":"전체 접기 ▲"}
+                  {(!expanded.turns&&!expanded.verbs&&!expanded.nouns&&!expanded.compare&&!expanded.tip&&!expanded.alt&&!expanded.deeper)?"전체 펼치기 ▼":"전체 접기 ▲"}
                 </div>
               </div>
 
-              {result.turns?.map(function(t,i){
+              {expanded.turns&&result.turns?.map(function(t,i){
                 var colors = [C.accent,C.blue,C.yellow,C.orange];
                 var color = colors[i % colors.length];
                 return (
