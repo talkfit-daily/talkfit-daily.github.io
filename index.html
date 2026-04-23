@@ -136,6 +136,22 @@
         return doc.exists ? doc.data().value : null;
       } catch { return null; }
     }
+    // 리더보드 업데이트
+    async function updateLeaderboard(userId, displayName) {
+      try {
+        var xp = getXP();
+        var lv = getLevel(xp);
+        var att = load("attendance") || {};
+        await fbDb.collection("leaderboard").doc(userId).set({
+          name: (displayName || "").split(" ")[0] || "유저",
+          xp: xp,
+          level: lv.level,
+          streak: att.streak || 0,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge: true});
+      } catch(e) {}
+    }
+
     async function saveCloud(userId, key, val) {
       try {
         await fbDb.collection("users").doc(userId).collection("data").doc(key).set({ value: val, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
@@ -917,7 +933,7 @@
 
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
-      var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat;
+      var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat, lbData=props.lbData, userId=props.userId;
       var days = ["S","M","T","W","T","F","S"];
       var today = new Date().getDay();
       // 이번 주 실제 학습한 요일 계산
@@ -1008,7 +1024,13 @@
                 <div style={{height:6,background:C.border,borderRadius:99,overflow:"hidden"}}>
                   <div style={{height:"100%",width:progress+"%",background:"linear-gradient(90deg,"+C.accent+","+C.blue+")",borderRadius:99,transition:"width 0.5s"}}/>
                 </div>
-                <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
+                <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+                  {lbData&&lbData.length>0&&userId?(function(){
+                    var rank=lbData.findIndex(function(u){return u.id===userId;})+1;
+                    return rank>0?React.createElement("div",{style:{fontSize:10,color:C.yellow,fontWeight:700}},"🏆 "+lbData.length+"명 중 "+rank+"등"):null;
+                  })():null}
+                  <div style={{fontSize:10,color:C.muted,marginLeft:"auto"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
+                </div>
                 {(comboActive||att.totalDays>0)&&(
                   <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
                     {comboActive&&<span style={{background:C.orange+"20",color:C.orange,padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>{"🔥 "+combo+"콤보"}</span>}
@@ -3099,6 +3121,8 @@
 
     function HistoryScreen(props) {
       var history = props.history;
+      var lbData = props.lbData;
+      var userId = props.userId;
       var att = load("attendance")||{};
       var st = load("xp_state")||{};
       var encountered = load("my_encountered_verbs")||[];
@@ -3134,7 +3158,39 @@
           </div>
 
 
-{/* 자주 만난 동사 TOP 10 */}
+          {/* 순위 */}
+          {lbData&&lbData.length>0&&(function(){
+            var myRank=userId?lbData.findIndex(function(u){return u.id===userId;})+1:0;
+            var showBoard=lbData.length>=100;
+            return(
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🏆 순위"}</div>
+                <div style={{background:C.surface,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:showBoard?10:0}}>
+                  <div style={{fontSize:14,fontWeight:800,color:C.text,textAlign:"center"}}>
+                    {myRank>0?("전체 "+lbData.length+"명 중 "+myRank+"등"):("전체 "+lbData.length+"명 참여 중")}
+                  </div>
+                </div>
+                {showBoard&&(
+                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,overflow:"hidden"}}>
+                    {lbData.slice(0,20).map(function(u,i){
+                      var isMe=userId&&u.id===userId;
+                      var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+                      return(
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<19?"1px solid "+C.border:"none",background:isMe?C.accent+"10":"transparent"}}>
+                          <span style={{fontSize:12,color:C.muted,minWidth:24,fontWeight:700}}>{medal||(i+1)}</span>
+                          <span style={{flex:1,fontSize:13,fontWeight:isMe?800:600,color:isMe?C.accent:C.text}}>{u.name}{isMe?" (나)":""}</span>
+                          <span style={{fontSize:11,color:C.muted}}>Lv.{u.level}</span>
+                          <span style={{fontSize:11,color:C.yellow,fontWeight:700}}>{(u.xp||0).toLocaleString()} XP</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 자주 만난 동사 TOP 10 */}
           {topVerbs.length>0&&(
             <div style={{marginBottom:20}}>
               <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🔥 내가 자주 쓰는 동사 TOP 10"}</div>
@@ -3340,6 +3396,15 @@
       var _loginLoading = useState(false); var loginLoading = _loginLoading[0]; var setLoginLoading = _loginLoading[1];
       var _aiLeft = useState(aiRemaining); var aiLeft = _aiLeft[0]; var setAiLeft = _aiLeft[1];
       var _levelUp = useState(null); var levelUpData = _levelUp[0]; var setLevelUpData = _levelUp[1];
+      var _lbData = useState(null); var lbData = _lbData[0]; var setLbData = _lbData[1];
+
+      // 리더보드 로드
+      useEffect(function(){
+        fbDb.collection("leaderboard").orderBy("xp","desc").limit(100).get().then(function(snap){
+          var list=[];snap.forEach(function(doc){list.push({id:doc.id,...doc.data()});});
+          setLbData(list);
+        }).catch(function(){});
+      },[]);
 
       // 레벨업 감지 (전역 hook)
       useEffect(function(){
@@ -3464,6 +3529,7 @@
         if (user) {
           var xpState = loadLocal("xp_state");
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
+          updateLeaderboard(user.uid, user.displayName);
         }
         setScreen("home"); setTab("home");
       };
@@ -3531,12 +3597,12 @@
           </div>
 
           <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} lbData={lbData} userId={user?user.uid:null}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
             {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
             {screen==="review"&&<ReviewScreen lessons={lessons} speakHistory={speakHistory} setSpeakHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}}/>}
-            {screen==="history"&&<HistoryScreen history={verbHistory}/>}
+            {screen==="history"&&<HistoryScreen history={verbHistory} lbData={lbData} userId={user?user.uid:null}/>}
             <div style={{display:screen==="speak"?"block":"none"}}><SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/></div>
             {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
             {screen==="admin"&&<AdminScreen/>}
