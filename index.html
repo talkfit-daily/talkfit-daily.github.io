@@ -1964,12 +1964,18 @@
       var BBC_DEFAULT = {id:"UCQjEfnSBuJPtMo3lsxRJiig",name:"BBC Learning English",thumbnail:""};
       var _myChannels = useState(function(){var ch=load("yt_channels"); if(!ch||ch.length===0){ch=[BBC_DEFAULT];save("yt_channels",ch);} return ch;}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
 
-      // BBC 프리캐시 영상 — 자막 대기 없이 바로 시작 가능
-      var BBC_PRECACHED = [
-        {id:"h42-e-zUhlw",title:"English In A Minute: 'used to' vs 'would'",channel:"BBC Learning English",thumbnail:"https://i.ytimg.com/vi/h42-e-zUhlw/mqdefault.jpg",duration:65,precached:true},
-        {id:"GS1xL1tEo0E",title:"6 Minute English: Is it OK to be direct?",channel:"BBC Learning English",thumbnail:"https://i.ytimg.com/vi/GS1xL1tEo0E/mqdefault.jpg",duration:370,precached:true},
-        {id:"LME3K4GwPLo",title:"English In A Minute: 'look', 'see' and 'watch'",channel:"BBC Learning English",thumbnail:"https://i.ytimg.com/vi/LME3K4GwPLo/mqdefault.jpg",duration:68,precached:true}
-      ];
+      // BBC 추천 영상 — 첫 방문 시 API로 가져와 캐시
+      var _bbcRecs = useState(function(){return load("bbc_cached_recs")||[];}); var bbcRecs = _bbcRecs[0]; var setBbcRecs = _bbcRecs[1];
+      var _bbcLoading = useState(false); var bbcLoading = _bbcLoading[0]; var setBbcLoading = _bbcLoading[1];
+      useEffect(function(){
+        if(bbcRecs.length>0) return;
+        setBbcLoading(true);
+        fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:BBC_DEFAULT.id})})
+        .then(function(r){return r.json();}).then(function(d){
+          var vids=(d.videos||[]).map(function(v){v.channel="BBC Learning English";return v;});
+          setBbcRecs(vids);save("bbc_cached_recs",vids);
+        }).catch(function(){}).finally(function(){setBbcLoading(false);});
+      },[]);
       var _chSearch = useState(""); var chSearch = _chSearch[0]; var setChSearch = _chSearch[1];
       var _chResults = useState([]); var chResults = _chResults[0]; var setChResults = _chResults[1];
       var _chSearching = useState(false); var chSearching = _chSearching[0]; var setChSearching = _chSearching[1];
@@ -2454,18 +2460,18 @@
                               <span key={ch.id} style={{background:C.accent+"15",color:C.accent,padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600}}>{ch.title}</span>
                             );})}
                           </div>
-                          {recVideos.length===0&&(
+                          {bbcRecs.length>0&&recVideos.length===0&&(
                             <div style={{marginBottom:12}}>
-                              <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ 바로 시작 (대기 없음)"}</div>
-                              {BBC_PRECACHED.map(function(rv){return(
+                              <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ BBC 추천 영상"}</div>
+                              {bbcRecs.map(function(rv){return(
                                 <div key={rv.id} onClick={function(){
                                   setYtUrl("https://youtu.be/"+rv.id);
                                   setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
                                 }} style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
                                   <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                                   <div style={{flex:1}}>
-                                    <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title}</div>
-                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel} · {Math.floor(rv.duration/60)}분</div>
+                                    <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{(rv.title||"").replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
+                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?" · "+Math.floor(rv.duration/60)+"분":""}</div>
                                   </div>
                                 </div>
                               );})}
