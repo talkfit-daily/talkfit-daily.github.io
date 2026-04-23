@@ -34,15 +34,35 @@ export default async function handler(req, res) {
       return res.status(200).json({ channels });
     }
 
-    // 채널에서 랜덤 영상 가져오기
+    // 채널에서 랜덤 영상 가져오기 (Shorts 제외)
     if (action === "random") {
       if (!channelId) return res.status(400).json({ error: "channelId가 필요해요." });
-      const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=20&key=${ytKey}`);
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=30&key=${ytKey}`);
       const d = await r.json();
-      const videos = (d.items || []).map(function(item) {
-        return { id: item.id.videoId, title: item.snippet.title, thumbnail: item.snippet.thumbnails.medium.url, date: item.snippet.publishedAt.slice(0, 10) };
-      });
-      // 최신 20개 중 랜덤 3개
+      const videoIds = (d.items || []).map(i => i.id.videoId).filter(Boolean);
+
+      // 영상 길이 조회 → Shorts(60초 미만) 제외
+      let videos = [];
+      if (videoIds.length > 0) {
+        const detailRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${videoIds.join(",")}&key=${ytKey}`);
+        const detailData = await detailRes.json();
+        for (const item of (detailData.items || [])) {
+          // ISO 8601 duration 파싱 (PT1M30S → 90초)
+          const dur = item.contentDetails?.duration || "";
+          const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+          const secs = match ? (parseInt(match[1]||0)*3600 + parseInt(match[2]||0)*60 + parseInt(match[3]||0)) : 0;
+          if (secs >= 60) { // 60초 이상만 (Shorts 제외)
+            videos.push({
+              id: item.id,
+              title: item.snippet.title,
+              thumbnail: item.snippet.thumbnails.medium?.url || "",
+              date: item.snippet.publishedAt?.slice(0, 10) || "",
+              duration: secs,
+            });
+          }
+        }
+      }
+      // 랜덤 셔플 후 3개
       for (var i = videos.length - 1; i > 0; i--) {
         var j = Math.floor(Math.random() * (i + 1));
         var temp = videos[i]; videos[i] = videos[j]; videos[j] = temp;

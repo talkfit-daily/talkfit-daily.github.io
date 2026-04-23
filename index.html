@@ -1963,6 +1963,13 @@
       var _ytDuration = useState(0); var ytDuration = _ytDuration[0]; var setYtDuration = _ytDuration[1];
       var BBC_DEFAULT = {id:"UCQjEfnSBuJPtMo3lsxRJiig",name:"BBC Learning English",thumbnail:""};
       var _myChannels = useState(function(){var ch=load("yt_channels"); if(!ch||ch.length===0){ch=[BBC_DEFAULT];save("yt_channels",ch);} return ch;}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
+
+      // BBC 프리캐시 영상 — 자막 대기 없이 바로 시작 가능
+      var BBC_PRECACHED = [
+        {id:"h42-e-zUhlw",title:"English In A Minute: 'used to' vs 'would'",channel:"BBC Learning English",thumbnail:"https://i.ytimg.com/vi/h42-e-zUhlw/mqdefault.jpg",duration:65,precached:true},
+        {id:"GS1xL1tEo0E",title:"6 Minute English: Is it OK to be direct?",channel:"BBC Learning English",thumbnail:"https://i.ytimg.com/vi/GS1xL1tEo0E/mqdefault.jpg",duration:370,precached:true},
+        {id:"LME3K4GwPLo",title:"English In A Minute: 'look', 'see' and 'watch'",channel:"BBC Learning English",thumbnail:"https://i.ytimg.com/vi/LME3K4GwPLo/mqdefault.jpg",duration:68,precached:true}
+      ];
       var _chSearch = useState(""); var chSearch = _chSearch[0]; var setChSearch = _chSearch[1];
       var _chResults = useState([]); var chResults = _chResults[0]; var setChResults = _chResults[1];
       var _chSearching = useState(false); var chSearching = _chSearching[0]; var setChSearching = _chSearching[1];
@@ -2343,7 +2350,7 @@
                         }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 잠시 후 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
                         return;
                       }).finally(function(){if(!ytLoading)return;setYtLoading(false);});
-                    }} style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
+                    }} id="yt-fetch-btn" style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
                       {ytLoading?"AI가 듣는 중...":"자막 가져오기"}
                     </button>
                   </div>
@@ -2447,18 +2454,29 @@
                               <span key={ch.id} style={{background:C.accent+"15",color:C.accent,padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600}}>{ch.title}</span>
                             );})}
                           </div>
+                          {recVideos.length===0&&(
+                            <div style={{marginBottom:12}}>
+                              <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ 바로 시작 (대기 없음)"}</div>
+                              {BBC_PRECACHED.map(function(rv){return(
+                                <div key={rv.id} onClick={function(){
+                                  setYtUrl("https://youtu.be/"+rv.id);
+                                  setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
+                                }} style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
+                                  <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
+                                  <div style={{flex:1}}>
+                                    <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title}</div>
+                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel} · {Math.floor(rv.duration/60)}분</div>
+                                  </div>
+                                </div>
+                              );})}
+                            </div>
+                          )}
                           <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
                           {recVideos.map(function(rv){return(
                             <div key={rv.id} onClick={function(){
                               setYtUrl("https://youtu.be/"+rv.id);
-                              // 자동으로 자막 가져오기 시작
-                              setYtLoading(true);setYtTitle("");setYtTranscript("");
-                              fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+rv.id,startMin:0})})
-                              .then(function(r){return r.json();}).then(function(data){
-                                if(data.transcript){setYtTitle(data.title||"");setYtVideoId(data.videoId||"");var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);if(data.hasMore){setTimeout(function(){fetchNextChunkInBackground(data.videoId||"",data.title||"",0,segs);},1000);}}
-                                else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
-                              }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
-                              window.scrollTo({top:0,behavior:"smooth"});
+                              // URL만 세팅하고 자막 가져오기 버튼 근처로 스크롤 (자동 fetch X)
+                              setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
                             }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
                               <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                               <div style={{flex:1}}>
