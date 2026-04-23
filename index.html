@@ -1572,6 +1572,8 @@
       var _savedYt = useState(function(){return load("yt_saved")||[];}); var savedYt = _savedYt[0]; var setSavedYt = _savedYt[1];
       var _ytHasMore = useState(false); var ytHasMore = _ytHasMore[0]; var setYtHasMore = _ytHasMore[1];
       var _ytCurrentMin = useState(0); var ytCurrentMin = _ytCurrentMin[0]; var setYtCurrentMin = _ytCurrentMin[1];
+      var _ytTotalChunks = useState(0); var ytTotalChunks = _ytTotalChunks[0]; var setYtTotalChunks = _ytTotalChunks[1];
+      var _ytDuration = useState(0); var ytDuration = _ytDuration[0]; var setYtDuration = _ytDuration[1];
       var _myChannels = useState(function(){return load("yt_channels")||[];}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
       var _chSearch = useState(""); var chSearch = _chSearch[0]; var setChSearch = _chSearch[1];
       var _chResults = useState([]); var chResults = _chResults[0]; var setChResults = _chResults[1];
@@ -1867,6 +1869,8 @@
                           setYtTranscript(segs[0]||data.transcript);
                           setYtHasMore(data.hasMore||false);
                           setYtCurrentMin(data.startMin||0);
+                          setYtTotalChunks(data.totalChunks||1);
+                          setYtDuration(data.durationSec||0);
                           saveYtProgress(data.videoId||"", data.title||"", segs, 0, data.hasMore, data.startMin||0);
                           // 백그라운드로 다음 구간 자동 로드
                           if(data.hasMore){setTimeout(function(){fetchNextChunkInBackground(data.videoId||"",data.title||"",0,segs);},1000);}
@@ -1907,7 +1911,7 @@
                   {ytSegments.length>0 && !result && (
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>구간 {ytSegIdx+1} / {ytSegments.length}{bgLoading?" (다음 구간 준비 중...)":""}</div>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / 약 "+(ytTotalChunks||ytSegments.length)+"개"}{bgLoading?" 🔄":""}</div>
                         <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
                       </div>
                       <div style={{height:4,background:C.border,borderRadius:99,marginBottom:12,overflow:"hidden"}}>
