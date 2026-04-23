@@ -8,17 +8,9 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
 ];
 
-// 레벨별 일일 AI 한도 (1~99) — 레슨(2)+회화(3)+채팅(10) 최소 보장
+// 일일 AI 한도 — 무료: 20회 고정, 프리미엄: 추후 확장
 function getDailyLimit(level) {
-  var lv = parseInt(level) || 1;
-  if (lv <= 3) return 12 + lv * 3;           // Lv1=15, Lv2=18, Lv3=21
-  if (lv <= 10) return 21 + (lv - 3) * 3;    // Lv4=24, Lv10=42
-  if (lv <= 20) return 42 + (lv - 10) * 3;   // Lv11=45, Lv20=72
-  if (lv <= 30) return 72 + (lv - 20) * 3;   // Lv21=75, Lv30=102
-  if (lv <= 50) return 102 + (lv - 30) * 2;  // Lv31=104, Lv50=142
-  if (lv <= 80) return 142 + (lv - 50) * 2;  // Lv51=144, Lv80=202
-  if (lv <= 98) return 202 + (lv - 80) * 2;  // Lv81=204, Lv98=238
-  return 9999;                              // Lv99 무제한 보상
+  return 20;
 }
 const MAX_SYSTEM_LEN = 5000;
 const MAX_USER_LEN = 3000;
