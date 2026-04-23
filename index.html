@@ -2460,7 +2460,7 @@
                               <span key={ch.id} style={{background:C.accent+"15",color:C.accent,padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600}}>{ch.title}</span>
                             );})}
                           </div>
-                          {bbcRecs.length>0&&recVideos.length===0&&(
+                          {bbcRecs.length>0&&(
                             <div style={{marginBottom:12}}>
                               <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ BBC 추천 영상"}</div>
                               {bbcRecs.map(function(rv){return(
@@ -2471,7 +2471,7 @@
                                   <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                                   <div style={{flex:1}}>
                                     <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{(rv.title||"").replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?" · "+Math.floor(rv.duration/60)+"분":""}</div>
+                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}</div>
                                   </div>
                                 </div>
                               );})}
@@ -2487,7 +2487,7 @@
                               <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                               <div style={{flex:1}}>
                                 <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                <div style={{fontSize:10,color:C.muted}}>{rv.channel} · {rv.date}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{rv.date?" · "+rv.date:""}</div>
                               </div>
                             </div>
                           );})}

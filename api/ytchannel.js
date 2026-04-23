@@ -51,7 +51,7 @@ export default async function handler(req, res) {
           const dur = item.contentDetails?.duration || "";
           const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
           const secs = match ? (parseInt(match[1]||0)*3600 + parseInt(match[2]||0)*60 + parseInt(match[3]||0)) : 0;
-          if (secs >= 60) { // 60초 이상만 (Shorts 제외)
+          if (secs > 0) {
             videos.push({
               id: item.id,
               title: item.snippet.title,
