@@ -79,6 +79,8 @@
     firebase.initializeApp(firebaseConfig);
     var fbAuth = firebase.auth();
     var fbDb = firebase.firestore();
+    // 브라우저 닫아도 로그인 유지 (Safari/iOS 포함)
+    fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
     function signInWithGoogle() {
       var provider = new firebase.auth.GoogleAuthProvider();
