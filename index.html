@@ -1576,6 +1576,8 @@
 
       var _fileLoading = useState(false); var fileLoading = _fileLoading[0]; var setFileLoading = _fileLoading[1];
       var _speakerNames = useState({}); var speakerNames = _speakerNames[0]; var setSpeakerNames = _speakerNames[1];
+      var _fileSegments = useState([]); var fileSegments = _fileSegments[0]; var setFileSegments = _fileSegments[1];
+      var _fileSegIdx = useState(0); var fileSegIdx = _fileSegIdx[0]; var setFileSegIdx = _fileSegIdx[1];
       // 텍스트에서 화자 추출
       function extractSpeakers(text){
         var matches = (text||"").match(/화자\d+/g) || [];
@@ -1783,7 +1785,8 @@
           }
           var parsed = JSON.parse(jsonStr.trim());
           setResult(parsed);
-          var entry = {id:Date.now(),date:new Date().toISOString().slice(0,10),scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs,key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip};
+          var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+          var entry = {id:Date.now(),date:todayK,scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs,key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip,sourceText:text};
           var next=[entry].concat(history).slice(0,50);
           setHistory(next);
           fetchAltSituations(parsed);
@@ -2323,7 +2326,12 @@
                       </div>
                       {practiceCheck.correct?(
                         <button onClick={function(){
-                          if(isLast){setPracticeMode(false);}
+                          if(isLast){
+                            setPracticeMode(false);
+                            // 회화 완료 마크 (연습까지 다 풀었을 때)
+                            var tk=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+                            saveLocal("speak_done_"+tk,true);
+                          }
                           else{setPracticeIdx(practiceIdx+1);setPracticeAnswer("");setPracticeCheck(null);}
                         }} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>{isLast?"연습 완료! 🎉":"다음 →"}</button>
                       ):(
