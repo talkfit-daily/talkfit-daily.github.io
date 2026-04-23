@@ -1821,12 +1821,22 @@
                           setYtHasMore(data.hasMore||false);
                           setYtCurrentMin(data.startMin||0);
                           saveYtProgress(data.videoId||"", data.title||"", segs, 0, data.hasMore, data.startMin||0);
-                        } else{alert(data.error||"자막을 가져올 수 없어요.");}
-                      }).catch(function(){alert("오류가 발생했어요.");}).finally(function(){setYtLoading(false);});
+                        } else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요. 다른 영상을 시도해주세요."));}
+                      }).catch(function(){setYtTitle("⚠️ 시간 초과예요. 짧은 영상으로 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
                     }} style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
-                      {ytLoading?"가져오는 중...":"자막 가져오기"}
+                      {ytLoading?"AI가 듣는 중...":"자막 가져오기"}
                     </button>
                   </div>
+                  {ytLoading && (
+                    <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,padding:20,marginBottom:12,textAlign:"center"}}>
+                      <div style={{fontSize:24,marginBottom:8}}>{"🎧"}</div>
+                      <div style={{fontSize:14,color:C.accent,fontWeight:700,marginBottom:6}}>AI가 영상을 듣고 있어요</div>
+                      <div style={{fontSize:12,color:C.muted,marginBottom:12}}>보통 2~3분 정도 걸려요. 잠시만 기다려주세요!</div>
+                      <div style={{height:4,background:C.border,borderRadius:99,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:"60%",background:"linear-gradient(90deg,"+C.accent+","+C.blue+")",borderRadius:99,animation:"pulse1 2s infinite"}}/>
+                      </div>
+                    </div>
+                  )}
                   {ytTitle && (
                     <div style={{background:C.surface,border:"1px solid "+C.red+"40",borderRadius:12,padding:14,marginBottom:12}}>
                       <div style={{fontSize:11,color:C.red,letterSpacing:2,fontWeight:700,marginBottom:6}}>영상 제목</div>
