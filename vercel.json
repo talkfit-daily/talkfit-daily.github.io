@@ -3,6 +3,7 @@
     { "source": "/api/claude", "destination": "/api/claude" },
     { "source": "/api/transcribe", "destination": "/api/transcribe" },
     { "source": "/api/youtube", "destination": "/api/youtube" },
-    { "source": "/api/ytchannel", "destination": "/api/ytchannel" }
+    { "source": "/api/ytchannel", "destination": "/api/ytchannel" },
+    { "source": "/api/tts", "destination": "/api/tts" }
   ]
 }

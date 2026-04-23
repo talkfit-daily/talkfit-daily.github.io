@@ -198,7 +198,34 @@
       });
     }
 
+    var ttsCache = {}; // 같은 문장 캐싱
+    var currentAudio = null;
     function speakEnglish(text) {
+      if (!text) return;
+      var clean = text.replace(/\*\*/g, "").trim();
+      if (currentAudio) { try { currentAudio.pause(); } catch{} currentAudio = null; }
+      // 캐시에 있으면 즉시 재생
+      if (ttsCache[clean]) {
+        currentAudio = new Audio("data:audio/wav;base64," + ttsCache[clean]);
+        currentAudio.play().catch(function(){fallbackSpeak(clean);});
+        return;
+      }
+      // Gemini TTS 호출
+      fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean })
+      }).then(function(r){return r.json();}).then(function(d){
+        if (d.audio) {
+          ttsCache[clean] = d.audio;
+          currentAudio = new Audio("data:audio/wav;base64," + d.audio);
+          currentAudio.play().catch(function(){fallbackSpeak(clean);});
+        } else {
+          fallbackSpeak(clean);
+        }
+      }).catch(function(){ fallbackSpeak(clean); });
+    }
+    function fallbackSpeak(text) {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
