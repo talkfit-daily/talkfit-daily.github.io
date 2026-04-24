@@ -2876,14 +2876,16 @@
                   if(!t.english||!t.korean) return;
                   var eng = (t.english||"").replace(/\*\*/g,"");
                   var kor = t.korean;
+                  // 너무 짧은 문장 제외 (4단어 미만)
+                  if(eng.split(" ").length<4) return;
                   // 빈칸 채우기
                   if(t.verbs_used&&t.verbs_used.length>0){
                     var verb = t.verbs_used[0];
                     var blank = makeVerbBlank(eng, verb.verb);
                     if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
                   }
-                  // 순서 맞추기 (8단어 이하만)
-                  if(eng.split(" ").length<=8){
+                  // 순서 맞추기 (4~8단어)
+                  if(eng.split(" ").length>=4&&eng.split(" ").length<=8){
                     var words = eng.split(" ");
                     var shuffled = [].concat(words);
                     for(var si=shuffled.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var tmp=shuffled[si];shuffled[si]=shuffled[sj];shuffled[sj]=tmp;}
