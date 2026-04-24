@@ -492,13 +492,33 @@
       var opts1 = [correctM1].concat(wrongMeanings.filter(function(w){return w!==correctM1;}).sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
       quizzes.push({type:"meaning", question:'"'+b1.verb+'" 의 뜻은?', options:opts1, answer:correctM1, verb:b1.verb});
 
+      // 동사 변형 매칭 (find→found/finds/finding, take out→took out/takes out 등)
+      function makeVerbBlank(sentence, verb) {
+        // 구동사: 각 단어 사이에 유연한 매칭
+        var parts = verb.split(" ");
+        var base = parts[0];
+        // 불규칙 동사 변형 테이블
+        var irregulars = {find:"found|finds|finding",get:"got|gets|getting",take:"took|takes|taking",make:"made|makes|making",go:"went|goes|going",have:"had|has|having",come:"came|comes|coming",give:"gave|gives|giving",put:"put|puts|putting",run:"ran|runs|running",say:"said|says|saying",think:"thought|thinks|thinking",know:"knew|knows|knowing",see:"saw|sees|seeing",keep:"kept|keeps|keeping",tell:"told|tells|telling",feel:"felt|feels|feeling",leave:"left|leaves|leaving",call:"called|calls|calling",turn:"turned|turns|turning",set:"set|sets|setting",show:"showed|shows|showing",end:"ended|ends|ending",look:"looked|looks|looking",work:"worked|works|working",break:"broke|breaks|breaking",hold:"held|holds|holding",bring:"brought|brings|bringing",let:"let|lets|letting",stand:"stood|stands|standing",hear:"heard|hears|hearing",try:"tried|tries|trying"};
+        var forms = base + (irregulars[base] ? "|" + irregulars[base] : "|" + base + "s|" + base + "ed|" + base + "ing");
+        var pattern;
+        if (parts.length > 1) {
+          pattern = new RegExp("\\b(" + forms + ")\\s+" + parts.slice(1).join("\\s+").replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + "\\b", "i");
+        } else {
+          pattern = new RegExp("\\b(" + forms + ")\\b", "i");
+        }
+        var result = sentence.replace(pattern, "______");
+        return result !== sentence ? result : sentence.replace(new RegExp(verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"), "______");
+      }
+
       // Q2: fill-blank for lesson1 phrasal
       var p1 = lessons[0].phrasal;
       var ex1 = p1.examples[0];
-      var blank1 = ex1.english.replace(new RegExp(p1.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
-      var wrongV1 = wrongVerbs.filter(function(v){return v!==p1.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
-      var opts2 = [p1.verb].concat(wrongV1).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"fillblank", question:blank1, hint:ex1.korean, options:opts2, answer:p1.verb, verb:p1.verb});
+      var blank1 = makeVerbBlank(ex1.english, p1.verb);
+      if(blank1.indexOf("______")!==-1){
+        var wrongV1 = wrongVerbs.filter(function(v){return v!==p1.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
+        var opts2 = [p1.verb].concat(wrongV1).sort(function(){return Math.random()-0.5;});
+        quizzes.push({type:"fillblank", question:blank1, hint:ex1.korean, options:opts2, answer:p1.verb, verb:p1.verb});
+      }
 
       // Q3: listening quiz - TTS plays English, pick Korean meaning
       var listenEx = allExamples[Math.floor(Math.random() * allExamples.length)];
@@ -536,10 +556,12 @@
       // Q6: fill-blank for basic verb (different example)
       var b2 = lessons[0].basic;
       var ex6 = b2.examples[Math.min(1, b2.examples.length-1)];
-      var blank6 = ex6.english.replace(new RegExp(b2.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
-      var wrongV6 = ["get","make","take","put","go","come","keep","look","work","run","call","find"].filter(function(v){return v!==b2.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
-      var opts6 = [b2.verb].concat(wrongV6).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"fillblank", question:blank6, hint:ex6.korean, options:opts6, answer:b2.verb, verb:b2.verb});
+      var blank6 = makeVerbBlank(ex6.english, b2.verb);
+      if(blank6.indexOf("______")!==-1){
+        var wrongV6 = ["get","make","take","put","go","come","keep","look","work","run","call","find"].filter(function(v){return v!==b2.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
+        var opts6 = [b2.verb].concat(wrongV6).sort(function(){return Math.random()-0.5;});
+        quizzes.push({type:"fillblank", question:blank6, hint:ex6.korean, options:opts6, answer:b2.verb, verb:b2.verb});
+      }
 
       // Q7: situation quiz
       var sitEx = allExamples[Math.floor(Math.random() * allExamples.length)];
@@ -2857,7 +2879,7 @@
                   // 빈칸 채우기
                   if(t.verbs_used&&t.verbs_used.length>0){
                     var verb = t.verbs_used[0];
-                    var blank = eng.replace(new RegExp("\\b"+verb.verb.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i"),"_____");
+                    var blank = makeVerbBlank(eng, verb.verb);
                     if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
                   }
                   // 순서 맞추기 (8단어 이하만)
