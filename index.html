@@ -3582,6 +3582,10 @@
         setScreen("home"); setTab("home");
       };
 
+      // 온보딩 — hooks는 모든 조건부 return 전에 선언
+      var _onboard = useState(function(){return loadLocal("onboarding_done")!=="v2";}); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
+      var _onboardStep = useState(0); var onboardStep = _onboardStep[0]; var setOnboardStep = _onboardStep[1];
+
       if (authLoading) return (
         <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{textAlign:"center"}}>
@@ -3590,10 +3594,6 @@
           </div>
         </div>
       );
-
-      // 온보딩 (첫 방문 1회만) — hooks는 조건부 return 전에 선언
-      var _onboard = useState(function(){return loadLocal("onboarding_done")!=="v2";}); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
-      var _onboardStep = useState(0); var onboardStep = _onboardStep[0]; var setOnboardStep = _onboardStep[1];
 
       if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} loading={loginLoading} onGuest={function(){setIsGuest(true);saveLocal("is_guest",true);}} />;
       if (showOnboarding) {
