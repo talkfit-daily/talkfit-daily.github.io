@@ -2732,6 +2732,9 @@
                       </div>
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
+                      {t.original&&(
+                        <div style={{fontSize:12,color:C.muted,lineHeight:1.4,marginBottom:8,fontStyle:"italic",opacity:0.6}}>{(t.original||"").replace(/\*\*/g,"")}</div>
+                      )}
                       <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:4}}>{renderHighlight(t.english,t.verbs_used)}</div>
                       {t.korean&&(
                         <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginBottom:8,opacity:0.85}}>{renderHighlight(t.korean,t.verbs_used,{dim:true,korean:true})}</div>
