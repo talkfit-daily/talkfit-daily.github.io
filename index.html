@@ -2180,23 +2180,36 @@
       function pollYtStatus(videoId, title, totalChunks) {
         if (!videoId) return;
         setBgLoading(true);
+        var lastChunkCount = 0;
         var pollFn = function(){
           fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/ytStatus?videoId="+encodeURIComponent(videoId))
           .then(function(r){return r.json();}).then(function(data){
-            if(data.exists && data.chunks){
-              // 모든 구간 transcript 합쳐서 segments 재계산
-              var allText = data.chunks.map(function(c){return c.transcript;}).join("\n");
-              var allSegs = splitSegments(allText);
+            if(data.exists && data.chunks && data.chunks.length > lastChunkCount){
+              // 새로 온 청크만 구간으로 추가 (기존 구간 안 건드림)
+              var newChunks = data.chunks.slice(lastChunkCount);
+              lastChunkCount = data.chunks.length;
+              var newSegs = [];
+              newChunks.forEach(function(c){ newSegs = newSegs.concat(splitSegments(c.transcript)); });
               setYtSegments(function(prev){
-                if(allSegs.length > prev.length){
-                  saveYtProgress(videoId, title, allSegs, 0, !data.done, 0);
-                  return allSegs;
-                }
-                return prev;
+                var merged = prev.concat(newSegs);
+                saveYtProgress(videoId, title, merged, 0, !data.done, 0);
+                return merged;
               });
-              if(data.done){setBgLoading(false);return;}
             }
-            setTimeout(pollFn, 3000); // 3초마다
+            if(data.done){
+              // 완료 시 전체를 한번 균등 재분할
+              if(data.chunks){
+                var allText = data.chunks.map(function(c){return c.transcript;}).join("\n");
+                var finalSegs = splitSegments(allText);
+                setYtSegments(function(prev){
+                  // 현재 구간 인덱스 유지
+                  saveYtProgress(videoId, title, finalSegs, 0, false, 0);
+                  return finalSegs;
+                });
+              }
+              setBgLoading(false);return;
+            }
+            setTimeout(pollFn, 3000);
           }).catch(function(){setTimeout(pollFn, 5000);});
         };
         setTimeout(pollFn, 2000);
@@ -2500,7 +2513,7 @@
                   {ytSegments.length>0 && !result && (
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+(bgLoading?"...":ytSegments.length)}{bgLoading?" 🔄":""}</div>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+(bgLoading?(ytDuration?("~"+Math.max(ytSegments.length,Math.round(ytDuration/30))):"..."):ytSegments.length)}{bgLoading?" 🔄":""}</div>
                         <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
                       </div>
                       <div style={{height:4,background:C.border,borderRadius:99,marginBottom:12,overflow:"hidden"}}>
