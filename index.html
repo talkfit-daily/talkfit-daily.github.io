@@ -2986,7 +2986,9 @@
       var toggleReveal = function(key){setRevealed(function(r){var n={};for(var k in r)n[k]=r[k];n[key]=!n[key];return n;});};
 
       var todayVerbs = [];
-      if (lessons) {
+      var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+      var verbDoneToday = !!loadLocal("verb_done_"+todayK);
+      if (lessons && verbDoneToday) {
         for (var li=0;li<lessons.length;li++) {
           if (lessons[li].basic) todayVerbs.push(lessons[li].basic);
           if (lessons[li].phrasal) todayVerbs.push(lessons[li].phrasal);
