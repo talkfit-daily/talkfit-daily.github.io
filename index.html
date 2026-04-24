@@ -2500,7 +2500,7 @@
                   {ytSegments.length>0 && !result && (
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+ytSegments.length}{bgLoading?" 🔄":""}</div>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+(bgLoading?"...":ytSegments.length)}{bgLoading?" 🔄":""}</div>
                         <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
                       </div>
                       <div style={{height:4,background:C.border,borderRadius:99,marginBottom:12,overflow:"hidden"}}>
