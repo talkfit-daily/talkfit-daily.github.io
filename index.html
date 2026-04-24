@@ -395,6 +395,7 @@
     var ttsAbortController = null;
     var ttsRequestId = 0;
     var ttsLoadingBtn = null;
+    var ttsOrigText = "";
     function speakEnglish(text, btnEl) {
       if (!text) return;
       var clean = text.replace(/\*\*/g, "").trim();
@@ -403,9 +404,9 @@
       if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch{} currentAudio = null; }
       if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch{}
       // 로딩 표시
-      if (ttsLoadingBtn) { ttsLoadingBtn.textContent = "🔊 원문 듣기"; ttsLoadingBtn.disabled = false; }
-      if (btnEl) { btnEl.textContent = "🔊 로딩 중..."; btnEl.disabled = true; ttsLoadingBtn = btnEl; }
-      function resetBtn(){ if(btnEl){btnEl.textContent="🔊 원문 듣기";btnEl.disabled=false;} ttsLoadingBtn=null; }
+      if (ttsLoadingBtn && ttsOrigText) { ttsLoadingBtn.textContent = ttsOrigText; ttsLoadingBtn.disabled = false; ttsLoadingBtn.style.opacity="1"; }
+      if (btnEl) { ttsOrigText = btnEl.textContent; btnEl.textContent = "🔊 로딩 중..."; btnEl.disabled = true; btnEl.style.opacity="0.5"; ttsLoadingBtn = btnEl; }
+      function resetBtn(){ if(btnEl){btnEl.textContent=ttsOrigText||btnEl.textContent;btnEl.disabled=false;btnEl.style.opacity="1";} ttsLoadingBtn=null;ttsOrigText=""; }
 
       var myReq = ++ttsRequestId;
 
@@ -1423,8 +1424,8 @@
                   </div>
                   <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{current.confuse_with.diff_ko}</div>
                   <div style={{display:"flex",gap:8,flexDirection:"column"}}>
-                    <div onClick={function(){speakEnglish(current.confuse_with.example_this);}} style={{fontSize:12,color:color,cursor:"pointer",background:color+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.verb}: "{current.confuse_with.example_this}"</div>
-                    <div onClick={function(){speakEnglish(current.confuse_with.example_other);}} style={{fontSize:12,color:C.orange,cursor:"pointer",background:C.orange+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.confuse_with.verb}: "{current.confuse_with.example_other}"</div>
+                    <div onClick={function(e){speakEnglish(current.confuse_with.example_this,e.currentTarget);}} style={{fontSize:12,color:color,cursor:"pointer",background:color+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.verb}: "{current.confuse_with.example_this}"</div>
+                    <div onClick={function(e){speakEnglish(current.confuse_with.example_other,e.currentTarget);}} style={{fontSize:12,color:C.orange,cursor:"pointer",background:C.orange+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.confuse_with.verb}: "{current.confuse_with.example_other}"</div>
                   </div>
                 </div>
               )}
@@ -2767,7 +2768,7 @@
                         <span style={{fontSize:10,color:vColor,fontWeight:700}}>{isPhrasal?"구동사":"기본"}</span>
                         <span style={{fontSize:13,color:C.muted}}>{v.meaning}</span>
                       </div>
-                      {v.example&&<div onClick={function(){speakEnglish(stripStars(v.example));}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(v.example)}{"\""}</div>}
+                      {v.example&&<div onClick={function(e){speakEnglish(stripStars(v.example),e.currentTarget);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(v.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -2787,7 +2788,7 @@
                         <span style={{color:C.blue,fontWeight:800,fontSize:16}}>{n.noun}</span>
                         <span style={{fontSize:13,color:C.muted}}>{n.meaning_ko}</span>
                       </div>
-                      {n.example&&<div onClick={function(){speakEnglish(stripStars(n.example));}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(n.example)}{"\""}</div>}
+                      {n.example&&<div onClick={function(e){speakEnglish(stripStars(n.example),e.currentTarget);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(n.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -2810,7 +2811,7 @@
                       </div>
                       <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{stripStars(vc.diff_ko)}</div>
                       {vc.examples&&vc.examples.map(function(ex,ei){return(
-                        <div key={ei} onClick={function(){speakEnglish(stripStars(ex));}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{stripStars(ex)}</div>
+                        <div key={ei} onClick={function(e){speakEnglish(stripStars(ex),e.currentTarget);}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{stripStars(ex)}</div>
                       );})}
                     </div>
                   );})}
@@ -3039,7 +3040,7 @@
                         <div key={ei} style={{background:color+"10",border:"1px solid "+color+"20",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
                           <div style={{fontSize:14,color:C.text,fontWeight:600,marginBottom:3}}>{ex.english||ex.en}</div>
                           <div style={{fontSize:12,color:C.muted}}>{ex.korean||ex.ko}</div>
-                          <button onClick={function(e){e.stopPropagation();speakEnglish(ex.english||ex.en);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(ex.english||ex.en,e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       );})}
 
@@ -3047,7 +3048,7 @@
                         <div style={{background:color+"10",border:"1px solid "+color+"30",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
                           <div style={{fontSize:11,color:color,letterSpacing:1,marginBottom:4,fontWeight:700}}>REAL EXAMPLE</div>
                           <div style={{fontSize:14,color:C.text,fontWeight:600}}>{v.good_example}</div>
-                          <button onClick={function(e){e.stopPropagation();speakEnglish(v.good_example);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(v.good_example,e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       )}
 
@@ -3095,7 +3096,7 @@
                               );})}
                             </div>
                           )}
-                          <button onClick={function(){speakEnglish(t.english);}} style={{marginTop:6,background:"none",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <button onClick={function(e){speakEnglish(t.english,e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       );})}
                       {filterBeVerbs(sp.key_verbs)&&filterBeVerbs(sp.key_verbs).length>0&&(
