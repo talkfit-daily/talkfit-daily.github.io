@@ -3594,7 +3594,7 @@
       if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} loading={loginLoading} onGuest={function(){setIsGuest(true);saveLocal("is_guest",true);}} />;
 
       // 온보딩 (첫 방문 1회만)
-      var _onboard = useState(function(){return !loadLocal("onboarding_done");}); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
+      var _onboard = useState(function(){return loadLocal("onboarding_done")!=="v2";}); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
       var _onboardStep = useState(0); var onboardStep = _onboardStep[0]; var setOnboardStep = _onboardStep[1];
       if (showOnboarding) {
         var steps = [
@@ -3616,10 +3616,10 @@
             {onboardStep < steps.length - 1 ? (
               <button onClick={function(){setOnboardStep(onboardStep+1);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"다음 →"}</button>
             ) : (
-              <button onClick={function(){setShowOnboarding(false);saveLocal("onboarding_done",true);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"시작하기! 🚀"}</button>
+              <button onClick={function(){setShowOnboarding(false);saveLocal("onboarding_done","v2");}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"시작하기! 🚀"}</button>
             )}
             {onboardStep < steps.length - 1 && (
-              <button onClick={function(){setShowOnboarding(false);saveLocal("onboarding_done",true);}} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer"}}>{"건너뛰기"}</button>
+              <button onClick={function(){setShowOnboarding(false);saveLocal("onboarding_done","v2");}} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer"}}>{"건너뛰기"}</button>
             )}
           </div>
         );
