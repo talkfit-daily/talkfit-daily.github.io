@@ -216,6 +216,32 @@
       };
     }
 
+    // ── LEADERBOARD ─────────────────────────────────────────────────
+    async function updateLeaderboard(userId, displayName, photoURL) {
+      if (!userId) return;
+      var xpState = load("xp_state") || {};
+      var att = load("attendance") || {};
+      try {
+        await fbDb.collection("leaderboard").doc(userId).set({
+          name: displayName || "익명",
+          photo: photoURL || "",
+          xp: xpState.xp || 0,
+          streak: att.streak || 0,
+          level: getLevel(xpState.xp || 0).level,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } catch(e) { console.error("leaderboard update fail:", e); }
+    }
+
+    async function fetchLeaderboard() {
+      try {
+        var snap = await fbDb.collection("leaderboard").orderBy("xp", "desc").limit(100).get();
+        var list = [];
+        snap.forEach(function(doc) { list.push({ id: doc.id, ...doc.data() }); });
+        return list;
+      } catch(e) { console.error("leaderboard fetch fail:", e); return []; }
+    }
+
     // 연속 출석 (훈련 완료 시)
     function claimAttendanceBonus() {
       var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
@@ -953,7 +979,7 @@
 
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
-      var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat;
+      var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat, lbData=props.lbData||[], userId=props.userId;
       var days = ["S","M","T","W","T","F","S"];
       var today = new Date().getDay();
       // 이번 주 실제 학습한 요일 계산
@@ -1044,7 +1070,16 @@
                 <div style={{height:6,background:C.border,borderRadius:99,overflow:"hidden"}}>
                   <div style={{height:"100%",width:progress+"%",background:"linear-gradient(90deg,"+C.accent+","+C.blue+")",borderRadius:99,transition:"width 0.5s"}}/>
                 </div>
-                <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
+                <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+                  {lbData.length>0&&userId?(function(){
+                    var rank=lbData.findIndex(function(u){return u.id===userId;})+1;
+                    if(!rank) return null;
+                    var total=lbData.length;
+                    var txt=total>=100?("🏆 "+total+"명 중 "+rank+"등"):("🏆 "+rank+"등");
+                    return React.createElement("div",{style:{fontSize:10,color:C.yellow,fontWeight:700}},txt);
+                  })():null}
+                  <div style={{fontSize:10,color:C.muted,marginLeft:"auto"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
+                </div>
                 {(comboActive||att.totalDays>0)&&(
                   <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
                     {comboActive&&<span style={{background:C.orange+"20",color:C.orange,padding:"3px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>{"🔥 "+combo+"콤보"}</span>}
@@ -3091,10 +3126,14 @@
 
     function HistoryScreen(props) {
       var history = props.history;
+      var lbData = props.lbData || [];
+      var userId = props.userId;
       var att = load("attendance")||{};
       var st = load("xp_state")||{};
       var encountered = load("my_encountered_verbs")||[];
       var topVerbs = encountered.slice().sort(function(a,b){return (b.count||1)-(a.count||1);}).slice(0,10);
+      var myRank = userId ? lbData.findIndex(function(u){return u.id===userId;})+1 : 0;
+      var totalUsers = lbData.length;
       if (!history.length && !att.totalDays && !encountered.length) return (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",color:C.muted,gap:12}}>
           <div style={{fontSize:36}}>{"📚"}</div><div style={{fontSize:14}}>아직 학습 기록이 없어요</div>
@@ -3124,6 +3163,42 @@
               <div style={{fontSize:22,fontWeight:900,color:C.blue}}>{encountered.length}{"개"}</div>
             </div>
           </div>
+
+          {/* 순위 카드 */}
+          {myRank > 0 && (
+            <div style={{background:"linear-gradient(135deg,"+C.yellow+"15,"+C.accent+"10)",border:"1px solid "+C.yellow+"30",borderRadius:12,padding:16,marginBottom:20,textAlign:"center"}}>
+              <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"🏆 나의 순위"}</div>
+              <div style={{fontSize:36,fontWeight:900,color:C.yellow}}>{myRank}<span style={{fontSize:14,color:C.muted}}>{"등"}</span></div>
+              {totalUsers>=100&&<div style={{fontSize:12,color:C.muted,marginTop:4}}>{totalUsers.toLocaleString()+"명 중"}</div>}
+            </div>
+          )}
+
+          {/* 리더보드 */}
+          {totalUsers>=100&&(
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🏅 리더보드"}</div>
+              {(function(){
+                var medals=["🥇","🥈","🥉"];
+                var showCount=totalUsers>=10000?100:(totalUsers>=1000?10:3);
+                var visible=lbData.slice(0,showCount);
+                return visible.map(function(u,i){
+                  var isMe=u.id===userId;
+                  return(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:isMe?C.accent+"15":C.surface,border:"1px solid "+(isMe?C.accent+"40":C.border),borderRadius:10,marginBottom:6}}>
+                      <span style={{fontSize:i<3?20:12,minWidth:28,textAlign:"center",color:i<3?C.yellow:C.muted,fontWeight:700}}>{i<3?medals[i]:(i+1)}</span>
+                      {u.photo?<img src={u.photo} style={{width:28,height:28,borderRadius:"50%"}} referrerPolicy="no-referrer"/>:<div style={{width:28,height:28,borderRadius:"50%",background:C.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>{"👤"}</div>}
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:isMe?800:600,color:isMe?C.accent:C.text}}>{u.name||"익명"}{isMe?" (나)":""}</div>
+                        <div style={{fontSize:10,color:C.muted}}>{"Lv."+u.level+" · "+((u.xp||0).toLocaleString())+" XP"}</div>
+                      </div>
+                      <div style={{fontSize:11,color:C.accent,fontWeight:700}}>{u.streak||0}{"🔥"}</div>
+                    </div>
+                  );
+                });
+              })()}
+              {totalUsers>=1000&&<div style={{fontSize:10,color:C.muted,textAlign:"center",marginTop:8}}>{"상위 "+(totalUsers>=10000?"1%":"1%")+" 공개"}</div>}
+            </div>
+          )}
 
           {/* 자주 만난 동사 TOP 10 */}
           {topVerbs.length>0&&(
@@ -3301,6 +3376,7 @@
       var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
       var _s8=useState([]); var verbHistory=_s8[0]; var setVerbHistory=_s8[1];
       var aiAvailable = true;
+      var _lb = useState([]); var lbData = _lb[0]; var setLbData = _lb[1];
 
       var _authState = useState(null); var user = _authState[0]; var setUser = _authState[1];
       var _authLoading = useState(true); var authLoading = _authLoading[0]; var setAuthLoading = _authLoading[1];
@@ -3326,12 +3402,6 @@
           showPraise({type:"levelup", level:newLevel.level, name:newLevel.name, bonus:0});
         };
         window.__showPraise = function(d){ showPraise(d); };
-        // ⚠️ 테스트용 — 확인 후 제거
-        setTimeout(function(){
-          showPraise({type:"streak", streak:3, bonus:10, milestoneBonus:0, milestoneText:""});
-          showPraise({type:"lesson", bonus:0});
-          showPraise({type:"speak", bonus:0});
-        }, 1500);
       }, []);
       var _isGuest = useState(function(){return loadLocal("is_guest")||false;}); var isGuest = _isGuest[0]; var setIsGuest = _isGuest[1];
 
@@ -3384,6 +3454,10 @@
             var localXp = loadLocal("xp_state");
             if (localXp) await saveCloud(user.uid, "xp_state", localXp);
           }
+          // 리더보드 업데이트 + 가져오기
+          await updateLeaderboard(user.uid, user.displayName, user.photoURL);
+          var lb = await fetchLeaderboard();
+          setLbData(lb);
         })();
       }, [user]);
 
@@ -3451,6 +3525,9 @@
         if (user) {
           var xpState = loadLocal("xp_state");
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
+          updateLeaderboard(user.uid, user.displayName, user.photoURL).then(function(){
+            fetchLeaderboard().then(function(lb){ setLbData(lb); });
+          });
         }
         setScreen("home"); setTab("home");
       };
@@ -3521,12 +3598,12 @@
           </div>
 
           <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:90}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} lbData={lbData} userId={user?user.uid:null}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
             {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} aiAvailable={aiAvailable}/>}
             {screen==="review"&&<ReviewScreen lessons={lessons} speakHistory={speakHistory} setSpeakHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}}/>}
-            {screen==="history"&&<HistoryScreen history={verbHistory}/>}
+            {screen==="history"&&<HistoryScreen history={verbHistory} lbData={lbData} userId={user?user.uid:null}/>}
             <div style={{display:screen==="speak"?"block":"none"}}><SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/></div>
             {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
             {screen==="admin"&&<AdminScreen/>}
