@@ -2140,17 +2140,17 @@
           lines = sentences.length > 1 ? sentences : [text];
         }
         // 짧으면 1개로
-        if (lines.length <= 5) return [lines.join("\n")];
-        // 균등 분할: 4-6줄씩, 마지막이 너무 짧으면 합침
-        var segs = []; var cur = [];
-        for (var i=0;i<lines.length;i++) {
-          cur.push(lines[i]);
-          if (cur.length >= 5) { segs.push(cur.join("\n")); cur=[]; }
-        }
-        if (cur.length) {
-          // 마지막이 2줄 이하면 이전 구간에 합침
-          if (cur.length <= 2 && segs.length > 0) segs[segs.length-1] += "\n" + cur.join("\n");
-          else segs.push(cur.join("\n"));
+        if (lines.length <= 6) return [lines.join("\n")];
+        // 균등 분할: 목표 구간당 5줄, 총 구간 수 계산 후 균등 배분
+        var targetPerSeg = 5;
+        var numSegs = Math.max(1, Math.round(lines.length / targetPerSeg));
+        var baseSize = Math.floor(lines.length / numSegs);
+        var extra = lines.length % numSegs;
+        var segs = []; var idx = 0;
+        for (var s = 0; s < numSegs; s++) {
+          var size = baseSize + (s < extra ? 1 : 0);
+          segs.push(lines.slice(idx, idx + size).join("\n"));
+          idx += size;
         }
         return segs;
       }
@@ -2476,7 +2476,7 @@
                           } else{setYtTitle("⚠️ 이 영상은 처리할 수 없어요. 다른 영상을 시도해주세요.");}
                         }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 잠시 후 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
                         return;
-                      }).finally(function(){if(!ytLoading)return;setYtLoading(false);});
+                      }).finally(function(){setYtLoading(false);});
                     }} id="yt-fetch-btn" style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
                       {ytLoading?"AI가 듣는 중...":"자막 가져오기"}
                     </button>
@@ -2500,7 +2500,7 @@
                   {ytSegments.length>0 && !result && (
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+(ytTotalChunks||ytSegments.length)}{bgLoading?" 🔄":""}</div>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+ytSegments.length}{bgLoading?" 🔄":""}</div>
                         <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
                       </div>
                       <div style={{height:4,background:C.border,borderRadius:99,marginBottom:12,overflow:"hidden"}}>
