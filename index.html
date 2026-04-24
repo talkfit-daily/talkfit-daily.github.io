@@ -2840,7 +2840,10 @@
               )}
 
               {result.turns&&result.turns.length>0&&!practiceMode&&(
-                <button onClick={function(){setPracticeMode(true);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);setPracticeScore({correct:0,total:0});}} style={{width:"100%",background:C.orange,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"📝 연습하기"}</button>
+                <button onClick={function(){setPracticeMode(true);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);setPracticeScore({correct:0,total:0});}} style={{width:"100%",background:C.orange,color:"#08090d",border:"none",borderRadius:14,padding:"16px 16px 10px",fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>
+                  {"📝 연습하기"}
+                  <div style={{fontSize:10,fontWeight:600,opacity:0.7,marginTop:4}}>{"연습 완료 시 회화 미션 달성! +15 XP"}</div>
+                </button>
               )}
 
               {practiceMode&&(function(){
