@@ -394,19 +394,25 @@
     var currentAudio = null;
     var ttsAbortController = null;
     var ttsRequestId = 0;
-    function speakEnglish(text) {
+    var ttsLoadingBtn = null;
+    function speakEnglish(text, btnEl) {
       if (!text) return;
       var clean = text.replace(/\*\*/g, "").trim();
       // 이전 요청 취소
       if (ttsAbortController) { try { ttsAbortController.abort(); } catch{} }
       if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch{} currentAudio = null; }
       if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch{}
+      // 로딩 표시
+      if (ttsLoadingBtn) { ttsLoadingBtn.textContent = "🔊 원문 듣기"; ttsLoadingBtn.disabled = false; }
+      if (btnEl) { btnEl.textContent = "🔊 로딩 중..."; btnEl.disabled = true; ttsLoadingBtn = btnEl; }
+      function resetBtn(){ if(btnEl){btnEl.textContent="🔊 원문 듣기";btnEl.disabled=false;} ttsLoadingBtn=null; }
 
       var myReq = ++ttsRequestId;
 
       if (ttsCache[clean]) {
         currentAudio = new Audio("data:audio/wav;base64," + ttsCache[clean]);
         currentAudio.play().catch(function(){fallbackSpeak(clean);});
+        resetBtn();
         return;
       }
 
@@ -417,7 +423,7 @@
         body: JSON.stringify({ text: clean }),
         signal: ttsAbortController.signal
       }).then(function(r){return r.json();}).then(function(d){
-        if (myReq !== ttsRequestId) return; // 더 새 요청이 들어왔으면 무시
+        if (myReq !== ttsRequestId) return;
         if (d.audio) {
           ttsCache[clean] = d.audio;
           currentAudio = new Audio("data:audio/wav;base64," + d.audio);
@@ -425,7 +431,8 @@
         } else {
           fallbackSpeak(clean);
         }
-      }).catch(function(e){ if(e.name!=="AbortError") fallbackSpeak(clean); });
+        resetBtn();
+      }).catch(function(e){ if(e.name!=="AbortError") fallbackSpeak(clean); resetBtn(); });
     }
     function fallbackSpeak(text) {
       if (!window.speechSynthesis) return;
@@ -1094,7 +1101,10 @@
             if(loadLocal("verb_done_"+todayK))missions.verbDone=true;
             if(loadLocal("speak_done_"+todayK))missions.speakDone=true;
             var st=load("xp_state")||{};
-            if((st.combo||0)>=3)missions.combo3=true;
+            // 콤보가 오늘 달성한 건지 확인 (5분 이내 활동 기준)
+            var comboRecent = st.lastCorrectTime && (Date.now() - st.lastCorrectTime < 24*60*60*1000);
+            var comboToday = st.lastCorrectTime && new Date(st.lastCorrectTime).toISOString().slice(0,10) === todayK;
+            if((st.combo||0)>=3 && comboToday)missions.combo3=true;
             save("daily_missions_"+todayK,missions);
             var done=(missions.verbDone?1:0)+(missions.speakDone?1:0)+(missions.combo3?1:0);
             return(
@@ -2697,9 +2707,6 @@
                       </div>
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
-                      {t.original&&t.original!==t.english&&(
-                        <div style={{fontSize:12,color:C.muted,lineHeight:1.4,marginBottom:6,fontStyle:"italic",opacity:0.7}}>{(t.original||"").replace(/\*\*/g,"")}</div>
-                      )}
                       <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:4}}>{renderHighlight(t.english,t.verbs_used)}</div>
                       {t.korean&&(
                         <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginBottom:8,opacity:0.85}}>{renderHighlight(t.korean,t.verbs_used,{dim:true,korean:true})}</div>
@@ -2713,7 +2720,7 @@
                           );})}
                         </div>
                       )}
-                      <button onClick={function(){speakEnglish((t.english||"").replace(/\*\*/g,""));}} style={{background:"none",border:"1px solid "+color+"40",color:color,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>{"🔊 원문 듣기"}</button>
+                      <button onClick={function(e){speakEnglish((t.english||"").replace(/\*\*/g,""),e.currentTarget);}} style={{background:"none",border:"1px solid "+color+"40",color:color,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>{"🔊 원문 듣기"}</button>
                     </div>
                   </div>
                 );
@@ -2927,48 +2934,6 @@
                       )}
                     </div>
                   )}
-                </div>);
-              })()}
-
-              {filterBeVerbs(result.key_verbs)&&filterBeVerbs(result.key_verbs).length>0&&(function(){
-                var matchedLessons=[];
-                if(window.LESSON_POOL_REF){
-                  filterBeVerbs(result.key_verbs).forEach(function(kv){
-                    var v=kv.verb.toLowerCase();
-                    window.LESSON_POOL_REF.forEach(function(lp){
-                      if(lp.basic&&lp.basic.verb===v) matchedLessons.push(lp.basic);
-                      if(lp.phrasal&&lp.phrasal.verb===v) matchedLessons.push(lp.phrasal);
-                    });
-                  });
-                }
-                if(matchedLessons.length===0) return null;
-                return(
-                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
-                  <div onClick={function(){toggleSection("deeper");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"📚 더 깊게 배워요 ("+matchedLessons.length+")"}</div>
-                    <div style={{fontSize:14,color:C.muted}}>{expanded.deeper?"▲":"▼"}</div>
-                  </div>
-                  {expanded.deeper&&<div style={{padding:"0 16px 16px"}}>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:10}}>이 대화에 나온 동사로 정식 레슨이 준비돼 있어요</div>
-                  {matchedLessons.slice(0,4).map(function(lesson,li){
-                    var isPh=lesson.verb.indexOf(" ")!==-1;
-                    var lc=isPh?C.accent:C.yellow;
-                    return(
-                    <div key={li} style={{background:C.bg,borderRadius:10,padding:12,marginBottom:6}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{color:lc,fontWeight:800,fontSize:15}}>{lesson.verb}</span>
-                        <span style={{fontSize:10,color:lc,background:lc+"20",padding:"2px 6px",borderRadius:4}}>{isPh?"구동사":"기본"}</span>
-                        <span style={{fontSize:12,color:C.muted}}>{lesson.meaning_ko}</span>
-                      </div>
-                      {lesson.examples&&lesson.examples[0]&&(
-                        <div onClick={function(){speakEnglish(lesson.examples[0].english);}} style={{fontSize:12,color:C.text,marginTop:6,cursor:"pointer"}}>{"🔊 \""}{lesson.examples[0].english}{"\""}</div>
-                      )}
-                      {lesson.examples&&lesson.examples[0]&&(
-                        <div style={{fontSize:11,color:C.muted,marginTop:2}}>{lesson.examples[0].korean}</div>
-                      )}
-                    </div>
-                  );})}
-                  </div>}
                 </div>);
               })()}
 
