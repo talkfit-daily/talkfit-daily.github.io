@@ -42,9 +42,26 @@
     @keyframes levelUp{0%{transform:scale(0.5);opacity:0}50%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
     @keyframes xpPop{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-30px);opacity:0}}
     ::-webkit-scrollbar{width:0}
-    button:active,.tf-press:active{transform:scale(0.94);opacity:0.8;transition:transform 0.08s ease,opacity 0.08s ease}
-    button,.tf-press{transition:transform 0.15s ease,opacity 0.15s ease}
+    .tf-pressing{transform:scale(0.93)!important;opacity:0.65!important;transition:transform 0.06s ease,opacity 0.06s ease!important}
+    button,img,[role="button"]{transition:transform 0.12s ease,opacity 0.12s ease;-webkit-tap-highlight-color:transparent}
   </style>
+  <script>
+  // 모든 클릭 가능한 요소에 누름 피드백 (이벤트 위임)
+  document.addEventListener("touchstart",function(e){
+    var el=e.target.closest("button,[style*='cursor'],.tf-press,img[style]");
+    if(!el)return;
+    // cursor:pointer 체크
+    var cs=getComputedStyle(el);
+    if(cs.cursor!=="pointer"&&!el.tagName.match(/BUTTON/i))return;
+    el.classList.add("tf-pressing");
+  },{passive:true});
+  document.addEventListener("touchend",function(){
+    document.querySelectorAll(".tf-pressing").forEach(function(el){el.classList.remove("tf-pressing");});
+  },{passive:true});
+  document.addEventListener("touchcancel",function(){
+    document.querySelectorAll(".tf-pressing").forEach(function(el){el.classList.remove("tf-pressing");});
+  },{passive:true});
+  </script>
 </head>
 <body>
   <div id="splash">
@@ -78,6 +95,8 @@
     firebase.initializeApp(firebaseConfig);
     var fbAuth = firebase.auth();
     var fbDb = firebase.firestore();
+    // 브라우저 닫아도 로그인 유지 (Safari/iOS 포함)
+    fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
     function signInWithGoogle() {
       var provider = new firebase.auth.GoogleAuthProvider();
@@ -117,6 +136,22 @@
         return doc.exists ? doc.data().value : null;
       } catch { return null; }
     }
+    // 리더보드 업데이트
+    async function updateLeaderboard(userId, displayName) {
+      try {
+        var xp = getXP();
+        var lv = getLevel(xp);
+        var att = load("attendance") || {};
+        await fbDb.collection("leaderboard").doc(userId).set({
+          name: (displayName || "").split(" ")[0] || "유저",
+          xp: xp,
+          level: lv.level,
+          streak: att.streak || 0,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge: true});
+      } catch(e) {}
+    }
+
     async function saveCloud(userId, key, val) {
       try {
         await fbDb.collection("users").doc(userId).collection("data").doc(key).set({ value: val, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
@@ -216,32 +251,6 @@
       };
     }
 
-    // ── LEADERBOARD ─────────────────────────────────────────────────
-    async function updateLeaderboard(userId, displayName, photoURL) {
-      if (!userId) return;
-      var xpState = load("xp_state") || {};
-      var att = load("attendance") || {};
-      try {
-        await fbDb.collection("leaderboard").doc(userId).set({
-          name: displayName || "익명",
-          photo: photoURL || "",
-          xp: xpState.xp || 0,
-          streak: att.streak || 0,
-          level: getLevel(xpState.xp || 0).level,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-      } catch(e) { console.error("leaderboard update fail:", e); }
-    }
-
-    async function fetchLeaderboard() {
-      try {
-        var snap = await fbDb.collection("leaderboard").orderBy("xp", "desc").limit(100).get();
-        var list = [];
-        snap.forEach(function(doc) { list.push({ id: doc.id, ...doc.data() }); });
-        return list;
-      } catch(e) { console.error("leaderboard fetch fail:", e); return []; }
-    }
-
     // 연속 출석 (훈련 완료 시)
     function claimAttendanceBonus() {
       var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
@@ -306,6 +315,18 @@
       if (streak>=30) return 10;
       if (streak>=7) return 5;
       return 3;
+    }
+
+    // 레벨별 AI 한도 (서버와 동일)
+    function getAiLimitByLevel(lv) {
+      if(lv<=3) return 12+lv*3;
+      if(lv<=10) return 21+(lv-3)*3;
+      if(lv<=20) return 42+(lv-10)*3;
+      if(lv<=30) return 72+(lv-20)*3;
+      if(lv<=50) return 102+(lv-30)*2;
+      if(lv<=80) return 142+(lv-50)*2;
+      if(lv<=98) return 202+(lv-80)*2;
+      return 9999;
     }
 
     // ── CONFETTI ────────────────────────────────────────────────────
@@ -570,11 +591,7 @@
       var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       var cached=load("ai_remaining_data");
       if(cached&&cached.date===todayK) return cached.count;
-      // 레벨 기반 기본값 (서버와 동일 공식)
-      var xp=(load("xp_state")||{xp:0}).xp;var lv=getLevel(xp).level;
-      if(lv<=3) return 12+lv*3;
-      if(lv<=10) return 21+(lv-3)*3;
-      return 42+(lv-10)*3;
+      return 30;
     })();
     var aiRemainingListeners = [];
     function onAiRemainingChange(fn) { aiRemainingListeners.push(fn); }
@@ -979,7 +996,7 @@
 
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
-      var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat, lbData=props.lbData||[], userId=props.userId;
+      var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat, lbData=props.lbData, userId=props.userId;
       var days = ["S","M","T","W","T","F","S"];
       var today = new Date().getDay();
       // 이번 주 실제 학습한 요일 계산
@@ -1071,11 +1088,10 @@
                   <div style={{height:"100%",width:progress+"%",background:"linear-gradient(90deg,"+C.accent+","+C.blue+")",borderRadius:99,transition:"width 0.5s"}}/>
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
-                  {lbData.length>0&&userId?(function(){
+                  {lbData&&lbData.length>0&&userId?(function(){
                     var rank=lbData.findIndex(function(u){return u.id===userId;})+1;
                     if(!rank) return null;
-                    var total=lbData.length;
-                    var txt=total>=100?("🏆 "+total+"명 중 "+rank+"등"):("🏆 "+rank+"등");
+                    var txt=lbData.length>=100?("🏆 "+lbData.length+"명 중 "+rank+"등"):("🏆 "+rank+"등");
                     return React.createElement("div",{style:{fontSize:10,color:C.yellow,fontWeight:700}},txt);
                   })():null}
                   <div style={{fontSize:10,color:C.muted,marginLeft:"auto"}}>{(lv.max-xp).toLocaleString()} XP to Lv.{lv.level+1}</div>
@@ -1111,7 +1127,7 @@
                 </div>
                 {[
                   {k:"verbDone",label:"동사 레슨 완료",reward:"+10 XP"},
-                  {k:"speakDone",label:"회화 탭에서 대화 분석 1회",reward:"+15 XP"},
+                  {k:"speakDone",label:"회화 연습 1회 완료",reward:"+15 XP"},
                   {k:"combo3",label:"3연속 정답",reward:"+5 XP"}
                 ].map(function(m,i){return(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",opacity:missions[m.k]?0.5:1}}>
@@ -2061,6 +2077,31 @@
       var _ytDuration = useState(0); var ytDuration = _ytDuration[0]; var setYtDuration = _ytDuration[1];
       var BBC_DEFAULT = {id:"UCQjEfnSBuJPtMo3lsxRJiig",name:"BBC Learning English",thumbnail:""};
       var _myChannels = useState(function(){var ch=load("yt_channels"); if(!ch||ch.length===0){ch=[BBC_DEFAULT];save("yt_channels",ch);} return ch;}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
+
+      // BBC 추천 영상 — 첫 방문 시 API로 가져와 캐시
+      var _bbcRecs = useState(function(){return load("bbc_cached_recs")||[];}); var bbcRecs = _bbcRecs[0]; var setBbcRecs = _bbcRecs[1];
+      var _bbcLoading = useState(false); var bbcLoading = _bbcLoading[0]; var setBbcLoading = _bbcLoading[1];
+      // BBC 자막 캐시
+      var _bbcTranscripts = useState(function(){return load("bbc_cached_transcripts")||{};}); var bbcTranscripts = _bbcTranscripts[0]; var setBbcTranscripts = _bbcTranscripts[1];
+      useEffect(function(){
+        if(bbcRecs.length>0) return;
+        setBbcLoading(true);
+        fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:BBC_DEFAULT.id})})
+        .then(function(r){return r.json();}).then(function(d){
+          var vids=(d.videos||[]).filter(function(v){return !v.duration||v.duration>=60;}).map(function(v){v.channel="BBC Learning English";return v;});
+          setBbcRecs(vids);save("bbc_cached_recs",vids);
+          // 백그라운드로 자막 미리 가져오기
+          vids.forEach(function(v){
+            if(bbcTranscripts[v.id]) return;
+            fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+v.id,startMin:0})})
+            .then(function(r){return r.json();}).then(function(data){
+              if(data.transcript){
+                setBbcTranscripts(function(prev){var n={};for(var k in prev)n[k]=prev[k];n[v.id]={title:data.title||v.title,transcript:data.transcript,videoId:data.videoId||v.id,hasMore:data.hasMore||false,startMin:data.startMin||0};save("bbc_cached_transcripts",n);return n;});
+              }
+            }).catch(function(){});
+          });
+        }).catch(function(){}).finally(function(){setBbcLoading(false);});
+      },[]);
       var _chSearch = useState(""); var chSearch = _chSearch[0]; var setChSearch = _chSearch[1];
       var _chResults = useState([]); var chResults = _chResults[0]; var setChResults = _chResults[1];
       var _chSearching = useState(false); var chSearching = _chSearching[0]; var setChSearching = _chSearching[1];
@@ -2441,7 +2482,7 @@
                         }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 잠시 후 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
                         return;
                       }).finally(function(){if(!ytLoading)return;setYtLoading(false);});
-                    }} style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
+                    }} id="yt-fetch-btn" style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
                       {ytLoading?"AI가 듣는 중...":"자막 가져오기"}
                     </button>
                   </div>
@@ -2545,23 +2586,45 @@
                               <span key={ch.id} style={{background:C.accent+"15",color:C.accent,padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600}}>{ch.title}</span>
                             );})}
                           </div>
+                          {bbcRecs.length>0&&(
+                            <div style={{marginBottom:12}}>
+                              <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ BBC 추천 영상"}</div>
+                              {bbcRecs.map(function(rv){return(
+                                <div key={rv.id} onClick={function(){
+                                  // 캐시된 자막이 있으면 바로 로드
+                                  var cached = bbcTranscripts[rv.id];
+                                  if(cached&&cached.transcript){
+                                    setYtUrl("https://youtu.be/"+rv.id);
+                                    setYtTitle(cached.title||rv.title);setYtVideoId(cached.videoId||rv.id);
+                                    var segs=splitSegments(cached.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||cached.transcript);
+                                    setYtHasMore(cached.hasMore||false);setYtCurrentMin(cached.startMin||0);
+                                    saveYtProgress(cached.videoId||rv.id,cached.title||rv.title,segs,0,cached.hasMore,cached.startMin||0);
+                                    window.scrollTo({top:0,behavior:"smooth"});
+                                  } else {
+                                    setYtUrl("https://youtu.be/"+rv.id);
+                                    setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
+                                  }
+                                }} style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
+                                  <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
+                                  <div style={{flex:1}}>
+                                    <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{(rv.title||"").replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
+                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{bbcTranscripts[rv.id]?" · ⚡ 바로 시작":""}</div>
+                                  </div>
+                                </div>
+                              );})}
+                            </div>
+                          )}
                           <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
                           {recVideos.map(function(rv){return(
                             <div key={rv.id} onClick={function(){
                               setYtUrl("https://youtu.be/"+rv.id);
-                              // 자동으로 자막 가져오기 시작
-                              setYtLoading(true);setYtTitle("");setYtTranscript("");
-                              fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+rv.id,startMin:0})})
-                              .then(function(r){return r.json();}).then(function(data){
-                                if(data.transcript){setYtTitle(data.title||"");setYtVideoId(data.videoId||"");var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);if(data.hasMore){setTimeout(function(){fetchNextChunkInBackground(data.videoId||"",data.title||"",0,segs);},1000);}}
-                                else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
-                              }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
-                              window.scrollTo({top:0,behavior:"smooth"});
+                              // URL만 세팅하고 자막 가져오기 버튼 근처로 스크롤 (자동 fetch X)
+                              setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
                             }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
                               <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                               <div style={{flex:1}}>
                                 <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                <div style={{fontSize:10,color:C.muted}}>{rv.channel} · {rv.date}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{rv.date?" · "+rv.date:""}</div>
                               </div>
                             </div>
                           );})}
@@ -2616,15 +2679,8 @@
             <div>
               {result.scenario&&(
                 <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div>
-                      <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>상황</div>
-                      <div style={{fontSize:14,color:C.text,fontWeight:600}}>{result.scenario}</div>
-                    </div>
-                    <div style={{background:C.accent+"20",color:C.accent,padding:"4px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>
-                      {result.speakers||1}{"명"}
-                    </div>
-                  </div>
+                  <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>상황</div>
+                  <div style={{fontSize:14,color:C.text,fontWeight:600}}>{result.scenario}</div>
                 </div>
               )}
 
@@ -2645,12 +2701,17 @@
                 </div>
               )}
 
-              {expanded.turns&&result.turns?.map(function(t,i){
-                var colors = [C.accent,C.blue,C.yellow,C.orange];
-                var color = colors[i % colors.length];
+              {expanded.turns&&(function(){
+                // 실제로 화자가 2명 이상인지 체크 (턴의 speaker 값이 다른 게 있는지)
+                var uniqueSpeakers={};result.turns.forEach(function(t){if(t.speaker)uniqueSpeakers[t.speaker]=true;});
+                var hasMul=Object.keys(uniqueSpeakers).length>1;
+                var speakerColors={};var cidx=0;var colors=[C.accent,C.blue,C.yellow,C.orange];
+                Object.keys(uniqueSpeakers).forEach(function(s){speakerColors[s]=colors[cidx%colors.length];cidx++;});
+                return result.turns.map(function(t,i){
+                var color = hasMul&&t.speaker?speakerColors[t.speaker]||C.accent:C.accent;
                 return (
                   <div key={i} style={{marginBottom:14}}>
-                    {result.speakers>1&&(
+                    {hasMul&&t.speaker&&(
                       <div style={{fontSize:11,color:color,fontWeight:800,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
                         <span style={{width:6,height:6,borderRadius:"50%",background:color}}/>
                         {t.speaker}
@@ -2677,7 +2738,7 @@
                     </div>
                   </div>
                 );
-              })}
+              });})()}
 
               {result.key_verbs?.length>0&&(
                 <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
@@ -2875,8 +2936,8 @@
                               if(!st.todayDone){st.todayDone=true;st.streak=(st.streak||0)+1;st.todayKey=tk;saveLocal("tk_state",st);
                                 // 출석 보너스
                                 var bonus=claimAttendanceBonus();
-                                if(bonus&&window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});window.__showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""});},800);}
-                                else{if(window.__showPraise)setTimeout(function(){window.__showPraise({type:"speak",bonus:0});},800);}
+                                if(bonus&&window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});window.__showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""});},800);
+                                } else if(window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});},800);}
                               }
                             }
                           }
@@ -3126,14 +3187,12 @@
 
     function HistoryScreen(props) {
       var history = props.history;
-      var lbData = props.lbData || [];
+      var lbData = props.lbData;
       var userId = props.userId;
       var att = load("attendance")||{};
       var st = load("xp_state")||{};
       var encountered = load("my_encountered_verbs")||[];
       var topVerbs = encountered.slice().sort(function(a,b){return (b.count||1)-(a.count||1);}).slice(0,10);
-      var myRank = userId ? lbData.findIndex(function(u){return u.id===userId;})+1 : 0;
-      var totalUsers = lbData.length;
       if (!history.length && !att.totalDays && !encountered.length) return (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",color:C.muted,gap:12}}>
           <div style={{fontSize:36}}>{"📚"}</div><div style={{fontSize:14}}>아직 학습 기록이 없어요</div>
@@ -3164,41 +3223,41 @@
             </div>
           </div>
 
-          {/* 순위 카드 */}
-          {myRank > 0 && (
-            <div style={{background:"linear-gradient(135deg,"+C.yellow+"15,"+C.accent+"10)",border:"1px solid "+C.yellow+"30",borderRadius:12,padding:16,marginBottom:20,textAlign:"center"}}>
-              <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"🏆 나의 순위"}</div>
-              <div style={{fontSize:36,fontWeight:900,color:C.yellow}}>{myRank}<span style={{fontSize:14,color:C.muted}}>{"등"}</span></div>
-              {totalUsers>=100&&<div style={{fontSize:12,color:C.muted,marginTop:4}}>{totalUsers.toLocaleString()+"명 중"}</div>}
-            </div>
-          )}
 
-          {/* 리더보드 */}
-          {totalUsers>=100&&(
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🏅 리더보드"}</div>
-              {(function(){
-                var medals=["🥇","🥈","🥉"];
-                var showCount=totalUsers>=10000?100:(totalUsers>=1000?10:3);
-                var visible=lbData.slice(0,showCount);
-                return visible.map(function(u,i){
-                  var isMe=u.id===userId;
+          {/* 순위 */}
+          {lbData&&lbData.length>0&&(function(){
+            var myRank=userId?lbData.findIndex(function(u){return u.id===userId;})+1:0;
+            var showBoard=lbData.length>=100;
+            return(
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:11,color:C.yellow,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"🏆 순위"}</div>
+                <div style={{background:C.surface,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14,marginBottom:showBoard?10:0}}>
+                  <div style={{fontSize:14,fontWeight:800,color:C.text,textAlign:"center"}}>
+                    {showBoard?(myRank>0?(lbData.length+"명 중 "+myRank+"등"):(lbData.length+"명 참여 중")):(myRank>0?(myRank+"등"):("참여 중"))}
+                  </div>
+                </div>
+                {showBoard&&lbData.length>=3&&(function(){
+                  var showCount=Math.max(3,Math.floor(lbData.length*0.01));
                   return(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:isMe?C.accent+"15":C.surface,border:"1px solid "+(isMe?C.accent+"40":C.border),borderRadius:10,marginBottom:6}}>
-                      <span style={{fontSize:i<3?20:12,minWidth:28,textAlign:"center",color:i<3?C.yellow:C.muted,fontWeight:700}}>{i<3?medals[i]:(i+1)}</span>
-                      {u.photo?<img src={u.photo} style={{width:28,height:28,borderRadius:"50%"}} referrerPolicy="no-referrer"/>:<div style={{width:28,height:28,borderRadius:"50%",background:C.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>{"👤"}</div>}
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:isMe?800:600,color:isMe?C.accent:C.text}}>{u.name||"익명"}{isMe?" (나)":""}</div>
-                        <div style={{fontSize:10,color:C.muted}}>{"Lv."+u.level+" · "+((u.xp||0).toLocaleString())+" XP"}</div>
-                      </div>
-                      <div style={{fontSize:11,color:C.accent,fontWeight:700}}>{u.streak||0}{"🔥"}</div>
-                    </div>
-                  );
-                });
-              })()}
-              {totalUsers>=1000&&<div style={{fontSize:10,color:C.muted,textAlign:"center",marginTop:8}}>{"상위 "+(totalUsers>=10000?"1%":"1%")+" 공개"}</div>}
-            </div>
-          )}
+                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,overflow:"hidden"}}>
+                    {lbData.slice(0,showCount).map(function(u,i){
+                      var isMe=userId&&u.id===userId;
+                      var medal=i<3?["🥇","🥈","🥉"][i]:"";
+                      var medalColor=i<3?[C.yellow,C.muted,C.orange][i]:C.text;
+                      return(
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderBottom:i<showCount-1?"1px solid "+C.border:"none",background:isMe?C.accent+"10":"transparent"}}>
+                          <span style={{fontSize:i<3?16:12,minWidth:24,textAlign:"center",color:C.muted,fontWeight:700}}>{medal||(i+1)}</span>
+                          <span style={{flex:1,fontSize:i<3?14:13,fontWeight:isMe?800:i<3?700:600,color:isMe?C.accent:C.text}}>{u.name}{isMe?" (나)":""}</span>
+                          <span style={{fontSize:11,color:C.muted}}>Lv.{u.level}</span>
+                          <span style={{fontSize:i<3?12:11,color:medalColor,fontWeight:700}}>{(u.xp||0).toLocaleString()} XP</span>
+                        </div>
+                      );
+                    })}
+                  </div>);
+                })()}
+              </div>
+            );
+          })()}
 
           {/* 자주 만난 동사 TOP 10 */}
           {topVerbs.length>0&&(
@@ -3248,13 +3307,28 @@
     // ── SETTINGS ────────────────────────────────────────────────────
     function SettingsScreen(props){
       var _t=useState(load("theme")||"dark"); var theme=_t[0]; var setTheme=_t[1];
-      var _fb=useState(""); var feedbackText=_fb[0]; var setFeedbackText=_fb[1];
-      var _fbSent=useState(false); var feedbackSent=_fbSent[0]; var setFeedbackSent=_fbSent[1];
+      var _f=useState(load("font_size")||"normal"); var fontSize=_f[0]; var setFontSize=_f[1];
+      var _fb=useState(""); var fbText=_fb[0]; var setFbText=_fb[1];
+      var _fbSent=useState(false); var fbSent=_fbSent[0]; var setFbSent=_fbSent[1];
+      var _fbSending=useState(false); var fbSending=_fbSending[0]; var setFbSending=_fbSending[1];
+      function submitFeedback(){
+        if(!fbText.trim()||fbSending)return;
+        setFbSending(true);
+        var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+        fbDb.collection("feedback").add({
+          text:fbText.trim(),
+          date:todayK,
+          timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+          user:props.user?props.user.email:"guest",
+          level:getLevel(getXP()).level,
+          device:navigator.userAgent.slice(0,80)
+        }).then(function(){setFbSent(true);setFbText("");}).catch(function(){alert("전송 실패. 다시 시도해주세요.");}).finally(function(){setFbSending(false);});
+      }
       function changeTheme(v){setTheme(v);save("theme",v);setTimeout(function(){location.reload();},300);}
-      function sendFeedback(){
-        if(!feedbackText.trim())return;
-        fbDb.collection("feedback").add({text:feedbackText,user:props.user?props.user.email:"guest",createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-        setFeedbackText("");setFeedbackSent(true);setTimeout(function(){setFeedbackSent(false);},3000);
+      function changeFont(v){
+        setFontSize(v);save("font_size",v);
+        var scale=v==="large"?1.2:(v==="small"?0.85:1);
+        document.documentElement.style.fontSize=(16*scale)+"px";
       }
       return(
         <div style={{padding:"24px 20px"}}>
@@ -3275,11 +3349,21 @@
             </div>
           )}
 
-          <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:12,padding:16,marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"💬 베타 피드백"}</div>
-            <div style={{fontSize:11,color:C.muted,marginBottom:8}}>불편한 점, 원하는 기능을 알려주세요!</div>
-            <textarea value={feedbackText} onChange={function(e){setFeedbackText(e.target.value);}} placeholder="피드백을 입력해주세요..." style={{width:"100%",minHeight:60,background:C.bg,border:"1px solid "+C.border,borderRadius:8,padding:10,fontSize:13,color:C.text,resize:"vertical"}}/>
-            <button onClick={sendFeedback} style={{width:"100%",marginTop:8,background:feedbackText.trim()?C.accent:C.border,color:feedbackText.trim()?"#08090d":C.muted,border:"none",borderRadius:10,padding:10,fontSize:13,fontWeight:700,cursor:feedbackText.trim()?"pointer":"default"}}>{feedbackSent?"보냈어요! 감사합니다 🙏":"피드백 보내기"}</button>
+          <div style={{background:C.surface,border:"1px solid "+C.orange+"30",borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.orange,marginBottom:4}}>{"💬 베타 피드백"}</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:10}}>불편한 점, 원하는 기능, 버그 등 자유롭게 남겨주세요!</div>
+            {fbSent?(
+              <div style={{textAlign:"center",padding:"12px 0"}}>
+                <div style={{fontSize:16,marginBottom:4}}>{"✅"}</div>
+                <div style={{fontSize:13,color:C.accent,fontWeight:600}}>소중한 의견 감사합니다!</div>
+                <button onClick={function(){setFbSent(false);}} style={{marginTop:8,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer"}}>추가 의견 남기기</button>
+              </div>
+            ):(
+              <div>
+                <textarea value={fbText} onChange={function(e){setFbText(e.target.value);}} rows={3} placeholder="여기에 자유롭게 적어주세요..." style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:10,padding:12,color:C.text,fontSize:13,lineHeight:1.5,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:8}}/>
+                <button onClick={submitFeedback} disabled={!fbText.trim()||fbSending} style={{width:"100%",background:fbText.trim()?C.orange:C.border,color:fbText.trim()?"#08090d":C.muted,border:"none",borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:"pointer"}}>{fbSending?"보내는 중...":"피드백 보내기"}</button>
+              </div>
+            )}
           </div>
 
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
@@ -3289,6 +3373,16 @@
                 <button key={o.v} onClick={function(){changeTheme(o.v);}} style={{flex:1,background:theme===o.v?C.accent+"20":C.bg,border:"1px solid "+(theme===o.v?C.accent:C.border),color:theme===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
               );})}
             </div>
+          </div>
+
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🔤 글자 크기"}</div>
+            <div style={{display:"flex",gap:8}}>
+              {[{v:"small",l:"작게",sz:12},{v:"normal",l:"보통",sz:14},{v:"large",l:"크게",sz:17}].map(function(o){return(
+                <button key={o.v} onClick={function(){changeFont(o.v);}} style={{flex:1,background:fontSize===o.v?C.accent+"20":C.bg,border:"1px solid "+(fontSize===o.v?C.accent:C.border),color:fontSize===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:o.sz,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
+              );})}
+            </div>
+            <div style={{fontSize:11,color:C.muted,marginTop:8,textAlign:"center"}}>{"현재: "+(fontSize==="large"?"크게":fontSize==="small"?"작게":"보통")}</div>
           </div>
 
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
@@ -3379,7 +3473,6 @@
       var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
       var _s8=useState([]); var verbHistory=_s8[0]; var setVerbHistory=_s8[1];
       var aiAvailable = true;
-      var _lb = useState([]); var lbData = _lb[0]; var setLbData = _lb[1];
 
       var _authState = useState(null); var user = _authState[0]; var setUser = _authState[1];
       var _authLoading = useState(true); var authLoading = _authLoading[0]; var setAuthLoading = _authLoading[1];
@@ -3396,6 +3489,15 @@
         if (praiseQueue.current.length > 0) { setPraiseData(praiseQueue.current.shift()); }
         else { setPraiseData(null); }
       }
+      var _lbData = useState(null); var lbData = _lbData[0]; var setLbData = _lbData[1];
+
+      // 리더보드 로드
+      useEffect(function(){
+        fbDb.collection("leaderboard").orderBy("xp","desc").limit(100).get().then(function(snap){
+          var list=[];snap.forEach(function(doc){list.push({id:doc.id,...doc.data()});});
+          setLbData(list);
+        }).catch(function(){});
+      },[]);
 
       // 레벨업 감지 (전역 hook)
       useEffect(function(){
@@ -3457,10 +3559,6 @@
             var localXp = loadLocal("xp_state");
             if (localXp) await saveCloud(user.uid, "xp_state", localXp);
           }
-          // 리더보드 업데이트 + 가져오기
-          await updateLeaderboard(user.uid, user.displayName, user.photoURL);
-          var lb = await fetchLeaderboard();
-          setLbData(lb);
         })();
       }, [user]);
 
@@ -3528,9 +3626,7 @@
         if (user) {
           var xpState = loadLocal("xp_state");
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
-          updateLeaderboard(user.uid, user.displayName, user.photoURL).then(function(){
-            fetchLeaderboard().then(function(lb){ setLbData(lb); });
-          });
+          updateLeaderboard(user.uid, user.displayName);
         }
         setScreen("home"); setTab("home");
       };
@@ -3579,23 +3675,20 @@
                 {"홈"}
               </button>
             )}
-            {screen==="home"&&isGuest&&!user&&(
-              <button onClick={function(){setIsGuest(false);saveLocal("is_guest",false);}} style={{background:C.accent+"20",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"로그인"}</button>
-            )}
             {screen==="home"&&(
-              <button onClick={function(){setScreen("settings");}} style={{background:"none",border:"none",color:C.muted,padding:"6px",cursor:"pointer",marginLeft:6}}>
-                {React.createElement("svg",{width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},
-                  React.createElement("circle",{cx:12,cy:12,r:3}),
-                  React.createElement("path",{d:"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"})
-                )}
-              </button>
-            )}
-            {screen==="home"&&user&&(
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                {isGuest&&!user&&(
+                  <button onClick={function(){setIsGuest(false);saveLocal("is_guest",false);}} style={{background:C.accent+"20",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"로그인"}</button>
+                )}
                 {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
                 <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft}</div>
                 <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
-                {user.photoURL && <img src={user.photoURL} style={{width:24,height:24,borderRadius:"50%",cursor:"pointer"}} onClick={function(){if(confirm("로그아웃 하시겠어요?"))signOutUser();}} title="로그아웃" referrerPolicy="no-referrer"/>}
+                <button onClick={function(){setScreen("settings");}} style={{background:"none",border:"none",color:C.muted,padding:"6px",cursor:"pointer"}}>
+                  {React.createElement("svg",{width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},
+                    React.createElement("circle",{cx:12,cy:12,r:3}),
+                    React.createElement("path",{d:"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"})
+                  )}
+                </button>
               </div>
             )}
           </div>
