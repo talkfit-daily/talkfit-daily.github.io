@@ -310,25 +310,6 @@
     }
     function getXP() { return (load("xp_state")||{xp:0}).xp; }
 
-    // ── STREAK BONUS (AI 횟수) ──────────────────────────────────────
-    function getDailyLimit(streak) {
-      if (streak>=30) return 10;
-      if (streak>=7) return 5;
-      return 3;
-    }
-
-    // 레벨별 AI 한도 (서버와 동일)
-    function getAiLimitByLevel(lv) {
-      if(lv<=3) return 12+lv*3;
-      if(lv<=10) return 21+(lv-3)*3;
-      if(lv<=20) return 42+(lv-10)*3;
-      if(lv<=30) return 72+(lv-20)*3;
-      if(lv<=50) return 102+(lv-30)*2;
-      if(lv<=80) return 142+(lv-50)*2;
-      if(lv<=98) return 202+(lv-80)*2;
-      return 9999;
-    }
-
     // ── CONFETTI ────────────────────────────────────────────────────
     function showConfetti() {
       var container = document.createElement('div');
@@ -945,7 +926,7 @@
       if (type === "lesson") return { emoji: "📚", title: "레슨 완료!", sub: "오늘의 동사, 완벽하게 익혔어요!", tag: "동사 레슨" };
       if (type === "speak") return { emoji: "🎤", title: "회화 완료!", sub: "입으로 말해야 진짜 내 것이 됩니다!", tag: "회화 연습" };
       if (type === "levelup") return { emoji: "🎉", title: "레벨 업!", sub: "Lv." + (data.level||1) + " " + (data.name||"") + " 달성!", tag: "LEVEL UP" };
-      return { emoji: "🎊", title: "대단해!", sub: "계속 이 조자로!", tag: "축하" };
+      return { emoji: "🎊", title: "대단해!", sub: "계속 이대로!", tag: "축하" };
     }
 
     function PraiseModal(props) {
@@ -3732,7 +3713,7 @@
                 <div style={{fontSize:14,color:C.accent,letterSpacing:3,marginBottom:8,fontWeight:700}}>{"LEVEL UP!"}</div>
                 <div style={{fontSize:36,fontWeight:900,color:C.accent,marginBottom:6}}>{"Lv."+levelUpData.level}</div>
                 <div style={{fontSize:18,color:C.text,fontWeight:700,marginBottom:20}}>{levelUpData.name}</div>
-                <div style={{fontSize:13,color:C.muted,marginBottom:8}}>{"AI 사용 한도 증가!"}</div>
+                <div style={{fontSize:13,color:C.muted,marginBottom:8}}>{"축하합니다! 🎉"}</div>
                 <div style={{fontSize:11,color:C.muted}}>탭하면 닫혀요</div>
               </div>
             </div>
