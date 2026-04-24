@@ -888,23 +888,30 @@
     })();
 
 
-    // ── PRAISE MODAL (말해보카 스타일 출석 칭찬) ──────────────────────
-    function getPraiseMessage(streak) {
-      if (streak >= 365) return { emoji: "🏆", title: "전설이다!", sub: "1년 연속 학습... 당신은 이미 마스터." };
-      if (streak >= 100) return { emoji: "👑", title: "100일 돌파!", sub: "상위 0.1%의 끈기. 진짜 대단해요." };
-      if (streak >= 30) return { emoji: "🔥", title: "30일 달성!", sub: "한 달 넘게 매일? 습관이 됐네요!" };
-      if (streak >= 14) return { emoji: "💪", title: "2주 연속!", sub: "이 정도면 영어가 일상이죠?" };
-      if (streak >= 7) return { emoji: "⭐", title: "일주일 연속!", sub: "7일이면 습관의 시작이래요!" };
-      if (streak >= 5) return { emoji: "🎯", title: "5일 연속!", sub: "꾸준함이 실력이 됩니다." };
-      if (streak >= 3) return { emoji: "🌱", title: "3일째 출석!", sub: "시작이 반이래! 이미 반은 성공한 거야~" };
-      if (streak >= 2) return { emoji: "✨", title: "2일 연속!", sub: "어제에 이어 오늘도! 좋은 흐름이에요." };
-      return { emoji: "👋", title: "오늘도 왔네!", sub: "매일 15분이면 충분해요." };
+    // ── PRAISE MODAL (말해보카 스타일 칭찬) ──────────────────────────
+    function getPraiseContent(type, data) {
+      if (type === "streak") {
+        var s = data.streak || 1;
+        if (s >= 365) return { emoji: "🏆", title: "전설이다!", sub: "1년 연속 학습... 당신은 이미 마스터.", tag: s+"일 연속" };
+        if (s >= 100) return { emoji: "👑", title: "100일 돌파!", sub: "상위 0.1%의 끈기. 진짜 대단해요.", tag: s+"일 연속" };
+        if (s >= 30) return { emoji: "🔥", title: "30일 달성!", sub: "한 달 넘게 매일? 습관이 됐네요!", tag: s+"일 연속" };
+        if (s >= 14) return { emoji: "💪", title: "2주 연속!", sub: "이 정도면 영어가 일상이죠?", tag: s+"일 연속" };
+        if (s >= 7) return { emoji: "⭐", title: "일주일 연속!", sub: "7일이면 습관의 시작이래요!", tag: s+"일 연속" };
+        if (s >= 5) return { emoji: "🎯", title: "5일 연속!", sub: "꾸준함이 실력이 됩니다.", tag: s+"일 연속" };
+        if (s >= 3) return { emoji: "🌱", title: "3일째 출석!", sub: "시작이 반이래! 이미 반은 성공한 거야~", tag: s+"일 연속" };
+        if (s >= 2) return { emoji: "✨", title: "2일 연속!", sub: "어제에 이어 오늘도! 좋은 흐름이에요.", tag: s+"일 연속" };
+        return { emoji: "👋", title: "오늘도 왔네!", sub: "매일 15분이면 충분해요.", tag: "출석 완료" };
+      }
+      if (type === "lesson") return { emoji: "📚", title: "레슨 완료!", sub: "오늘의 동사, 완벽하게 익혔어요!", tag: "동사 레슨" };
+      if (type === "speak") return { emoji: "🎤", title: "회화 완료!", sub: "입으로 말해야 진짜 내 것이 됩니다!", tag: "회화 연습" };
+      if (type === "levelup") return { emoji: "🎉", title: "레벨 업!", sub: "Lv." + (data.level||1) + " " + (data.name||"") + " 달성!", tag: "LEVEL UP" };
+      return { emoji: "🎊", title: "대단해!", sub: "계속 이 조자로!", tag: "축하" };
     }
 
     function PraiseModal(props) {
       var data = props.data; var onClose = props.onClose;
       if (!data) return null;
-      var msg = getPraiseMessage(data.streak);
+      var msg = getPraiseContent(data.type || "streak", data);
       var particles = [];
       for (var i = 0; i < 12; i++) {
         var emojis = ["🌟","⭐","✨","💫","🎉","🎊"];
@@ -923,19 +930,21 @@
         );
       }
       return (
-        <div onClick={onClose} style={{position:"fixed",inset:0,background:"#000c",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+        <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
           {particles}
           <div style={{background:"linear-gradient(160deg, "+C.accent+"18, "+C.blue+"12, "+C.bg+")",border:"2px solid "+C.accent+"50",borderRadius:28,padding:"48px 32px 36px",textAlign:"center",maxWidth:320,width:"85%",animation:"levelUp 0.5s",position:"relative",overflow:"hidden"}}>
             <div style={{fontSize:72,marginBottom:8,filter:"drop-shadow(0 4px 20px "+C.accent+"60)"}}>{msg.emoji}</div>
             <div style={{display:"inline-block",background:"linear-gradient(135deg, "+C.accent+", "+C.blue+")",padding:"6px 20px",borderRadius:20,marginBottom:16}}>
-              <span style={{fontSize:13,fontWeight:800,color:"#08090d"}}>{"🔥 "+data.streak+"일 연속"}</span>
+              <span style={{fontSize:13,fontWeight:800,color:"#08090d"}}>{"🔥 "+msg.tag}</span>
             </div>
             <div style={{fontSize:26,fontWeight:900,color:C.text,marginBottom:8,lineHeight:1.2}}>{msg.title}</div>
             <div style={{fontSize:14,color:C.muted,lineHeight:1.6,marginBottom:20}}>{msg.sub}</div>
-            <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
-              <span style={{background:C.accent+"20",color:C.accent,padding:"6px 14px",borderRadius:10,fontSize:13,fontWeight:700}}>{"+ "+data.bonus+" XP"}</span>
-              {data.milestoneBonus > 0 && <span style={{background:C.yellow+"20",color:C.yellow,padding:"6px 14px",borderRadius:10,fontSize:13,fontWeight:700}}>{"🏅 "+data.milestoneText+" +"+data.milestoneBonus+" XP"}</span>}
-            </div>
+            {data.bonus > 0 && (
+              <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
+                <span style={{background:C.accent+"20",color:C.accent,padding:"6px 14px",borderRadius:10,fontSize:13,fontWeight:700}}>{"+ "+data.bonus+" XP"}</span>
+                {data.milestoneBonus > 0 && <span style={{background:C.yellow+"20",color:C.yellow,padding:"6px 14px",borderRadius:10,fontSize:13,fontWeight:700}}>{"🏅 "+data.milestoneText+" +"+data.milestoneBonus+" XP"}</span>}
+              </div>
+            )}
             <div style={{fontSize:11,color:C.muted+"80",marginTop:20}}>{"탭하면 닫혀요"}</div>
           </div>
         </div>
@@ -2831,7 +2840,8 @@
                               if(!st.todayDone){st.todayDone=true;st.streak=(st.streak||0)+1;st.todayKey=tk;saveLocal("tk_state",st);
                                 // 출석 보너스
                                 var bonus=claimAttendanceBonus();
-                                if(bonus&&window.__showPraise){setTimeout(function(){window.__showPraise(bonus);},800);}
+                                if(bonus&&window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});window.__showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""});},800);}
+                                else{if(window.__showPraise)setTimeout(function(){window.__showPraise({type:"speak",bonus:0});},800);}
                               }
                             }
                           }
@@ -3298,18 +3308,30 @@
       var _aiLeft = useState(aiRemaining); var aiLeft = _aiLeft[0]; var setAiLeft = _aiLeft[1];
       var _levelUp = useState(null); var levelUpData = _levelUp[0]; var setLevelUpData = _levelUp[1];
       var _praise = useState(null); var praiseData = _praise[0]; var setPraiseData = _praise[1];
+      var praiseQueue = useRef([]);
+      function showPraise(d) {
+        if (praiseData) { praiseQueue.current.push(d); }
+        else { setPraiseData(d); }
+      }
+      function closePraise() {
+        if (praiseQueue.current.length > 0) { setPraiseData(praiseQueue.current.shift()); }
+        else { setPraiseData(null); }
+      }
 
       // 레벨업 감지 (전역 hook)
       useEffect(function(){
         window.__onLevelUp = function(newLevel){
           setLevelUpData(newLevel);
           setTimeout(function(){setLevelUpData(null);}, 5000);
+          showPraise({type:"levelup", level:newLevel.level, name:newLevel.name, bonus:0});
         };
-        window.__showPraise = function(bonusData){
-          setPraiseData(bonusData);
-        };
+        window.__showPraise = function(d){ showPraise(d); };
         // ⚠️ 테스트용 — 확인 후 제거
-        setTimeout(function(){ setPraiseData({streak:3, bonus:10, milestoneBonus:0, milestoneText:""}); }, 1500);
+        setTimeout(function(){
+          showPraise({type:"streak", streak:3, bonus:10, milestoneBonus:0, milestoneText:""});
+          showPraise({type:"lesson", bonus:0});
+          showPraise({type:"speak", bonus:0});
+        }, 1500);
       }, []);
       var _isGuest = useState(function(){return loadLocal("is_guest")||false;}); var isGuest = _isGuest[0]; var setIsGuest = _isGuest[1];
 
@@ -3417,11 +3439,13 @@
         var newStreak = fullyDone ? streak+1 : streak;
         setStreak(newStreak); setTodayDone(fullyDone); setVerbHistory(newHistory);
         persist({streak:newStreak,todayDone:fullyDone,history:newHistory,lessons:lessons});
+        // 레슨 완료 칭찬
+        showPraise({type:"lesson", bonus:0});
         // 둘 다 완료 시 출석 보너스
         if (fullyDone) {
           var bonus = claimAttendanceBonus();
           if (bonus) {
-            setTimeout(function(){ if(window.__showPraise) window.__showPraise(bonus); }, 800);
+            setTimeout(function(){ showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""}); }, 800);
           }
         }
         if (user) {
@@ -3528,7 +3552,7 @@
               );})}
             </div>
           )}
-          <PraiseModal data={praiseData} onClose={function(){setPraiseData(null);}}/>
+          <PraiseModal data={praiseData} onClose={closePraise}/>
           {levelUpData&&(
             <div onClick={function(){setLevelUpData(null);}} style={{position:"fixed",inset:0,background:"#000d",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",animation:"splashFade 0.3s",cursor:"pointer"}}>
               <div style={{background:"linear-gradient(135deg,"+C.accent+"30,"+C.blue+"30)",border:"2px solid "+C.accent,borderRadius:24,padding:"40px 32px",textAlign:"center",maxWidth:340,animation:"levelUp 0.6s"}}>
