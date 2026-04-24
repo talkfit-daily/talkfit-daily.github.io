@@ -2271,6 +2271,8 @@
           var parsed = JSON.parse(jsonStr.trim());
           setResult(parsed);
           var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+          // 회화 분석 완료 = 미션 체크
+          saveLocal("speak_done_"+todayK, true);
           // 로그인 사용자만 개인 동사 풀 적용
           var loggedIn = !!load("tk_state");
           if (loggedIn && parsed.key_verbs && parsed.key_verbs.length > 0) {
