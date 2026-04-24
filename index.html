@@ -2185,30 +2185,17 @@
           fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/ytStatus?videoId="+encodeURIComponent(videoId))
           .then(function(r){return r.json();}).then(function(data){
             if(data.exists && data.chunks && data.chunks.length > lastChunkCount){
-              // 새로 온 청크만 구간으로 추가 (기존 구간 안 건드림)
+              // 새로 온 청크 = 새 구간으로 추가 (기존 구간 안 건드림)
               var newChunks = data.chunks.slice(lastChunkCount);
               lastChunkCount = data.chunks.length;
-              var newSegs = [];
-              newChunks.forEach(function(c){ newSegs = newSegs.concat(splitSegments(c.transcript)); });
+              var newSegs = newChunks.map(function(c){return c.transcript;});
               setYtSegments(function(prev){
                 var merged = prev.concat(newSegs);
                 saveYtProgress(videoId, title, merged, 0, !data.done, 0);
                 return merged;
               });
             }
-            if(data.done){
-              // 완료 시 전체를 한번 균등 재분할
-              if(data.chunks){
-                var allText = data.chunks.map(function(c){return c.transcript;}).join("\n");
-                var finalSegs = splitSegments(allText);
-                setYtSegments(function(prev){
-                  // 현재 구간 인덱스 유지
-                  saveYtProgress(videoId, title, finalSegs, 0, false, 0);
-                  return finalSegs;
-                });
-              }
-              setBgLoading(false);return;
-            }
+            if(data.done){setBgLoading(false);return;}
             setTimeout(pollFn, 3000);
           }).catch(function(){setTimeout(pollFn, 5000);});
         };
@@ -2465,16 +2452,17 @@
                         if(data.transcript){
                           setYtTitle(data.title||"");
                           setYtVideoId(data.videoId||"");
-                          var segs = splitSegments(data.transcript);
+                          // 서버 청크 = 1구간 (splitSegments 안 씀)
+                          var segs = [data.transcript];
                           setYtSegments(segs);
                           setYtSegIdx(0);
-                          setYtTranscript(segs[0]||data.transcript);
+                          setYtTranscript(data.transcript);
                           setYtHasMore(data.hasMore||false);
                           setYtCurrentMin(data.startMin||0);
                           setYtTotalChunks(data.totalChunks||1);
                           setYtDuration(data.durationSec||0);
                           saveYtProgress(data.videoId||"", data.title||"", segs, 0, data.hasMore, data.startMin||0);
-                          // 백그라운드로 다음 구간 자동 로드
+                          // 백그라운드로 나머지 구간 폴링
                           if(data.hasMore){setTimeout(function(){fetchNextChunkInBackground(data.videoId||"",data.title||"",0,segs);},1000);}
                         } else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
                       }).catch(function(){
@@ -2483,7 +2471,7 @@
                         .then(function(r){return r.json();}).then(function(data){
                           if(data.transcript){
                             setYtTitle(data.title||"");setYtVideoId(data.videoId||"");
-                            var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);
+                            var segs=[data.transcript];setYtSegments(segs);setYtSegIdx(0);
                             setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);
                             saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);
                           } else{setYtTitle("⚠️ 이 영상은 처리할 수 없어요. 다른 영상을 시도해주세요.");}
@@ -2526,15 +2514,15 @@
                       </div>
                       {ytSegIdx>=ytSegments.length-1&&ytHasMore&&(
                         <button disabled={ytLoading} onClick={function(){
-                          var nextMin = (ytCurrentMin||0)+5;
+                          var nextMin = (ytCurrentMin||0)+3;
                           setYtLoading(true);
                           fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+ytVideoId,startMin:nextMin})})
                           .then(function(r){return r.json();}).then(function(data){
                             if(data.transcript){
-                              var segs = splitSegments(data.transcript);
+                              var segs = [data.transcript];
                               setYtSegments(segs);
                               setYtSegIdx(0);
-                              setYtTranscript(segs[0]||data.transcript);
+                              setYtTranscript(data.transcript);
                               setYtHasMore(data.hasMore||false);
                               setYtCurrentMin(nextMin);
                               setResult(null);
@@ -2542,7 +2530,7 @@
                             } else{alert(data.error||"더 이상 가져올 수 없어요.");}
                           }).catch(function(){alert("오류가 발생했어요.");}).finally(function(){setYtLoading(false);});
                         }} style={{width:"100%",marginTop:10,background:C.orange+"20",border:"1px solid "+C.orange+"40",color:C.orange,borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                          {ytLoading?"가져오는 중... (2-3분 소요)":"▶ 다음 5분 가져오기 ("+(ytCurrentMin+5)+"-"+(ytCurrentMin+10)+"분)"}
+                          {ytLoading?"가져오는 중...":"▶ 다음 구간 가져오기 ("+(ytCurrentMin+3)+"-"+(ytCurrentMin+6)+"분)"}
                         </button>
                       )}
                     </div>
@@ -2604,7 +2592,7 @@
                                   if(cached&&cached.transcript){
                                     setYtUrl("https://youtu.be/"+rv.id);
                                     setYtTitle(cached.title||rv.title);setYtVideoId(cached.videoId||rv.id);
-                                    var segs=splitSegments(cached.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||cached.transcript);
+                                    var segs=[cached.transcript];setYtSegments(segs);setYtSegIdx(0);setYtTranscript(cached.transcript);
                                     setYtHasMore(cached.hasMore||false);setYtCurrentMin(cached.startMin||0);
                                     saveYtProgress(cached.videoId||rv.id,cached.title||rv.title,segs,0,cached.hasMore,cached.startMin||0);
                                     window.scrollTo({top:0,behavior:"smooth"});
