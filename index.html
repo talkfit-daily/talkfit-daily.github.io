@@ -1994,7 +1994,8 @@
       var setResult=function(r){_setResultRaw(r);if(r)saveLocal("speak_last_result",r);else saveLocal("speak_last_result",null);};
       var _s5=useState(false); var isLoading=_s5[0]; var setIsLoading=_s5[1];
       var _s6=useState(""); var textInput=_s6[0]; var setTextInput=_s6[1];
-      var _s7=useState("record"); var mode=_s7[0]; var setMode=_s7[1];
+      var _s7=useState(function(){return loadLocal("speak_mode")||"record";}); var mode=_s7[0]; var _setModeRaw=_s7[1];
+      var setMode=function(v){_setModeRaw(v);saveLocal("speak_mode",v);};
       var _s8=useState(0); var seconds=_s8[0]; var setSeconds=_s8[1];
       var _s9f=useState(null); var audioFile=_s9f[0]; var setAudioFile=_s9f[1];
       var _s10f=useState(null); var audioUrl=_s10f[0]; var setAudioUrl=_s10f[1];
@@ -2003,11 +2004,14 @@
       var _altLoad=useState(false); var altLoading=_altLoad[0]; var setAltLoading=_altLoad[1];
       var _expanded=useState({turns:true,verbs:true,nouns:false,compare:false,tip:true,alt:false,deeper:false}); var expanded=_expanded[0]; var setExpanded=_expanded[1];
       function toggleSection(k){setExpanded(function(e){var n={};for(var x in e)n[x]=e[x];n[k]=!n[k];return n;});}
-      var _practiceMode=useState(false); var practiceMode=_practiceMode[0]; var setPracticeMode=_practiceMode[1];
-      var _practiceIdx=useState(0); var practiceIdx=_practiceIdx[0]; var setPracticeIdx=_practiceIdx[1];
+      var _practiceMode=useState(function(){return loadLocal("speak_practice_mode")||false;}); var practiceMode=_practiceMode[0]; var _setPracticeModeRaw=_practiceMode[1];
+      var setPracticeMode=function(v){_setPracticeModeRaw(v);saveLocal("speak_practice_mode",v);};
+      var _practiceIdx=useState(function(){return loadLocal("speak_practice_idx")||0;}); var practiceIdx=_practiceIdx[0]; var _setPracticeIdxRaw=_practiceIdx[1];
+      var setPracticeIdx=function(v){_setPracticeIdxRaw(v);saveLocal("speak_practice_idx",v);};
       var _practiceAnswer=useState(""); var practiceAnswer=_practiceAnswer[0]; var setPracticeAnswer=_practiceAnswer[1];
       var _practiceCheck=useState(null); var practiceCheck=_practiceCheck[0]; var setPracticeCheck=_practiceCheck[1];
-      var _practiceScore=useState({correct:0,total:0}); var practiceScore=_practiceScore[0]; var setPracticeScore=_practiceScore[1];
+      var _practiceScore=useState(function(){return loadLocal("speak_practice_score")||{correct:0,total:0};}); var practiceScore=_practiceScore[0]; var _setPracticeScoreRaw=_practiceScore[1];
+      var setPracticeScore=function(v){_setPracticeScoreRaw(v);saveLocal("speak_practice_score",v);};
       var recRef = useRef(null);
       var timerRef = useRef(null);
 
@@ -2891,7 +2895,7 @@
                   <div style={{fontSize:14,color:C.text,marginBottom:12,lineHeight:1.6}}>
                     {q.type==="fill"&&<div><div style={{fontSize:14,color:C.text,marginBottom:8}}>{q.korean}</div><div style={{fontSize:16,fontWeight:600,color:C.muted}}>{q.sentence}</div></div>}
                     {q.type==="translate"&&<div style={{fontSize:16,fontWeight:600}}>{q.korean}</div>}
-                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:12}}>{q.korean}</div>{practiceAnswer&&<div style={{marginBottom:10,fontSize:15,color:C.text,background:C.bg,borderRadius:10,padding:"12px 14px",minHeight:20,lineHeight:1.6}}>{practiceAnswer}<span style={{cursor:"pointer",marginLeft:8,color:C.red,fontSize:12}} onClick={function(){var words=practiceAnswer.trim().split(" ");words.pop();setPracticeAnswer(words.join(" "));}}>{"← 지우기"}</span></div>}<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
+                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:12}}>{q.korean}</div><div style={{marginBottom:10,fontSize:15,color:practiceAnswer?C.text:C.muted,background:C.bg,borderRadius:10,padding:"12px 14px",minHeight:44,lineHeight:1.6}}>{practiceAnswer||"단어를 눌러 문장을 만드세요"}{practiceAnswer&&<span style={{cursor:"pointer",marginLeft:8,color:C.red,fontSize:12}} onClick={function(){var words=practiceAnswer.trim().split(" ");words.pop();setPracticeAnswer(words.join(" "));}}>{"← 지우기"}</span>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
                       var selected = (practiceAnswer||"").split(" ").filter(function(s){return s;});
                       var usedCount = selected.filter(function(s){return s===w;}).length;
                       var totalCount = q.words.slice(0,wi+1).filter(function(ww){return ww===w;}).length;
