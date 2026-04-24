@@ -924,6 +924,8 @@
     };
     var C = (load("theme")==="light") ? C_LIGHT : C_DARK;
     // 폰트 크기는 앱 루트 zoom으로 적용 (data-app-root)
+    var BE_VERBS = ["am","is","are","was","were","be","been","being","'m","'s","'re"];
+    function filterBeVerbs(verbs) { return (verbs||[]).filter(function(v){ return BE_VERBS.indexOf((v.verb||"").toLowerCase()) === -1; }); }
 
 
     // ── PRAISE MODAL (말해보카 스타일 칭찬) ──────────────────────────
@@ -2322,7 +2324,7 @@
               }
             });
           }
-          var entry = {id:Date.now(),date:todayK,scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs,key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip,sourceText:text};
+          var entry = {id:Date.now(),date:todayK,scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:filterBeVerbs(parsed.key_verbs),key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip,sourceText:text};
           var next=[entry].concat(history).slice(0,50);
           setHistory(next);
           fetchAltSituations(parsed);
@@ -2736,18 +2738,18 @@
                 );
               });})()}
 
-              {result.key_verbs?.length>0&&(
+              {filterBeVerbs(result.key_verbs)?.length>0&&(
                 <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                   <div onClick={function(){toggleSection("verbs");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"📌 KEY VERBS · "+result.key_verbs.length+"개"}</div>
+                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"📌 KEY VERBS · "+filterBeVerbs(result.key_verbs).length+"개"}</div>
                     <div style={{fontSize:14,color:C.muted}}>{expanded.verbs?"▲":"▼"}</div>
                   </div>
                   {expanded.verbs&&<div style={{padding:"0 16px 16px"}}>
-                  {result.key_verbs.map(function(v,i){
+                  {filterBeVerbs(result.key_verbs).map(function(v,i){
                     var isPhrasal=(v.type==="phrasal"||v.verb.indexOf(" ")!==-1);
                     var vColor=isPhrasal?C.accent:C.yellow;
                     return(
-                    <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<result.key_verbs.length-1?"1px solid "+C.border:"none"}}>
+                    <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<filterBeVerbs(result.key_verbs).length-1?"1px solid "+C.border:"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                         <span style={{color:vColor,fontWeight:800,fontSize:16}}>{v.verb}</span>
                         <span style={{fontSize:10,color:vColor,fontWeight:700}}>{isPhrasal?"구동사":"기본"}</span>
@@ -2947,10 +2949,10 @@
                 </div>);
               })()}
 
-              {result.key_verbs&&result.key_verbs.length>0&&(function(){
+              {filterBeVerbs(result.key_verbs)&&filterBeVerbs(result.key_verbs).length>0&&(function(){
                 var matchedLessons=[];
                 if(window.LESSON_POOL_REF){
-                  result.key_verbs.forEach(function(kv){
+                  filterBeVerbs(result.key_verbs).forEach(function(kv){
                     var v=kv.verb.toLowerCase();
                     window.LESSON_POOL_REF.forEach(function(lp){
                       if(lp.basic&&lp.basic.verb===v) matchedLessons.push(lp.basic);
@@ -3121,11 +3123,11 @@
                           <button onClick={function(){speakEnglish(t.english);}} style={{marginTop:6,background:"none",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       );})}
-                      {sp.key_verbs&&sp.key_verbs.length>0&&(
+                      {filterBeVerbs(sp.key_verbs)&&filterBeVerbs(sp.key_verbs).length>0&&(
                         <div style={{marginTop:8}}>
                           <div style={{fontSize:10,color:C.muted,letterSpacing:1,marginBottom:6}}>KEY VERBS</div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            {sp.key_verbs.map(function(kv,ki){
+                            {filterBeVerbs(sp.key_verbs).map(function(kv,ki){
                               var isPh=(kv.type==="phrasal"||kv.verb.indexOf(" ")!==-1);
                               var vc=isPh?C.accent:C.yellow;
                               return(
