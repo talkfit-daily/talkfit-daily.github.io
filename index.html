@@ -3248,31 +3248,18 @@
     // ── SETTINGS ────────────────────────────────────────────────────
     function SettingsScreen(props){
       var _t=useState(load("theme")||"dark"); var theme=_t[0]; var setTheme=_t[1];
-      var _f=useState(load("font_size")||"normal"); var fontSize=_f[0]; var setFontSize=_f[1];
+      var _fb=useState(""); var feedbackText=_fb[0]; var setFeedbackText=_fb[1];
+      var _fbSent=useState(false); var feedbackSent=_fbSent[0]; var setFeedbackSent=_fbSent[1];
       function changeTheme(v){setTheme(v);save("theme",v);setTimeout(function(){location.reload();},300);}
-      function changeFont(v){setFontSize(v);save("font_size",v);setTimeout(function(){location.reload();},300);}
+      function sendFeedback(){
+        if(!feedbackText.trim())return;
+        fbDb.collection("feedback").add({text:feedbackText,user:props.user?props.user.email:"guest",createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+        setFeedbackText("");setFeedbackSent(true);setTimeout(function(){setFeedbackSent(false);},3000);
+      }
       return(
         <div style={{padding:"24px 20px"}}>
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>SETTINGS</div>
           <div style={{fontSize:22,fontWeight:800,marginBottom:24}}>설정</div>
-
-          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
-            <div style={{display:"flex",gap:8}}>
-              {[{v:"dark",l:"다크"},{v:"light",l:"라이트"}].map(function(o){return(
-                <button key={o.v} onClick={function(){changeTheme(o.v);}} style={{flex:1,background:theme===o.v?C.accent+"20":C.bg,border:"1px solid "+(theme===o.v?C.accent:C.border),color:theme===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
-              );})}
-            </div>
-          </div>
-
-          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🔤 글자 크기"}</div>
-            <div style={{display:"flex",gap:8}}>
-              {[{v:"small",l:"작게"},{v:"normal",l:"보통"},{v:"large",l:"크게"}].map(function(o){return(
-                <button key={o.v} onClick={function(){changeFont(o.v);}} style={{flex:1,background:fontSize===o.v?C.accent+"20":C.bg,border:"1px solid "+(fontSize===o.v?C.accent:C.border),color:fontSize===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:o.v==="small"?12:o.v==="large"?16:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
-              );})}
-            </div>
-          </div>
 
           {props.user&&(
             <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
@@ -3288,10 +3275,26 @@
             </div>
           )}
 
+          <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"💬 베타 피드백"}</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:8}}>불편한 점, 원하는 기능을 알려주세요!</div>
+            <textarea value={feedbackText} onChange={function(e){setFeedbackText(e.target.value);}} placeholder="피드백을 입력해주세요..." style={{width:"100%",minHeight:60,background:C.bg,border:"1px solid "+C.border,borderRadius:8,padding:10,fontSize:13,color:C.text,resize:"vertical"}}/>
+            <button onClick={sendFeedback} style={{width:"100%",marginTop:8,background:feedbackText.trim()?C.accent:C.border,color:feedbackText.trim()?"#08090d":C.muted,border:"none",borderRadius:10,padding:10,fontSize:13,fontWeight:700,cursor:feedbackText.trim()?"pointer":"default"}}>{feedbackSent?"보냈어요! 감사합니다 🙏":"피드백 보내기"}</button>
+          </div>
+
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
+            <div style={{display:"flex",gap:8}}>
+              {[{v:"dark",l:"다크"},{v:"light",l:"라이트"}].map(function(o){return(
+                <button key={o.v} onClick={function(){changeTheme(o.v);}} style={{flex:1,background:theme===o.v?C.accent+"20":C.bg,border:"1px solid "+(theme===o.v?C.accent:C.border),color:theme===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
+              );})}
+            </div>
+          </div>
+
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
-              {"TalkFit v1.0"}<br/>
+              {"TalkFit v1.2.0 (Beta)"}<br/>
               {"© 2026 TalkFit. All rights reserved."}<br/>
               {"문의: krave.official.team@gmail.com"}
             </div>
