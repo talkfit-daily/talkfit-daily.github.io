@@ -3583,11 +3583,11 @@
       };
 
       // 온보딩 — hooks는 모든 조건부 return 전에 선언
-      var _onboard = useState(function(){
-        // 로그인 유저: 한 번만, 게스트: 매번
-        if (loadLocal("onboarding_done")==="v2") return false;
-        return true;
-      }); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
+      var _onboard = useState(true); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
+      // 로그인 유저가 이미 봤으면 자동 닫기
+      useEffect(function(){
+        if (user && loadLocal("onboarding_done")==="v2") setShowOnboarding(false);
+      }, [user]);
       var _onboardStep = useState(0); var onboardStep = _onboardStep[0]; var setOnboardStep = _onboardStep[1];
 
       if (authLoading) return (
