@@ -2363,6 +2363,18 @@
 
           {!result && (
             <div>
+              {!loadLocal("speak_guide_seen")&&(
+                <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:12,padding:14,marginBottom:16}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:8}}>{"💡 이렇게 사용하세요"}</div>
+                  <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    {"1. 내가 한 말을 녹음하거나 타이핑하세요"}<br/>
+                    {"2. '쉬운 영어로 변환' 버튼을 누르면 AI가 분석해요"}<br/>
+                    {"3. 원어민이 쓰는 쉬운 동사 표현을 배워요"}<br/>
+                    {"4. 연습 문제까지 풀면 회화 미션 완료! +15 XP"}
+                  </div>
+                  <button onClick={function(){saveLocal("speak_guide_seen",true);}} style={{marginTop:8,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer"}}>{"다시 안 보기"}</button>
+                </div>
+              )}
               <div style={{display:"flex",gap:8,marginBottom:20}}>
                 {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"YouTube",desc:"영상 학습",ytIcon:true}].map(function(t){return(
                   <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
