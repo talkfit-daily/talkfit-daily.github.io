@@ -3641,7 +3641,12 @@
         </div>
       );
 
-      if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} loading={loginLoading} onGuest={function(){setIsGuest(true);saveLocal("is_guest",true);}} />;
+      if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} loading={loginLoading} onGuest={function(){
+        // 게스트 진입 시 이전 로그인 유저의 로컬 데이터 클리어
+        var keys=Object.keys(localStorage).filter(function(k){return k.startsWith("tf_")&&k!=="tf_is_guest"&&k!=="tf_theme"&&k!=="tf_font_size"&&k!=="tf_onboarding_done";});
+        keys.forEach(function(k){localStorage.removeItem(k);});
+        setIsGuest(true);saveLocal("is_guest",true);setStreak(0);setTodayDone(false);setLessons(getTodayLesson());setVerbHistory([]);setSpeakHistory([]);
+      }} />;
       if (showOnboarding) {
         var steps = [
           {emoji:"😤",title:"다른 사람 대화 외워도\n내 말은 영어로 못 한다",lines:["그래서 만들었습니다"]},
