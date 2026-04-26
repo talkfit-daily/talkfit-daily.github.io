@@ -2475,6 +2475,17 @@
 
               {mode==="record" && (
                 <div>
+                  {!recording&&!transcript&&(
+                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:16}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"🎤 이렇게 하세요"}</div>
+                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                        {"1. 아래 버튼을 눌러 녹음 시작"}<br/>
+                        {"2. 한국어로 자유롭게 말하기 (대화, 전화, 혼잣말 다 OK)"}<br/>
+                        {"3. 버튼 다시 눌러 녹음 중지"}<br/>
+                        {"4. \"쉬운 영어로 변환\" 버튼 누르면 AI가 분석!"}
+                      </div>
+                    </div>
+                  )}
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:20}}>
                     <button onClick={recording?stopRec:startRec} style={{width:88,height:88,borderRadius:"50%",border:"none",cursor:"pointer",background:recording?C.red:C.accent,color:"#08090d",fontSize:30,boxShadow:recording?"0 0 40px "+C.red+"60":"0 8px 32px "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
                       {recording?"⏹":"🎙️"}
@@ -2482,7 +2493,6 @@
                     <div style={{marginTop:12,fontSize:recording?18:13,color:recording?C.red:C.muted,fontWeight:recording?800:400}}>
                       {recording?formatTime(seconds):"탭해서 녹음 시작"}
                     </div>
-                    {!recording&&<div style={{fontSize:11,color:C.muted,marginTop:4}}>대화, 전화, 혼잣말 다 OK</div>}
                   </div>
 
                   {(transcript||interim)&&(
@@ -2501,7 +2511,16 @@
 
               {mode==="type" && (
                 <div style={{marginBottom:16}}>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>오늘 했던 대화를 적어보세요</div>
+                  {!textInput.trim()&&(
+                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"⌨️ 이렇게 하세요"}</div>
+                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                        {"1. 오늘 했던 대화를 한국어로 적기"}<br/>
+                        {"2. 카톡 대화, 혼잣말, 일기 다 OK"}<br/>
+                        {"3. \"쉬운 영어로 변환\" 버튼 누르면 끝!"}
+                      </div>
+                    </div>
+                  )}
                   <textarea value={textInput} onChange={function(e){setTextInput(e.target.value);}} rows={6} placeholder={"예시:\n야 오늘 점심 뭐 먹을래?\n나 어제 먹은 데 또 가자\n거기 줄 길지 않을까?"} style={{width:"100%",background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:textInput.length>1500?C.red:C.muted,marginTop:6,padding:"0 4px"}}>
                     <span>{textInput.length>1500?"⚠️ 1500자까지만 분석돼요":"길면 자동으로 잘라서 분석해요"}</span>
@@ -2512,7 +2531,16 @@
 
               {mode==="file" && (
                 <div style={{marginBottom:16}}>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>오디오 파일을 올리면 AI가 자동으로 텍스트로 변환해요</div>
+                  {!fileTranscript&&!fileLoading&&(
+                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"📁 이렇게 하세요"}</div>
+                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                        {"1. 녹음 파일 선택 (mp3, m4a, wav 등)"}<br/>
+                        {"2. AI가 자동으로 텍스트 변환 + 화자 구별"}<br/>
+                        {"3. \"쉬운 영어로 변환\" 버튼으로 학습 시작!"}
+                      </div>
+                    </div>
+                  )}
                   <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:12}}>
                     <input type="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.aac" onChange={handleFileUpload} style={{fontSize:13,color:C.text,marginBottom:8,width:"100%"}}/>
                     <div style={{fontSize:10,color:C.muted,marginTop:4}}>mp3, m4a, wav, webm 지원 · 최대 4MB</div>
@@ -2555,7 +2583,17 @@
 
               {mode==="youtube" && (
                 <div style={{marginBottom:16}}>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:8}}>YouTube 링크를 붙여넣으면 자막을 자동으로 가져와요</div>
+                  {!ytTranscript&&!ytLoading&&ytSegments.length===0&&(
+                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"▶️ 이렇게 하세요"}</div>
+                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                        {"1. YouTube 링크 붙여넣기"}<br/>
+                        {"2. \"자막 가져오기\" 버튼 누르기"}<br/>
+                        {"3. 자막 확인 후 \"쉬운 영어로 변환\""}<br/>
+                        {"또는 아래 추천 영상을 바로 선택!"}
+                      </div>
+                    </div>
+                  )}
                   <div style={{display:"flex",gap:8,marginBottom:12}}>
                     <input value={ytUrl} onChange={function(e){setYtUrl(e.target.value);}} placeholder="https://youtube.com/watch?v=..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
                     <button disabled={ytLoading||!ytUrl.trim()} onClick={function(){
