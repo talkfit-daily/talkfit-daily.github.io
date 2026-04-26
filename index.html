@@ -310,25 +310,6 @@
     }
     function getXP() { return (load("xp_state")||{xp:0}).xp; }
 
-    // ── STREAK BONUS (AI 횟수) ──────────────────────────────────────
-    function getDailyLimit(streak) {
-      if (streak>=30) return 10;
-      if (streak>=7) return 5;
-      return 3;
-    }
-
-    // 레벨별 AI 한도 (서버와 동일)
-    function getAiLimitByLevel(lv) {
-      if(lv<=3) return 12+lv*3;
-      if(lv<=10) return 21+(lv-3)*3;
-      if(lv<=20) return 42+(lv-10)*3;
-      if(lv<=30) return 72+(lv-20)*3;
-      if(lv<=50) return 102+(lv-30)*2;
-      if(lv<=80) return 142+(lv-50)*2;
-      if(lv<=98) return 202+(lv-80)*2;
-      return 9999;
-    }
-
     // ── CONFETTI ────────────────────────────────────────────────────
     function showConfetti() {
       var container = document.createElement('div');
@@ -372,6 +353,37 @@
         window.__bgListeners[name] = (window.__bgListeners[name]||[]).filter(function(f){return f!==fn;});
       };
     }
+    function highlightVerbs(text, verbsUsed) {
+      if (!text || !verbsUsed || verbsUsed.length === 0) return text;
+      // 구동사 먼저 (긴 것 우선), 그 다음 기본동사
+      var sorted = verbsUsed.slice().sort(function(a,b){return b.verb.length - a.verb.length;});
+      var parts = [{text: text, verb: null}];
+      sorted.forEach(function(v) {
+        var vw = v.verb.toLowerCase();
+        var isPhrasal = (v.type === "phrasal" || v.verb.indexOf(" ") !== -1);
+        var regex = new RegExp("\\b(" + vw.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "(?:s|ed|ing|d|es)?)\\b", "gi");
+        var newParts = [];
+        parts.forEach(function(p) {
+          if (p.verb) { newParts.push(p); return; }
+          var last = 0;
+          var m;
+          while ((m = regex.exec(p.text)) !== null) {
+            if (m.index > last) newParts.push({text: p.text.slice(last, m.index), verb: null});
+            newParts.push({text: m[0], verb: v, phrasal: isPhrasal});
+            last = m.index + m[0].length;
+          }
+          if (last < p.text.length) newParts.push({text: p.text.slice(last), verb: null});
+        });
+        parts = newParts;
+      });
+      if (parts.every(function(p){return !p.verb;})) return text;
+      return parts.map(function(p, i) {
+        if (!p.verb) return p.text;
+        var vc = p.phrasal ? C.accent : C.yellow;
+        return React.createElement("span", {key: i, style: {color: vc, fontWeight: 700, opacity: 0.9}}, p.text);
+      });
+    }
+
     function renderHighlight(text, verbsUsed, opts) {
       if (!text) return text;
       if (text.indexOf("**") === -1) return text;
@@ -413,19 +425,26 @@
     var currentAudio = null;
     var ttsAbortController = null;
     var ttsRequestId = 0;
-    function speakEnglish(text) {
+    var ttsLoadingBtn = null;
+    var ttsOrigText = "";
+    function speakEnglish(text, btnEl) {
       if (!text) return;
       var clean = text.replace(/\*\*/g, "").trim();
       // 이전 요청 취소
       if (ttsAbortController) { try { ttsAbortController.abort(); } catch{} }
       if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch{} currentAudio = null; }
       if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch{}
+      // 로딩 표시
+      if (ttsLoadingBtn && ttsOrigText) { ttsLoadingBtn.textContent = ttsOrigText; ttsLoadingBtn.disabled = false; ttsLoadingBtn.style.opacity="1"; }
+      if (btnEl) { ttsOrigText = btnEl.textContent; btnEl.textContent = "🔊 로딩 중..."; btnEl.disabled = true; btnEl.style.opacity="0.5"; ttsLoadingBtn = btnEl; }
+      function resetBtn(){ if(btnEl){btnEl.textContent=ttsOrigText||btnEl.textContent;btnEl.disabled=false;btnEl.style.opacity="1";} ttsLoadingBtn=null;ttsOrigText=""; }
 
       var myReq = ++ttsRequestId;
 
       if (ttsCache[clean]) {
         currentAudio = new Audio("data:audio/wav;base64," + ttsCache[clean]);
         currentAudio.play().catch(function(){fallbackSpeak(clean);});
+        resetBtn();
         return;
       }
 
@@ -436,7 +455,7 @@
         body: JSON.stringify({ text: clean }),
         signal: ttsAbortController.signal
       }).then(function(r){return r.json();}).then(function(d){
-        if (myReq !== ttsRequestId) return; // 더 새 요청이 들어왔으면 무시
+        if (myReq !== ttsRequestId) return;
         if (d.audio) {
           ttsCache[clean] = d.audio;
           currentAudio = new Audio("data:audio/wav;base64," + d.audio);
@@ -444,7 +463,8 @@
         } else {
           fallbackSpeak(clean);
         }
-      }).catch(function(e){ if(e.name!=="AbortError") fallbackSpeak(clean); });
+        resetBtn();
+      }).catch(function(e){ if(e.name!=="AbortError") fallbackSpeak(clean); resetBtn(); });
     }
     function fallbackSpeak(text) {
       if (!window.speechSynthesis) return;
@@ -504,13 +524,33 @@
       var opts1 = [correctM1].concat(wrongMeanings.filter(function(w){return w!==correctM1;}).sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
       quizzes.push({type:"meaning", question:'"'+b1.verb+'" 의 뜻은?', options:opts1, answer:correctM1, verb:b1.verb});
 
+      // 동사 변형 매칭 (find→found/finds/finding, take out→took out/takes out 등)
+      function makeVerbBlank(sentence, verb) {
+        // 구동사: 각 단어 사이에 유연한 매칭
+        var parts = verb.split(" ");
+        var base = parts[0];
+        // 불규칙 동사 변형 테이블
+        var irregulars = {find:"found|finds|finding",get:"got|gets|getting",take:"took|takes|taking",make:"made|makes|making",go:"went|goes|going",have:"had|has|having",come:"came|comes|coming",give:"gave|gives|giving",put:"put|puts|putting",run:"ran|runs|running",say:"said|says|saying",think:"thought|thinks|thinking",know:"knew|knows|knowing",see:"saw|sees|seeing",keep:"kept|keeps|keeping",tell:"told|tells|telling",feel:"felt|feels|feeling",leave:"left|leaves|leaving",call:"called|calls|calling",turn:"turned|turns|turning",set:"set|sets|setting",show:"showed|shows|showing",end:"ended|ends|ending",look:"looked|looks|looking",work:"worked|works|working",break:"broke|breaks|breaking",hold:"held|holds|holding",bring:"brought|brings|bringing",let:"let|lets|letting",stand:"stood|stands|standing",hear:"heard|hears|hearing",try:"tried|tries|trying"};
+        var forms = base + (irregulars[base] ? "|" + irregulars[base] : "|" + base + "s|" + base + "ed|" + base + "ing");
+        var pattern;
+        if (parts.length > 1) {
+          pattern = new RegExp("\\b(" + forms + ")\\s+" + parts.slice(1).join("\\s+").replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + "\\b", "i");
+        } else {
+          pattern = new RegExp("\\b(" + forms + ")\\b", "i");
+        }
+        var result = sentence.replace(pattern, "______");
+        return result !== sentence ? result : sentence.replace(new RegExp(verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"), "______");
+      }
+
       // Q2: fill-blank for lesson1 phrasal
       var p1 = lessons[0].phrasal;
       var ex1 = p1.examples[0];
-      var blank1 = ex1.english.replace(new RegExp(p1.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
-      var wrongV1 = wrongVerbs.filter(function(v){return v!==p1.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
-      var opts2 = [p1.verb].concat(wrongV1).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"fillblank", question:blank1, hint:ex1.korean, options:opts2, answer:p1.verb, verb:p1.verb});
+      var blank1 = makeVerbBlank(ex1.english, p1.verb);
+      if(blank1.indexOf("______")!==-1){
+        var wrongV1 = wrongVerbs.filter(function(v){return v!==p1.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
+        var opts2 = [p1.verb].concat(wrongV1).sort(function(){return Math.random()-0.5;});
+        quizzes.push({type:"fillblank", question:blank1, hint:ex1.korean, options:opts2, answer:p1.verb, verb:p1.verb});
+      }
 
       // Q3: listening quiz - TTS plays English, pick Korean meaning
       var listenEx = allExamples[Math.floor(Math.random() * allExamples.length)];
@@ -548,10 +588,12 @@
       // Q6: fill-blank for basic verb (different example)
       var b2 = lessons[0].basic;
       var ex6 = b2.examples[Math.min(1, b2.examples.length-1)];
-      var blank6 = ex6.english.replace(new RegExp(b2.verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"),"______");
-      var wrongV6 = ["get","make","take","put","go","come","keep","look","work","run","call","find"].filter(function(v){return v!==b2.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
-      var opts6 = [b2.verb].concat(wrongV6).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"fillblank", question:blank6, hint:ex6.korean, options:opts6, answer:b2.verb, verb:b2.verb});
+      var blank6 = makeVerbBlank(ex6.english, b2.verb);
+      if(blank6.indexOf("______")!==-1){
+        var wrongV6 = ["get","make","take","put","go","come","keep","look","work","run","call","find"].filter(function(v){return v!==b2.verb;}).sort(function(){return Math.random()-0.5;}).slice(0,3);
+        var opts6 = [b2.verb].concat(wrongV6).sort(function(){return Math.random()-0.5;});
+        quizzes.push({type:"fillblank", question:blank6, hint:ex6.korean, options:opts6, answer:b2.verb, verb:b2.verb});
+      }
 
       // Q7: situation quiz
       var sitEx = allExamples[Math.floor(Math.random() * allExamples.length)];
@@ -923,13 +965,73 @@
       text:"#0f172a",muted:"#64748b",
     };
     var C = (load("theme")==="light") ? C_LIGHT : C_DARK;
-    // 폰트 크기 적용
-    (function(){
-      var fs = load("font_size") || "normal";
-      var scale = fs==="large" ? 1.15 : (fs==="small" ? 0.9 : 1);
-      document.documentElement.style.fontSize = (16*scale)+"px";
-    })();
+    // 폰트 크기는 앱 루트 zoom으로 적용 (data-app-root)
+    var BE_VERBS = ["am","is","are","was","were","be","been","being","'m","'s","'re"];
+    function filterBeVerbs(verbs) { return (verbs||[]).filter(function(v){ return BE_VERBS.indexOf((v.verb||"").toLowerCase()) === -1; }); }
 
+
+    // ── PRAISE MODAL (말해보카 스타일 칭찬) ──────────────────────────
+    function getPraiseContent(type, data) {
+      if (type === "streak") {
+        var s = data.streak || 1;
+        if (s >= 365) return { emoji: "🏆", title: "전설이다!", sub: "1년 연속 학습... 당신은 이미 마스터.", tag: s+"일 연속" };
+        if (s >= 100) return { emoji: "👑", title: "100일 돌파!", sub: "상위 0.1%의 끈기. 진짜 대단해요.", tag: s+"일 연속" };
+        if (s >= 30) return { emoji: "🔥", title: "30일 달성!", sub: "한 달 넘게 매일? 습관이 됐네요!", tag: s+"일 연속" };
+        if (s >= 14) return { emoji: "💪", title: "2주 연속!", sub: "이 정도면 영어가 일상이죠?", tag: s+"일 연속" };
+        if (s >= 7) return { emoji: "⭐", title: "일주일 연속!", sub: "7일이면 습관의 시작이래요!", tag: s+"일 연속" };
+        if (s >= 5) return { emoji: "🎯", title: "5일 연속!", sub: "꾸준함이 실력이 됩니다.", tag: s+"일 연속" };
+        if (s >= 3) return { emoji: "🌱", title: "3일째 출석!", sub: "시작이 반이래! 이미 반은 성공한 거야~", tag: s+"일 연속" };
+        if (s >= 2) return { emoji: "✨", title: "2일 연속!", sub: "어제에 이어 오늘도! 좋은 흐름이에요.", tag: s+"일 연속" };
+        return { emoji: "👋", title: "오늘도 왔네!", sub: "매일 15분이면 충분해요.", tag: "출석 완료" };
+      }
+      if (type === "lesson") return { emoji: "📚", title: "레슨 완료!", sub: "오늘의 동사, 완벽하게 익혔어요!", tag: "동사 레슨" };
+      if (type === "speak") return { emoji: "🎤", title: "회화 완료!", sub: "입으로 말해야 진짜 내 것이 됩니다!", tag: "회화 연습" };
+      if (type === "levelup") return { emoji: "🎉", title: "레벨 업!", sub: "Lv." + (data.level||1) + " " + (data.name||"") + " 달성!", tag: "LEVEL UP" };
+      return { emoji: "🎊", title: "대단해!", sub: "계속 이대로!", tag: "축하" };
+    }
+
+    function PraiseModal(props) {
+      var data = props.data; var onClose = props.onClose;
+      if (!data) return null;
+      var msg = getPraiseContent(data.type || "streak", data);
+      var particles = [];
+      for (var i = 0; i < 12; i++) {
+        var emojis = ["🌟","⭐","✨","💫","🎉","🎊"];
+        particles.push(
+          React.createElement("div", {
+            key: i,
+            style: {
+              position: "absolute",
+              fontSize: 20 + Math.random() * 14,
+              left: (5 + Math.random() * 90) + "%",
+              top: -30,
+              animation: "confettiFall " + (1.5 + Math.random() * 2) + "s linear " + (Math.random() * 0.8) + "s forwards",
+              opacity: 0.9
+            }
+          }, emojis[i % emojis.length])
+        );
+      }
+      return (
+        <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          {particles}
+          <div style={{background:"linear-gradient(160deg, "+C.accent+"18, "+C.blue+"12, "+C.bg+")",border:"2px solid "+C.accent+"50",borderRadius:28,padding:"48px 32px 36px",textAlign:"center",maxWidth:320,width:"85%",animation:"levelUp 0.5s",position:"relative",overflow:"hidden"}}>
+            <div style={{fontSize:72,marginBottom:8,filter:"drop-shadow(0 4px 20px "+C.accent+"60)"}}>{msg.emoji}</div>
+            <div style={{display:"inline-block",background:"linear-gradient(135deg, "+C.accent+", "+C.blue+")",padding:"6px 20px",borderRadius:20,marginBottom:16}}>
+              <span style={{fontSize:13,fontWeight:800,color:"#08090d"}}>{"🔥 "+msg.tag}</span>
+            </div>
+            <div style={{fontSize:26,fontWeight:900,color:C.text,marginBottom:8,lineHeight:1.2}}>{msg.title}</div>
+            <div style={{fontSize:14,color:C.muted,lineHeight:1.6,marginBottom:20}}>{msg.sub}</div>
+            {data.bonus > 0 && (
+              <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
+                <span style={{background:C.accent+"20",color:C.accent,padding:"6px 14px",borderRadius:10,fontSize:13,fontWeight:700}}>{"+ "+data.bonus+" XP"}</span>
+                {data.milestoneBonus > 0 && <span style={{background:C.yellow+"20",color:C.yellow,padding:"6px 14px",borderRadius:10,fontSize:13,fontWeight:700}}>{"🏅 "+data.milestoneText+" +"+data.milestoneBonus+" XP"}</span>}
+              </div>
+            )}
+            <div style={{fontSize:11,color:C.muted+"80",marginTop:20}}>{"탭하면 닫혀요"}</div>
+          </div>
+        </div>
+      );
+    }
 
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
@@ -972,6 +1074,41 @@
         :hour<22?{t:"Good evening",s:"오늘 하루 마무리 15분"}
         :{t:"Late night study",s:"집중 잘 되는 시간이죠"};
 
+      var IDIOMS = [
+        {en:"be toast",ko:"끝장나다, 망하다",ex:"If the boss finds out, I'm toast.",exKo:"사장님이 알면 나 끝이야."},
+        {en:"piece of cake",ko:"식은 죽 먹기",ex:"The test was a piece of cake.",exKo:"그 시험 완전 쉬웠어."},
+        {en:"break the ice",ko:"어색함을 깨다",ex:"He told a joke to break the ice.",exKo:"그가 농담으로 분위기를 풀었어."},
+        {en:"hit the nail on the head",ko:"정곡을 찌르다",ex:"You hit the nail on the head.",exKo:"네가 딱 맞는 말을 했어."},
+        {en:"under the weather",ko:"몸이 안 좋다",ex:"I'm feeling under the weather today.",exKo:"오늘 몸이 좀 안 좋아."},
+        {en:"spill the beans",ko:"비밀을 누설하다",ex:"Don't spill the beans about the party!",exKo:"파티 얘기 비밀 지켜!"},
+        {en:"cost an arm and a leg",ko:"엄청 비싸다",ex:"That bag cost an arm and a leg.",exKo:"그 가방 엄청 비쌌어."},
+        {en:"on the same page",ko:"같은 생각이다",ex:"Are we on the same page?",exKo:"우리 같은 생각인 거 맞지?"},
+        {en:"a no-brainer",ko:"당연한 선택",ex:"Taking that job was a no-brainer.",exKo:"그 일 하는 건 당연한 선택이었어."},
+        {en:"the last straw",ko:"더 이상 못 참겠다",ex:"That was the last straw for me.",exKo:"그게 내 마지막 인내심이었어."},
+        {en:"once in a blue moon",ko:"아주 드물게",ex:"I eat fast food once in a blue moon.",exKo:"나 패스트푸드 거의 안 먹어."},
+        {en:"let the cat out of the bag",ko:"비밀이 새다",ex:"Who let the cat out of the bag?",exKo:"누가 비밀을 말해버린 거야?"},
+        {en:"burn the midnight oil",ko:"밤새 일/공부하다",ex:"I burned the midnight oil studying.",exKo:"공부하느라 밤을 새웠어."},
+        {en:"bite the bullet",ko:"이를 악물고 하다",ex:"I just bit the bullet and apologized.",exKo:"그냥 이 악물고 사과했어."},
+        {en:"call it a day",ko:"오늘은 여기까지",ex:"Let's call it a day.",exKo:"오늘은 여기까지 하자."},
+        {en:"cut to the chase",ko:"본론으로 들어가다",ex:"Let me cut to the chase.",exKo:"바로 본론으로 갈게."},
+        {en:"go the extra mile",ko:"더 노력하다",ex:"She always goes the extra mile.",exKo:"그녀는 항상 한 발 더 나가."},
+        {en:"get out of hand",ko:"통제 불능이 되다",ex:"The party got out of hand.",exKo:"파티가 통제 불능이 됐어."},
+        {en:"hang in there",ko:"버텨, 힘내",ex:"Hang in there, it'll get better.",exKo:"버텨, 나아질 거야."},
+        {en:"in the same boat",ko:"같은 처지",ex:"We're all in the same boat.",exKo:"우리 다 같은 처지야."},
+        {en:"keep an eye on",ko:"지켜보다, 주시하다",ex:"Can you keep an eye on my bag?",exKo:"내 가방 좀 봐줄 수 있어?"},
+        {en:"miss the boat",ko:"기회를 놓치다",ex:"You missed the boat on that deal.",exKo:"너 그 기회 놓쳤어."},
+        {en:"pull someone's leg",ko:"놀리다, 장난치다",ex:"Are you pulling my leg?",exKo:"나 놀리는 거야?"},
+        {en:"ring a bell",ko:"어디서 들어본 것 같다",ex:"That name rings a bell.",exKo:"그 이름 어디서 들어본 것 같아."},
+        {en:"sleep on it",ko:"하루 더 생각하다",ex:"Let me sleep on it.",exKo:"하루 더 생각해볼게."},
+        {en:"the ball is in your court",ko:"이제 네 차례야",ex:"I've done my part. The ball is in your court.",exKo:"내 할 건 했어. 이제 네 차례야."},
+        {en:"up in the air",ko:"아직 미정이다",ex:"Our plans are still up in the air.",exKo:"계획이 아직 확정 안 됐어."},
+        {en:"wrap your head around",ko:"이해하다",ex:"I can't wrap my head around it.",exKo:"도저히 이해가 안 돼."},
+        {en:"beat around the bush",ko:"돌려 말하다",ex:"Stop beating around the bush.",exKo:"돌려 말하지 마."},
+        {en:"get the hang of",ko:"요령을 터득하다",ex:"I'm getting the hang of it.",exKo:"이제 좀 감이 잡혀."}
+      ];
+      var dayOfYear = Math.floor((new Date()-new Date(new Date().getFullYear(),0,0))/(1000*60*60*24));
+      var todayIdiom = IDIOMS[dayOfYear % IDIOMS.length];
+
       // Extract all 4 verbs from the 2 lesson sets
       var allVerbTags = [];
       if (lessons && lessons.length >= 1) {
@@ -987,7 +1124,24 @@
             {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}).toUpperCase()}
           </div>
           <div style={{fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4}}>{greeting.t}</div>
-          <div style={{fontSize:14,color:C.muted,marginBottom:20}}>{greeting.s}</div>
+          <div style={{fontSize:14,color:C.muted,marginBottom:12}}>{greeting.s}</div>
+
+          <div onClick={function(){var el=document.getElementById("idiom-detail");if(el)el.style.display=el.style.display==="none"?"block":"block";el.style.maxHeight=el.style.maxHeight==="0px"?"200px":"0px";}} style={{background:C.surface,border:"1px solid "+C.yellow+"25",borderRadius:12,padding:"10px 14px",marginBottom:16,cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+              <span style={{fontSize:11,color:C.yellow,fontWeight:700,letterSpacing:1}}>{"💡 오늘의 표현"}</span>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:C.text}}>
+              <span style={{color:C.yellow}}>{"\""}{todayIdiom.en}{"\""}</span>
+              <span style={{fontSize:13,color:C.muted,fontWeight:400}}>{" = "}{todayIdiom.ko}</span>
+            </div>
+            <div id="idiom-detail" style={{maxHeight:0,overflow:"hidden",transition:"max-height 0.3s ease"}}>
+              <div style={{marginTop:8,padding:"8px 10px",background:C.bg,borderRadius:8}}>
+                <div style={{fontSize:13,color:C.text,fontStyle:"italic",marginBottom:4}}>{"\""}{todayIdiom.ex}{"\""}</div>
+                <div style={{fontSize:12,color:C.muted}}>{todayIdiom.exKo}</div>
+              </div>
+            </div>
+            <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>탭하면 예문 보기</div>
+          </div>
 
           <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"30",borderRadius:16,padding:20,marginBottom:20}}>
             <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6}}>STREAK</div>
@@ -1048,12 +1202,13 @@
           {/* 일일 미션 */}
           {(function(){
             var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-            var missions=load("daily_missions_"+todayK)||{verbDone:false,speakDone:false,quiz3:0,combo3:false};
-            // 자동 업데이트
+            var missions={verbDone:false,speakDone:false,combo3:false};
+            // 매번 재계산
             if(loadLocal("verb_done_"+todayK))missions.verbDone=true;
             if(loadLocal("speak_done_"+todayK))missions.speakDone=true;
             var st=load("xp_state")||{};
-            if((st.combo||0)>=3)missions.combo3=true;
+            var comboToday = st.lastCorrectTime && (st.combo||0)>=3 && new Date(st.lastCorrectTime).toISOString().slice(0,10) === todayK;
+            if(comboToday)missions.combo3=true;
             save("daily_missions_"+todayK,missions);
             var done=(missions.verbDone?1:0)+(missions.speakDone?1:0)+(missions.combo3?1:0);
             return(
@@ -1352,8 +1507,8 @@
                   </div>
                   <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{current.confuse_with.diff_ko}</div>
                   <div style={{display:"flex",gap:8,flexDirection:"column"}}>
-                    <div onClick={function(){speakEnglish(current.confuse_with.example_this);}} style={{fontSize:12,color:color,cursor:"pointer",background:color+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.verb}: "{current.confuse_with.example_this}"</div>
-                    <div onClick={function(){speakEnglish(current.confuse_with.example_other);}} style={{fontSize:12,color:C.orange,cursor:"pointer",background:C.orange+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.confuse_with.verb}: "{current.confuse_with.example_other}"</div>
+                    <div onClick={function(e){speakEnglish(current.confuse_with.example_this,e.currentTarget);}} style={{fontSize:12,color:color,cursor:"pointer",background:color+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.verb}: "{current.confuse_with.example_this}"</div>
+                    <div onClick={function(e){speakEnglish(current.confuse_with.example_other,e.currentTarget);}} style={{fontSize:12,color:C.orange,cursor:"pointer",background:C.orange+"10",borderRadius:8,padding:"8px 10px"}}>{"🔊 "}{current.confuse_with.verb}: "{current.confuse_with.example_other}"</div>
                   </div>
                 </div>
               )}
@@ -1943,7 +2098,8 @@
       var setResult=function(r){_setResultRaw(r);if(r)saveLocal("speak_last_result",r);else saveLocal("speak_last_result",null);};
       var _s5=useState(false); var isLoading=_s5[0]; var setIsLoading=_s5[1];
       var _s6=useState(""); var textInput=_s6[0]; var setTextInput=_s6[1];
-      var _s7=useState("record"); var mode=_s7[0]; var setMode=_s7[1];
+      var _s7=useState(function(){return loadLocal("speak_mode")||"record";}); var mode=_s7[0]; var _setModeRaw=_s7[1];
+      var setMode=function(v){_setModeRaw(v);saveLocal("speak_mode",v);};
       var _s8=useState(0); var seconds=_s8[0]; var setSeconds=_s8[1];
       var _s9f=useState(null); var audioFile=_s9f[0]; var setAudioFile=_s9f[1];
       var _s10f=useState(null); var audioUrl=_s10f[0]; var setAudioUrl=_s10f[1];
@@ -1952,11 +2108,14 @@
       var _altLoad=useState(false); var altLoading=_altLoad[0]; var setAltLoading=_altLoad[1];
       var _expanded=useState({turns:true,verbs:true,nouns:false,compare:false,tip:true,alt:false,deeper:false}); var expanded=_expanded[0]; var setExpanded=_expanded[1];
       function toggleSection(k){setExpanded(function(e){var n={};for(var x in e)n[x]=e[x];n[k]=!n[k];return n;});}
-      var _practiceMode=useState(false); var practiceMode=_practiceMode[0]; var setPracticeMode=_practiceMode[1];
-      var _practiceIdx=useState(0); var practiceIdx=_practiceIdx[0]; var setPracticeIdx=_practiceIdx[1];
+      var _practiceMode=useState(function(){return loadLocal("speak_practice_mode")||false;}); var practiceMode=_practiceMode[0]; var _setPracticeModeRaw=_practiceMode[1];
+      var setPracticeMode=function(v){_setPracticeModeRaw(v);saveLocal("speak_practice_mode",v);};
+      var _practiceIdx=useState(function(){return loadLocal("speak_practice_idx")||0;}); var practiceIdx=_practiceIdx[0]; var _setPracticeIdxRaw=_practiceIdx[1];
+      var setPracticeIdx=function(v){_setPracticeIdxRaw(v);saveLocal("speak_practice_idx",v);};
       var _practiceAnswer=useState(""); var practiceAnswer=_practiceAnswer[0]; var setPracticeAnswer=_practiceAnswer[1];
       var _practiceCheck=useState(null); var practiceCheck=_practiceCheck[0]; var setPracticeCheck=_practiceCheck[1];
-      var _practiceScore=useState({correct:0,total:0}); var practiceScore=_practiceScore[0]; var setPracticeScore=_practiceScore[1];
+      var _practiceScore=useState(function(){return loadLocal("speak_practice_score")||{correct:0,total:0};}); var practiceScore=_practiceScore[0]; var _setPracticeScoreRaw=_practiceScore[1];
+      var setPracticeScore=function(v){_setPracticeScoreRaw(v);saveLocal("speak_practice_score",v);};
       var recRef = useRef(null);
       var timerRef = useRef(null);
 
@@ -2012,7 +2171,7 @@
       var _ytCurrentMin = useState(0); var ytCurrentMin = _ytCurrentMin[0]; var setYtCurrentMin = _ytCurrentMin[1];
       var _ytTotalChunks = useState(0); var ytTotalChunks = _ytTotalChunks[0]; var setYtTotalChunks = _ytTotalChunks[1];
       var _ytDuration = useState(0); var ytDuration = _ytDuration[0]; var setYtDuration = _ytDuration[1];
-      var BBC_DEFAULT = {id:"UCQjEfnSBuJPtMo3lsxRJiig",name:"BBC Learning English",thumbnail:""};
+      var BBC_DEFAULT = {id:"UCHaHD477h-FeBbVh9Sh7syA",title:"BBC Learning English",thumbnail:""};
       var _myChannels = useState(function(){var ch=load("yt_channels"); if(!ch||ch.length===0){ch=[BBC_DEFAULT];save("yt_channels",ch);} return ch;}); var myChannels = _myChannels[0]; var setMyChannels = _myChannels[1];
 
       // BBC 추천 영상 — 첫 방문 시 API로 가져와 캐시
@@ -2082,17 +2241,17 @@
           lines = sentences.length > 1 ? sentences : [text];
         }
         // 짧으면 1개로
-        if (lines.length <= 5) return [lines.join("\n")];
-        // 균등 분할: 4-6줄씩, 마지막이 너무 짧으면 합침
-        var segs = []; var cur = [];
-        for (var i=0;i<lines.length;i++) {
-          cur.push(lines[i]);
-          if (cur.length >= 5) { segs.push(cur.join("\n")); cur=[]; }
-        }
-        if (cur.length) {
-          // 마지막이 2줄 이하면 이전 구간에 합침
-          if (cur.length <= 2 && segs.length > 0) segs[segs.length-1] += "\n" + cur.join("\n");
-          else segs.push(cur.join("\n"));
+        if (lines.length <= 6) return [lines.join("\n")];
+        // 균등 분할: 목표 구간당 5줄, 총 구간 수 계산 후 균등 배분
+        var targetPerSeg = 5;
+        var numSegs = Math.max(1, Math.round(lines.length / targetPerSeg));
+        var baseSize = Math.floor(lines.length / numSegs);
+        var extra = lines.length % numSegs;
+        var segs = []; var idx = 0;
+        for (var s = 0; s < numSegs; s++) {
+          var size = baseSize + (s < extra ? 1 : 0);
+          segs.push(lines.slice(idx, idx + size).join("\n"));
+          idx += size;
         }
         return segs;
       }
@@ -2122,23 +2281,23 @@
       function pollYtStatus(videoId, title, totalChunks) {
         if (!videoId) return;
         setBgLoading(true);
+        var lastChunkCount = 0;
         var pollFn = function(){
           fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/ytStatus?videoId="+encodeURIComponent(videoId))
           .then(function(r){return r.json();}).then(function(data){
-            if(data.exists && data.chunks){
-              // 모든 구간 transcript 합쳐서 segments 재계산
-              var allText = data.chunks.map(function(c){return c.transcript;}).join("\n");
-              var allSegs = splitSegments(allText);
+            if(data.exists && data.chunks && data.chunks.length > lastChunkCount){
+              // 새로 온 청크 = 새 구간으로 추가 (기존 구간 안 건드림)
+              var newChunks = data.chunks.slice(lastChunkCount);
+              lastChunkCount = data.chunks.length;
+              var newSegs = newChunks.map(function(c){return c.transcript;});
               setYtSegments(function(prev){
-                if(allSegs.length > prev.length){
-                  saveYtProgress(videoId, title, allSegs, 0, !data.done, 0);
-                  return allSegs;
-                }
-                return prev;
+                var merged = prev.concat(newSegs);
+                saveYtProgress(videoId, title, merged, 0, !data.done, 0);
+                return merged;
               });
-              if(data.done){setBgLoading(false);return;}
             }
-            setTimeout(pollFn, 3000); // 3초마다
+            if(data.done){setBgLoading(false);return;}
+            setTimeout(pollFn, 3000);
           }).catch(function(){setTimeout(pollFn, 5000);});
         };
         setTimeout(pollFn, 2000);
@@ -2205,7 +2364,7 @@
         }
         setIsLoading(true);
         setAltSituations(null);
-        var system='You are an American English coach for Korean speakers. Analyze this Korean conversation/monologue.\n\nRules:\n- Detect how many speakers there are from context (1-4 people)\n- Split into turns if multiple speakers\n- Translate each turn to natural American English using ONLY simple/basic verbs (get, make, take, put, go, have, keep, come, run, look, turn, end up, figure out, hang out, etc.)\n- NEVER use difficult/formal vocabulary. Americans use simple verbs for everything.\n- In the english field, wrap verbs with ** markers. IMPORTANT: phrasal verbs must be wrapped as ONE unit like **give up**, **take out**, **get over**, NOT as separate words. Basic verbs: **get**, **put**, **make**. Phrasal verbs: **take out**, **give up**, **get over**.\n- In verbs_used, set type to \"basic\" or \"phrasal\"\n- IMPORTANT: original = the original input sentence as-is. english = converted to easy basic verbs. korean = natural Korean translation of english. All 3 fields are required for every turn.\n- In korean field, wrap each Korean verb with ** markers IN THE EXACT SAME ORDER as the **verbs in english field**. The N-th ** in korean MUST correspond to the N-th ** in english. Example: english "I **got** your text and **gave up** waiting" (get=basic, give up=phrasal) → korean "네 문자 **받고** 기다리는 거 **포기했어**" (받고=get position, 포기했어=give up position). If you change the order, the colors will be wrong.\n- IMPORTANT: key_verbs MUST include EVERY unique verb that appears in any turns.verbs_used. Do not skip any. Deduplicate by verb name.\n- Pick 3-5 useful nouns\n\nReturn ONLY valid JSON:\n{"scenario":"상황 한줄 요약 (한국어)","speakers":1,"turns":[{"speaker":"화자1","original":"원래 문장 (입력이 영어면 영어, 한국어면 한국어 그대로)","english":"I **got** your text and **gave up** waiting.","korean":"문자 받고 기다리는 거 포기했어.","verbs_used":[{"verb":"get","type":"basic","usage":"받다"},{"verb":"give up","type":"phrasal","usage":"포기하다"}]}],"key_verbs":[{"verb":"get","type":"basic","meaning":"의미","example":"I got your text"},{"verb":"give up","type":"phrasal","meaning":"의미","example":"I gave up"}],"key_nouns":[{"noun":"deadline","meaning_ko":"마감 기한","example":"The deadline is tomorrow."}],"verb_compare":[{"verbs":["say","tell","talk"],"diff_ko":"say=말하다(내용), tell=전하다(대상 필요), talk=대화하다(상호)","examples":["I said sorry","I told him sorry","We talked about it"]}],"coach_tip":"핵심 포인트 한국어 2문장"}\n\nFor verb_compare: pick 1-2 groups of similar verbs that appeared in this conversation and explain the difference in Korean. Only include verbs that Korean speakers commonly confuse.';
+        var system='You are an American English coach for Korean speakers. Analyze this Korean conversation/monologue.\n\nRules:\n- Detect how many speakers there are from context (1-4 people)\n- Split into turns if multiple speakers\n- Translate each turn to natural American English using ONLY simple/basic verbs (get, make, take, put, go, have, keep, come, run, look, turn, end up, figure out, hang out, etc.)\n- NEVER use difficult/formal vocabulary. Americans use simple verbs for everything.\n- In the english field, wrap verbs with ** markers. IMPORTANT: phrasal verbs must be wrapped as ONE unit like **give up**, **take out**, **get over**, NOT as separate words. Basic verbs: **get**, **put**, **make**. Phrasal verbs: **take out**, **give up**, **get over**.\n- In verbs_used, set type to \"basic\" or \"phrasal\"\n- IMPORTANT: original = the original input sentence as-is. english = converted to easy basic verbs. korean = natural Korean translation of english. All 3 fields are required for every turn.\n- In korean field, wrap each Korean verb with ** markers IN THE EXACT SAME ORDER as the **verbs in english field**. The N-th ** in korean MUST correspond to the N-th ** in english. Example: english "I **got** your text and **gave up** waiting" (get=basic, give up=phrasal) → korean "네 문자 **받고** 기다리는 거 **포기했어**" (받고=get position, 포기했어=give up position). If you change the order, the colors will be wrong.\n- IMPORTANT: key_verbs MUST include EVERY unique verb that appears in any turns.verbs_used. Do not skip any. Deduplicate by verb name.\n- NEVER include be verbs (am, is, are, was, were, be, been, being, \'m, \'s, \'re) as key_verbs or in verbs_used. They are too basic to learn.\n- When wrapping contractions like they\'re, don\'t, isn\'t — show the FULL form in verbs_used (e.g. "are" not "\'re", "do not" not "don\'t"). But in the english text keep the natural contraction.\n- Pick 3-5 useful nouns\n\nReturn ONLY valid JSON:\n{"scenario":"상황 한줄 요약 (한국어)","speakers":1,"turns":[{"speaker":"화자1","original":"원래 문장 (입력이 영어면 영어, 한국어면 한국어 그대로)","english":"I **got** your text and **gave up** waiting.","korean":"문자 받고 기다리는 거 포기했어.","verbs_used":[{"verb":"get","type":"basic","usage":"받다"},{"verb":"give up","type":"phrasal","usage":"포기하다"}]}],"key_verbs":[{"verb":"get","type":"basic","meaning":"의미","example":"I got your text"},{"verb":"give up","type":"phrasal","meaning":"의미","example":"I gave up"}],"key_nouns":[{"noun":"deadline","meaning_ko":"마감 기한","example":"The deadline is tomorrow."}],"verb_compare":[{"verbs":["say","tell","talk"],"diff_ko":"say=말하다(내용), tell=전하다(대상 필요), talk=대화하다(상호)","examples":["I said sorry","I told him sorry","We talked about it"]}],"coach_tip":"핵심 포인트 한국어 2문장"}\n\nFor verb_compare: pick 1-2 groups of similar verbs that appeared in this conversation and explain the difference in Korean. Only include verbs that Korean speakers commonly confuse.';
         callClaude(system,'한국어 대화/독백:\n"'+text+'"\n\n화자 수를 유추하고, 각 발화를 쉬운 기본동사/구동사만 써서 미국식으로 변환해줘.')
         .then(function(raw){
           // JSON 추출: ```json...``` 또는 {...} 찾기
@@ -2264,7 +2423,7 @@
               }
             });
           }
-          var entry = {id:Date.now(),date:todayK,scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:parsed.key_verbs,key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip,sourceText:text};
+          var entry = {id:Date.now(),date:todayK,scenario:parsed.scenario,speakers:parsed.speakers,turns:parsed.turns,key_verbs:filterBeVerbs(parsed.key_verbs),key_nouns:parsed.key_nouns,verb_compare:parsed.verb_compare,coach_tip:parsed.coach_tip,sourceText:text};
           var next=[entry].concat(history).slice(0,50);
           setHistory(next);
           fetchAltSituations(parsed);
@@ -2287,6 +2446,18 @@
 
           {!result && (
             <div>
+              {!loadLocal("speak_guide_seen")&&(
+                <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:12,padding:14,marginBottom:16}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:8}}>{"💡 이렇게 사용하세요"}</div>
+                  <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    {"1. 내가 한 말을 녹음하거나 타이핑하세요"}<br/>
+                    {"2. '쉬운 영어로 변환' 버튼을 누르면 AI가 분석해요"}<br/>
+                    {"3. 원어민이 쓰는 쉬운 동사 표현을 배워요"}<br/>
+                    {"4. 연습 문제까지 풀면 회화 미션 완료! +15 XP"}
+                  </div>
+                  <button onClick={function(){saveLocal("speak_guide_seen",true);}} style={{marginTop:8,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer"}}>{"다시 안 보기"}</button>
+                </div>
+              )}
               <div style={{display:"flex",gap:8,marginBottom:20}}>
                 {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"YouTube",desc:"영상 학습",ytIcon:true}].map(function(t){return(
                   <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
@@ -2362,7 +2533,7 @@
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                         <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>인식된 텍스트</div>
-                        <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
+                        <button onClick={function(){navigator.clipboard.writeText(applySpeakerNames(fileTranscript)).then(function(){var b=event.target;b.textContent="복사됨 ✓";setTimeout(function(){b.textContent="전체 복사";},1500);});}} style={{fontSize:10,color:C.accent,background:"none",border:"1px solid "+C.accent+"40",borderRadius:6,padding:"2px 8px",cursor:"pointer"}}>전체 복사</button>
                       </div>
                       {extractSpeakers(fileTranscript).length>0&&(
                         <div style={{background:C.bg,borderRadius:10,padding:10,marginBottom:8}}>
@@ -2394,16 +2565,17 @@
                         if(data.transcript){
                           setYtTitle(data.title||"");
                           setYtVideoId(data.videoId||"");
-                          var segs = splitSegments(data.transcript);
+                          // 서버 청크 = 1구간 (splitSegments 안 씀)
+                          var segs = [data.transcript];
                           setYtSegments(segs);
                           setYtSegIdx(0);
-                          setYtTranscript(segs[0]||data.transcript);
+                          setYtTranscript(data.transcript);
                           setYtHasMore(data.hasMore||false);
                           setYtCurrentMin(data.startMin||0);
                           setYtTotalChunks(data.totalChunks||1);
                           setYtDuration(data.durationSec||0);
                           saveYtProgress(data.videoId||"", data.title||"", segs, 0, data.hasMore, data.startMin||0);
-                          // 백그라운드로 다음 구간 자동 로드
+                          // 백그라운드로 나머지 구간 폴링
                           if(data.hasMore){setTimeout(function(){fetchNextChunkInBackground(data.videoId||"",data.title||"",0,segs);},1000);}
                         } else{setYtTitle("⚠️ "+(data.error||"자막을 가져올 수 없어요."));}
                       }).catch(function(){
@@ -2412,13 +2584,13 @@
                         .then(function(r){return r.json();}).then(function(data){
                           if(data.transcript){
                             setYtTitle(data.title||"");setYtVideoId(data.videoId||"");
-                            var segs=splitSegments(data.transcript);setYtSegments(segs);setYtSegIdx(0);
+                            var segs=[data.transcript];setYtSegments(segs);setYtSegIdx(0);
                             setYtTranscript(segs[0]||data.transcript);setYtHasMore(data.hasMore||false);setYtCurrentMin(data.startMin||0);
                             saveYtProgress(data.videoId||"",data.title||"",segs,0,data.hasMore,data.startMin||0);
                           } else{setYtTitle("⚠️ 이 영상은 처리할 수 없어요. 다른 영상을 시도해주세요.");}
                         }).catch(function(){setYtTitle("⚠️ 시간이 오래 걸려요. 잠시 후 다시 시도해주세요.");}).finally(function(){setYtLoading(false);});
                         return;
-                      }).finally(function(){if(!ytLoading)return;setYtLoading(false);});
+                      }).finally(function(){setYtLoading(false);});
                     }} id="yt-fetch-btn" style={{background:C.red,color:"white",border:"none",borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:ytLoading||!ytUrl.trim()?0.5:1}}>
                       {ytLoading?"AI가 듣는 중...":"자막 가져오기"}
                     </button>
@@ -2442,8 +2614,8 @@
                   {ytSegments.length>0 && !result && (
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+(ytTotalChunks||ytSegments.length)}{bgLoading?" 🔄":""}</div>
-                        <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
+                        <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+(bgLoading?(ytDuration?("~"+Math.max(ytSegments.length,Math.round(ytDuration/30))):"..."):ytSegments.length)}{bgLoading?" 🔄":""}</div>
+                        <button onClick={function(){navigator.clipboard.writeText(ytTranscript).then(function(){var b=event.target;b.textContent="복사됨 ✓";setTimeout(function(){b.textContent="전체 복사";},1500);});}} style={{fontSize:10,color:C.accent,background:"none",border:"1px solid "+C.accent+"40",borderRadius:6,padding:"2px 8px",cursor:"pointer"}}>전체 복사</button>
                       </div>
                       <div style={{height:4,background:C.border,borderRadius:99,marginBottom:12,overflow:"hidden"}}>
                         <div style={{height:"100%",width:((ytSegIdx+1)/ytSegments.length*100)+"%",background:C.accent,borderRadius:99,transition:"width 0.3s"}}/>
@@ -2455,15 +2627,15 @@
                       </div>
                       {ytSegIdx>=ytSegments.length-1&&ytHasMore&&(
                         <button disabled={ytLoading} onClick={function(){
-                          var nextMin = (ytCurrentMin||0)+5;
+                          var nextMin = (ytCurrentMin||0)+3;
                           setYtLoading(true);
                           fetch("https://us-central1-talkfit-dbacd.cloudfunctions.net/youtube",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:"https://youtu.be/"+ytVideoId,startMin:nextMin})})
                           .then(function(r){return r.json();}).then(function(data){
                             if(data.transcript){
-                              var segs = splitSegments(data.transcript);
+                              var segs = [data.transcript];
                               setYtSegments(segs);
                               setYtSegIdx(0);
-                              setYtTranscript(segs[0]||data.transcript);
+                              setYtTranscript(data.transcript);
                               setYtHasMore(data.hasMore||false);
                               setYtCurrentMin(nextMin);
                               setResult(null);
@@ -2471,7 +2643,7 @@
                             } else{alert(data.error||"더 이상 가져올 수 없어요.");}
                           }).catch(function(){alert("오류가 발생했어요.");}).finally(function(){setYtLoading(false);});
                         }} style={{width:"100%",marginTop:10,background:C.orange+"20",border:"1px solid "+C.orange+"40",color:C.orange,borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                          {ytLoading?"가져오는 중... (2-3분 소요)":"▶ 다음 5분 가져오기 ("+(ytCurrentMin+5)+"-"+(ytCurrentMin+10)+"분)"}
+                          {ytLoading?"가져오는 중...":"▶ 다음 구간 가져오기 ("+(ytCurrentMin+3)+"-"+(ytCurrentMin+6)+"분)"}
                         </button>
                       )}
                     </div>
@@ -2523,6 +2695,19 @@
                               <span key={ch.id} style={{background:C.accent+"15",color:C.accent,padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600}}>{ch.title}</span>
                             );})}
                           </div>
+                          <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
+                          {recVideos.map(function(rv){return(
+                            <div key={rv.id} onClick={function(){
+                              setYtUrl("https://youtu.be/"+rv.id);
+                              setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
+                            }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
+                              <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{rv.date?" · "+rv.date:""}</div>
+                              </div>
+                            </div>
+                          );})}
                           {bbcRecs.length>0&&(
                             <div style={{marginBottom:12}}>
                               <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ BBC 추천 영상"}</div>
@@ -2533,7 +2718,7 @@
                                   if(cached&&cached.transcript){
                                     setYtUrl("https://youtu.be/"+rv.id);
                                     setYtTitle(cached.title||rv.title);setYtVideoId(cached.videoId||rv.id);
-                                    var segs=splitSegments(cached.transcript);setYtSegments(segs);setYtSegIdx(0);setYtTranscript(segs[0]||cached.transcript);
+                                    var segs=[cached.transcript];setYtSegments(segs);setYtSegIdx(0);setYtTranscript(cached.transcript);
                                     setYtHasMore(cached.hasMore||false);setYtCurrentMin(cached.startMin||0);
                                     saveYtProgress(cached.videoId||rv.id,cached.title||rv.title,segs,0,cached.hasMore,cached.startMin||0);
                                     window.scrollTo({top:0,behavior:"smooth"});
@@ -2551,20 +2736,6 @@
                               );})}
                             </div>
                           )}
-                          <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
-                          {recVideos.map(function(rv){return(
-                            <div key={rv.id} onClick={function(){
-                              setYtUrl("https://youtu.be/"+rv.id);
-                              // URL만 세팅하고 자막 가져오기 버튼 근처로 스크롤 (자동 fetch X)
-                              setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
-                            }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
-                              <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
-                              <div style={{flex:1}}>
-                                <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{rv.date?" · "+rv.date:""}</div>
-                              </div>
-                            </div>
-                          );})}
                         </div>
                       ):(
                         <div style={{fontSize:12,color:C.muted,textAlign:"center",padding:"20px 0"}}>
@@ -2655,8 +2826,8 @@
                       </div>
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
-                      {t.original&&t.original!==t.english&&(
-                        <div style={{fontSize:12,color:C.muted,lineHeight:1.4,marginBottom:6,fontStyle:"italic",opacity:0.7}}>{(t.original||"").replace(/\*\*/g,"")}</div>
+                      {t.original&&(
+                        <div style={{fontSize:13,color:C.muted,lineHeight:1.5,marginBottom:8,fontStyle:"italic",opacity:0.75}}>{highlightVerbs((t.original||"").replace(/\*\*/g,""),t.verbs_used)}</div>
                       )}
                       <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:4}}>{renderHighlight(t.english,t.verbs_used)}</div>
                       {t.korean&&(
@@ -2671,30 +2842,30 @@
                           );})}
                         </div>
                       )}
-                      <button onClick={function(){speakEnglish((t.english||"").replace(/\*\*/g,""));}} style={{background:"none",border:"1px solid "+color+"40",color:color,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>{"🔊 원문 듣기"}</button>
+                      <button onClick={function(e){speakEnglish((t.english||"").replace(/\*\*/g,""),e.currentTarget);}} style={{background:"none",border:"1px solid "+color+"40",color:color,borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>{"🔊 원문 듣기"}</button>
                     </div>
                   </div>
                 );
               });})()}
 
-              {result.key_verbs?.length>0&&(
+              {filterBeVerbs(result.key_verbs)?.length>0&&(
                 <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                   <div onClick={function(){toggleSection("verbs");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"📌 KEY VERBS · "+result.key_verbs.length+"개"}</div>
+                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"📌 KEY VERBS · "+filterBeVerbs(result.key_verbs).length+"개"}</div>
                     <div style={{fontSize:14,color:C.muted}}>{expanded.verbs?"▲":"▼"}</div>
                   </div>
                   {expanded.verbs&&<div style={{padding:"0 16px 16px"}}>
-                  {result.key_verbs.map(function(v,i){
+                  {filterBeVerbs(result.key_verbs).map(function(v,i){
                     var isPhrasal=(v.type==="phrasal"||v.verb.indexOf(" ")!==-1);
                     var vColor=isPhrasal?C.accent:C.yellow;
                     return(
-                    <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<result.key_verbs.length-1?"1px solid "+C.border:"none"}}>
+                    <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<filterBeVerbs(result.key_verbs).length-1?"1px solid "+C.border:"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                         <span style={{color:vColor,fontWeight:800,fontSize:16}}>{v.verb}</span>
                         <span style={{fontSize:10,color:vColor,fontWeight:700}}>{isPhrasal?"구동사":"기본"}</span>
                         <span style={{fontSize:13,color:C.muted}}>{v.meaning}</span>
                       </div>
-                      {v.example&&<div onClick={function(){speakEnglish(stripStars(v.example));}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(v.example)}{"\""}</div>}
+                      {v.example&&<div style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2}}>{"\""}{stripStars(v.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -2714,7 +2885,7 @@
                         <span style={{color:C.blue,fontWeight:800,fontSize:16}}>{n.noun}</span>
                         <span style={{fontSize:13,color:C.muted}}>{n.meaning_ko}</span>
                       </div>
-                      {n.example&&<div onClick={function(){speakEnglish(stripStars(n.example));}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(n.example)}{"\""}</div>}
+                      {n.example&&<div style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2}}>{"\""}{stripStars(n.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -2737,7 +2908,7 @@
                       </div>
                       <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{stripStars(vc.diff_ko)}</div>
                       {vc.examples&&vc.examples.map(function(ex,ei){return(
-                        <div key={ei} onClick={function(){speakEnglish(stripStars(ex));}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{stripStars(ex)}</div>
+                        <div key={ei} onClick={function(e){speakEnglish(stripStars(ex),e.currentTarget);}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{stripStars(ex)}</div>
                       );})}
                     </div>
                   );})}
@@ -2791,7 +2962,10 @@
               )}
 
               {result.turns&&result.turns.length>0&&!practiceMode&&(
-                <button onClick={function(){setPracticeMode(true);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);setPracticeScore({correct:0,total:0});}} style={{width:"100%",background:C.orange,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"📝 연습하기"}</button>
+                <button onClick={function(){setPracticeMode(true);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);setPracticeScore({correct:0,total:0});}} style={{width:"100%",background:C.orange,color:"#08090d",border:"none",borderRadius:14,padding:"16px 16px 10px",fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>
+                  {"📝 연습하기"}
+                  <div style={{fontSize:10,fontWeight:600,opacity:0.7,marginTop:4}}>{"연습 완료 시 회화 미션 달성! +15 XP"}</div>
+                </button>
               )}
 
               {practiceMode&&(function(){
@@ -2800,14 +2974,16 @@
                   if(!t.english||!t.korean) return;
                   var eng = (t.english||"").replace(/\*\*/g,"");
                   var kor = t.korean;
+                  // 너무 짧은 문장 제외 (4단어 미만)
+                  if(eng.split(" ").length<4) return;
                   // 빈칸 채우기
                   if(t.verbs_used&&t.verbs_used.length>0){
                     var verb = t.verbs_used[0];
-                    var blank = eng.replace(new RegExp("\\b"+verb.verb.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i"),"_____");
+                    var blank = makeVerbBlank(eng, verb.verb);
                     if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
                   }
-                  // 순서 맞추기 (8단어 이하만)
-                  if(eng.split(" ").length<=8){
+                  // 순서 맞추기 (4~8단어)
+                  if(eng.split(" ").length>=4&&eng.split(" ").length<=8){
                     var words = eng.split(" ");
                     var shuffled = [].concat(words);
                     for(var si=shuffled.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var tmp=shuffled[si];shuffled[si]=shuffled[sj];shuffled[sj]=tmp;}
@@ -2839,7 +3015,7 @@
                   <div style={{fontSize:14,color:C.text,marginBottom:12,lineHeight:1.6}}>
                     {q.type==="fill"&&<div><div style={{fontSize:14,color:C.text,marginBottom:8}}>{q.korean}</div><div style={{fontSize:16,fontWeight:600,color:C.muted}}>{q.sentence}</div></div>}
                     {q.type==="translate"&&<div style={{fontSize:16,fontWeight:600}}>{q.korean}</div>}
-                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:12}}>{q.korean}</div>{practiceAnswer&&<div style={{marginBottom:10,fontSize:15,color:C.text,background:C.bg,borderRadius:10,padding:"12px 14px",minHeight:20,lineHeight:1.6}}>{practiceAnswer}<span style={{cursor:"pointer",marginLeft:8,color:C.red,fontSize:12}} onClick={function(){var words=practiceAnswer.trim().split(" ");words.pop();setPracticeAnswer(words.join(" "));}}>{"← 지우기"}</span></div>}<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
+                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:12}}>{q.korean}</div><div style={{marginBottom:10,fontSize:15,color:practiceAnswer?C.text:C.muted,background:C.bg,borderRadius:10,padding:"12px 14px",minHeight:44,lineHeight:1.6}}>{practiceAnswer||"단어를 눌러 문장을 만드세요"}{practiceAnswer&&<span style={{cursor:"pointer",marginLeft:8,color:C.red,fontSize:12}} onClick={function(){var words=practiceAnswer.trim().split(" ");words.pop();setPracticeAnswer(words.join(" "));}}>{"← 지우기"}</span>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
                       var selected = (practiceAnswer||"").split(" ").filter(function(s){return s;});
                       var usedCount = selected.filter(function(s){return s===w;}).length;
                       var totalCount = q.words.slice(0,wi+1).filter(function(ww){return ww===w;}).length;
@@ -2873,7 +3049,8 @@
                               if(!st.todayDone){st.todayDone=true;st.streak=(st.streak||0)+1;st.todayKey=tk;saveLocal("tk_state",st);
                                 // 출석 보너스
                                 var bonus=claimAttendanceBonus();
-                                if(bonus){setTimeout(function(){alert("🔥 "+bonus.streak+"일 연속 훈련! 출석 보너스 +"+bonus.bonus+" XP");},800);}
+                                if(bonus&&window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});window.__showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""});},800);
+                                } else if(window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});},800);}
                               }
                             }
                           }
@@ -2884,48 +3061,6 @@
                       )}
                     </div>
                   )}
-                </div>);
-              })()}
-
-              {result.key_verbs&&result.key_verbs.length>0&&(function(){
-                var matchedLessons=[];
-                if(window.LESSON_POOL_REF){
-                  result.key_verbs.forEach(function(kv){
-                    var v=kv.verb.toLowerCase();
-                    window.LESSON_POOL_REF.forEach(function(lp){
-                      if(lp.basic&&lp.basic.verb===v) matchedLessons.push(lp.basic);
-                      if(lp.phrasal&&lp.phrasal.verb===v) matchedLessons.push(lp.phrasal);
-                    });
-                  });
-                }
-                if(matchedLessons.length===0) return null;
-                return(
-                <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
-                  <div onClick={function(){toggleSection("deeper");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"📚 더 깊게 배워요 ("+matchedLessons.length+")"}</div>
-                    <div style={{fontSize:14,color:C.muted}}>{expanded.deeper?"▲":"▼"}</div>
-                  </div>
-                  {expanded.deeper&&<div style={{padding:"0 16px 16px"}}>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:10}}>이 대화에 나온 동사로 정식 레슨이 준비돼 있어요</div>
-                  {matchedLessons.slice(0,4).map(function(lesson,li){
-                    var isPh=lesson.verb.indexOf(" ")!==-1;
-                    var lc=isPh?C.accent:C.yellow;
-                    return(
-                    <div key={li} style={{background:C.bg,borderRadius:10,padding:12,marginBottom:6}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{color:lc,fontWeight:800,fontSize:15}}>{lesson.verb}</span>
-                        <span style={{fontSize:10,color:lc,background:lc+"20",padding:"2px 6px",borderRadius:4}}>{isPh?"구동사":"기본"}</span>
-                        <span style={{fontSize:12,color:C.muted}}>{lesson.meaning_ko}</span>
-                      </div>
-                      {lesson.examples&&lesson.examples[0]&&(
-                        <div onClick={function(){speakEnglish(lesson.examples[0].english);}} style={{fontSize:12,color:C.text,marginTop:6,cursor:"pointer"}}>{"🔊 \""}{lesson.examples[0].english}{"\""}</div>
-                      )}
-                      {lesson.examples&&lesson.examples[0]&&(
-                        <div style={{fontSize:11,color:C.muted,marginTop:2}}>{lesson.examples[0].korean}</div>
-                      )}
-                    </div>
-                  );})}
-                  </div>}
                 </div>);
               })()}
 
@@ -2948,7 +3083,9 @@
       var toggleReveal = function(key){setRevealed(function(r){var n={};for(var k in r)n[k]=r[k];n[key]=!n[key];return n;});};
 
       var todayVerbs = [];
-      if (lessons) {
+      var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+      var verbDoneToday = !!loadLocal("verb_done_"+todayK);
+      if (lessons && verbDoneToday) {
         for (var li=0;li<lessons.length;li++) {
           if (lessons[li].basic) todayVerbs.push(lessons[li].basic);
           if (lessons[li].phrasal) todayVerbs.push(lessons[li].phrasal);
@@ -3002,7 +3139,7 @@
                         <div key={ei} style={{background:color+"10",border:"1px solid "+color+"20",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
                           <div style={{fontSize:14,color:C.text,fontWeight:600,marginBottom:3}}>{ex.english||ex.en}</div>
                           <div style={{fontSize:12,color:C.muted}}>{ex.korean||ex.ko}</div>
-                          <button onClick={function(e){e.stopPropagation();speakEnglish(ex.english||ex.en);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(ex.english||ex.en,e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       );})}
 
@@ -3010,7 +3147,7 @@
                         <div style={{background:color+"10",border:"1px solid "+color+"30",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
                           <div style={{fontSize:11,color:color,letterSpacing:1,marginBottom:4,fontWeight:700}}>REAL EXAMPLE</div>
                           <div style={{fontSize:14,color:C.text,fontWeight:600}}>{v.good_example}</div>
-                          <button onClick={function(e){e.stopPropagation();speakEnglish(v.good_example);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(v.good_example,e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       )}
 
@@ -3058,14 +3195,14 @@
                               );})}
                             </div>
                           )}
-                          <button onClick={function(){speakEnglish(t.english);}} style={{marginTop:6,background:"none",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <button onClick={function(e){speakEnglish(t.english,e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
                         </div>
                       );})}
-                      {sp.key_verbs&&sp.key_verbs.length>0&&(
+                      {filterBeVerbs(sp.key_verbs)&&filterBeVerbs(sp.key_verbs).length>0&&(
                         <div style={{marginTop:8}}>
                           <div style={{fontSize:10,color:C.muted,letterSpacing:1,marginBottom:6}}>KEY VERBS</div>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            {sp.key_verbs.map(function(kv,ki){
+                            {filterBeVerbs(sp.key_verbs).map(function(kv,ki){
                               var isPh=(kv.type==="phrasal"||kv.verb.indexOf(" ")!==-1);
                               var vc=isPh?C.accent:C.yellow;
                               return(
@@ -3261,7 +3398,12 @@
         }).then(function(){setFbSent(true);setFbText("");}).catch(function(){alert("전송 실패. 다시 시도해주세요.");}).finally(function(){setFbSending(false);});
       }
       function changeTheme(v){setTheme(v);save("theme",v);setTimeout(function(){location.reload();},300);}
-      function changeFont(v){setFontSize(v);save("font_size",v);setTimeout(function(){location.reload();},300);}
+      function changeFont(v){
+        setFontSize(v);save("font_size",v);
+        var scale=v==="large"?1.15:(v==="small"?0.88:1);
+        var root=document.querySelector('[data-app-root]');
+        if(root) root.style.zoom=scale;
+      }
       return(
         <div style={{padding:"24px 20px"}}>
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>SETTINGS</div>
@@ -3308,11 +3450,22 @@
           </div>
 
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🔤 글자 크기"}</div>
+            <div style={{display:"flex",gap:8}}>
+              {[{v:"small",l:"작게",sz:12},{v:"normal",l:"보통",sz:14},{v:"large",l:"크게",sz:17}].map(function(o){return(
+                <button key={o.v} onClick={function(){changeFont(o.v);}} style={{flex:1,background:fontSize===o.v?C.accent+"20":C.bg,border:"1px solid "+(fontSize===o.v?C.accent:C.border),color:fontSize===o.v?C.accent:C.text,borderRadius:10,padding:"12px",fontSize:o.sz,fontWeight:700,cursor:"pointer"}}>{o.l}</button>
+              );})}
+            </div>
+            <div style={{fontSize:11,color:C.muted,marginTop:8,textAlign:"center"}}>{"현재: "+(fontSize==="large"?"크게":fontSize==="small"?"작게":"보통")}</div>
+          </div>
+
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
-              {"TalkFit v1.0.0 (Beta)"}<br/>
+              {"TalkFit v1.3.0 (Beta)"}<br/>
               {"© 2026 TalkFit. All rights reserved."}<br/>
-              {"문의: krave.official.team@gmail.com"}
+              {"문의: krave.official.team@gmail.com"}<br/>
+              <a href="/privacy.html" target="_blank" style={{color:C.accent,textDecoration:"underline"}}>개인정보처리방침</a>
             </div>
           </div>
 
@@ -3401,6 +3554,16 @@
       var _loginLoading = useState(false); var loginLoading = _loginLoading[0]; var setLoginLoading = _loginLoading[1];
       var _aiLeft = useState(aiRemaining); var aiLeft = _aiLeft[0]; var setAiLeft = _aiLeft[1];
       var _levelUp = useState(null); var levelUpData = _levelUp[0]; var setLevelUpData = _levelUp[1];
+      var _praise = useState(null); var praiseData = _praise[0]; var setPraiseData = _praise[1];
+      var praiseQueue = useRef([]);
+      function showPraise(d) {
+        if (praiseData) { praiseQueue.current.push(d); }
+        else { setPraiseData(d); }
+      }
+      function closePraise() {
+        if (praiseQueue.current.length > 0) { setPraiseData(praiseQueue.current.shift()); }
+        else { setPraiseData(null); }
+      }
       var _lbData = useState(null); var lbData = _lbData[0]; var setLbData = _lbData[1];
 
       // 리더보드 로드
@@ -3416,7 +3579,9 @@
         window.__onLevelUp = function(newLevel){
           setLevelUpData(newLevel);
           setTimeout(function(){setLevelUpData(null);}, 5000);
+          showPraise({type:"levelup", level:newLevel.level, name:newLevel.name, bonus:0});
         };
+        window.__showPraise = function(d){ showPraise(d); };
       }, []);
       var _isGuest = useState(function(){return loadLocal("is_guest")||false;}); var isGuest = _isGuest[0]; var setIsGuest = _isGuest[1];
 
@@ -3524,11 +3689,13 @@
         var newStreak = fullyDone ? streak+1 : streak;
         setStreak(newStreak); setTodayDone(fullyDone); setVerbHistory(newHistory);
         persist({streak:newStreak,todayDone:fullyDone,history:newHistory,lessons:lessons});
+        // 레슨 완료 칭찬
+        showPraise({type:"lesson", bonus:0});
         // 둘 다 완료 시 출석 보너스
         if (fullyDone) {
           var bonus = claimAttendanceBonus();
           if (bonus) {
-            setTimeout(function(){ alert("🔥 "+bonus.streak+"일 연속 훈련! 출석 보너스 +" + bonus.bonus + " XP"); }, 800);
+            setTimeout(function(){ showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""}); }, 800);
           }
         }
         if (user) {
@@ -3539,6 +3706,14 @@
         setScreen("home"); setTab("home");
       };
 
+      // 온보딩 — hooks는 모든 조건부 return 전에 선언
+      var _onboard = useState(true); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
+      // 로그인 유저가 이미 봤으면 자동 닫기
+      useEffect(function(){
+        if (user && loadLocal("onboarding_done")==="v2") setShowOnboarding(false);
+      }, [user]);
+      var _onboardStep = useState(0); var onboardStep = _onboardStep[0]; var setOnboardStep = _onboardStep[1];
+
       if (authLoading) return (
         <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{textAlign:"center"}}>
@@ -3548,7 +3723,40 @@
         </div>
       );
 
-      if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} loading={loginLoading} onGuest={function(){setIsGuest(true);saveLocal("is_guest",true);}} />;
+      if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} loading={loginLoading} onGuest={function(){
+        // 게스트 진입 시 이전 로그인 유저의 로컬 데이터 클리어
+        var keys=Object.keys(localStorage).filter(function(k){return k.startsWith("tf_")&&k!=="tf_is_guest"&&k!=="tf_theme"&&k!=="tf_font_size"&&k!=="tf_onboarding_done";});
+        keys.forEach(function(k){localStorage.removeItem(k);});
+        setIsGuest(true);saveLocal("is_guest",true);setStreak(0);setTodayDone(false);setLessons(getTodayLesson());setVerbHistory([]);setSpeakHistory([]);
+      }} />;
+      if (showOnboarding) {
+        var steps = [
+          {emoji:"😤",title:"다른 사람 대화 외워도\n내 말은 영어로 못 한다",lines:["그래서 만들었습니다"]},
+          {emoji:"💡",title:"내가 하는 말을 녹음하면\n원어민 표현으로 바꿔줘요",lines:["카톡 대화도, 혼잣말도 OK","쉬운 동사만으로 다 말한다"]},
+          {emoji:"🚀",title:"하루 15분이면 충분해요",lines:["동사 레슨 + 내 대화 영어 변환","무료. 앱 설치 없음. 지금 바로"]}
+        ];
+        var s = steps[onboardStep];
+        return (
+          <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 24px"}}>
+            <div style={{fontSize:64,marginBottom:16}}>{s.emoji}</div>
+            <div style={{fontSize:22,fontWeight:900,marginBottom:16,textAlign:"center",lineHeight:1.3}}>{s.title}</div>
+            <div style={{marginBottom:32,textAlign:"center"}}>
+              {s.lines.map(function(l,i){return <div key={i} style={{fontSize:14,color:C.muted,lineHeight:2}}>{l}</div>;})}
+            </div>
+            <div style={{display:"flex",gap:6,marginBottom:24}}>
+              {steps.map(function(_,i){return <div key={i} style={{width:i===onboardStep?20:8,height:8,borderRadius:4,background:i===onboardStep?C.accent:C.border,transition:"width 0.3s"}}/>;}) }
+            </div>
+            {onboardStep < steps.length - 1 ? (
+              <button onClick={function(){setOnboardStep(onboardStep+1);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"다음 →"}</button>
+            ) : (
+              <button onClick={function(){setShowOnboarding(false);if(user)saveLocal("onboarding_done","v2");}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"시작하기! 🚀"}</button>
+            )}
+            {onboardStep < steps.length - 1 && (
+              <button onClick={function(){setShowOnboarding(false);if(user)saveLocal("onboarding_done","v2");}} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer"}}>{"건너뛰기"}</button>
+            )}
+          </div>
+        );
+      }
 
       function TabIcon(props){
         var c=props.color;var s=props.type;
@@ -3566,7 +3774,7 @@
       ];
 
       return (
-        <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column"}}>
+        <div data-app-root style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column",zoom:(function(){var fs=load("font_size")||"normal";return fs==="large"?1.15:(fs==="small"?0.88:1);})()}}>
           <div style={{position:"sticky",top:0,zIndex:10,background:C.bg+"ee",backdropFilter:"blur(12px)",borderBottom:"1px solid "+C.border,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{fontWeight:900,fontSize:16,letterSpacing:-0.5,display:"flex",alignItems:"center",gap:8}}>
               {React.createElement("svg",{width:24,height:24,viewBox:"0 0 512 512"},
@@ -3601,7 +3809,7 @@
             )}
           </div>
 
-          <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:90}}>
+          <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:120}}>
             {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} lbData={lbData} userId={user?user.uid:null}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
@@ -3633,6 +3841,7 @@
               );})}
             </div>
           )}
+          <PraiseModal data={praiseData} onClose={closePraise}/>
           {levelUpData&&(
             <div onClick={function(){setLevelUpData(null);}} style={{position:"fixed",inset:0,background:"#000d",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",animation:"splashFade 0.3s",cursor:"pointer"}}>
               <div style={{background:"linear-gradient(135deg,"+C.accent+"30,"+C.blue+"30)",border:"2px solid "+C.accent,borderRadius:24,padding:"40px 32px",textAlign:"center",maxWidth:340,animation:"levelUp 0.6s"}}>
@@ -3640,7 +3849,7 @@
                 <div style={{fontSize:14,color:C.accent,letterSpacing:3,marginBottom:8,fontWeight:700}}>{"LEVEL UP!"}</div>
                 <div style={{fontSize:36,fontWeight:900,color:C.accent,marginBottom:6}}>{"Lv."+levelUpData.level}</div>
                 <div style={{fontSize:18,color:C.text,fontWeight:700,marginBottom:20}}>{levelUpData.name}</div>
-                <div style={{fontSize:13,color:C.muted,marginBottom:8}}>{"AI 사용 한도 증가!"}</div>
+                <div style={{fontSize:13,color:C.muted,marginBottom:8}}>{"축하합니다! 🎉"}</div>
                 <div style={{fontSize:11,color:C.muted}}>탭하면 닫혀요</div>
               </div>
             </div>
