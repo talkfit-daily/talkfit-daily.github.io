@@ -121,11 +121,19 @@
     const CREATOR_NAME = "by TalkFit";
 
     // ── STORAGE ─────────────────────────────────────────────────────
+    var PERSIST_KEYS = ["is_guest","theme","font_size","onboarding_done","speak_guide_seen","my_channels"];
+    function _isGuest() {
+      try { return JSON.parse(localStorage.getItem("tf_is_guest")); } catch { return false; }
+    }
+    function _storage(key) {
+      if (PERSIST_KEYS.indexOf(key) !== -1) return localStorage;
+      return _isGuest() ? sessionStorage : localStorage;
+    }
     function loadLocal(key) {
-      try { var v = localStorage.getItem("tf_"+key); return v ? JSON.parse(v) : null; } catch { return null; }
+      try { var v = _storage(key).getItem("tf_"+key); return v ? JSON.parse(v) : null; } catch { return null; }
     }
     function saveLocal(key, val) {
-      try { localStorage.setItem("tf_"+key, JSON.stringify(val)); } catch {}
+      try { _storage(key).setItem("tf_"+key, JSON.stringify(val)); } catch {}
     }
     function load(key) { return loadLocal(key); }
     function save(key, val) { saveLocal(key, val); }
