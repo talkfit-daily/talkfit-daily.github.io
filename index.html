@@ -353,6 +353,37 @@
         window.__bgListeners[name] = (window.__bgListeners[name]||[]).filter(function(f){return f!==fn;});
       };
     }
+    function highlightVerbs(text, verbsUsed) {
+      if (!text || !verbsUsed || verbsUsed.length === 0) return text;
+      // 구동사 먼저 (긴 것 우선), 그 다음 기본동사
+      var sorted = verbsUsed.slice().sort(function(a,b){return b.verb.length - a.verb.length;});
+      var parts = [{text: text, verb: null}];
+      sorted.forEach(function(v) {
+        var vw = v.verb.toLowerCase();
+        var isPhrasal = (v.type === "phrasal" || v.verb.indexOf(" ") !== -1);
+        var regex = new RegExp("\\b(" + vw.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "(?:s|ed|ing|d|es)?)\\b", "gi");
+        var newParts = [];
+        parts.forEach(function(p) {
+          if (p.verb) { newParts.push(p); return; }
+          var last = 0;
+          var m;
+          while ((m = regex.exec(p.text)) !== null) {
+            if (m.index > last) newParts.push({text: p.text.slice(last, m.index), verb: null});
+            newParts.push({text: m[0], verb: v, phrasal: isPhrasal});
+            last = m.index + m[0].length;
+          }
+          if (last < p.text.length) newParts.push({text: p.text.slice(last), verb: null});
+        });
+        parts = newParts;
+      });
+      if (parts.every(function(p){return !p.verb;})) return text;
+      return parts.map(function(p, i) {
+        if (!p.verb) return p.text;
+        var vc = p.phrasal ? C.accent : C.yellow;
+        return React.createElement("span", {key: i, style: {color: vc, fontWeight: 700, opacity: 0.9}}, p.text);
+      });
+    }
+
     function renderHighlight(text, verbsUsed, opts) {
       if (!text) return text;
       if (text.indexOf("**") === -1) return text;
@@ -1043,6 +1074,41 @@
         :hour<22?{t:"Good evening",s:"오늘 하루 마무리 15분"}
         :{t:"Late night study",s:"집중 잘 되는 시간이죠"};
 
+      var IDIOMS = [
+        {en:"be toast",ko:"끝장나다, 망하다",ex:"If the boss finds out, I'm toast.",exKo:"사장님이 알면 나 끝이야."},
+        {en:"piece of cake",ko:"식은 죽 먹기",ex:"The test was a piece of cake.",exKo:"그 시험 완전 쉬웠어."},
+        {en:"break the ice",ko:"어색함을 깨다",ex:"He told a joke to break the ice.",exKo:"그가 농담으로 분위기를 풀었어."},
+        {en:"hit the nail on the head",ko:"정곡을 찌르다",ex:"You hit the nail on the head.",exKo:"네가 딱 맞는 말을 했어."},
+        {en:"under the weather",ko:"몸이 안 좋다",ex:"I'm feeling under the weather today.",exKo:"오늘 몸이 좀 안 좋아."},
+        {en:"spill the beans",ko:"비밀을 누설하다",ex:"Don't spill the beans about the party!",exKo:"파티 얘기 비밀 지켜!"},
+        {en:"cost an arm and a leg",ko:"엄청 비싸다",ex:"That bag cost an arm and a leg.",exKo:"그 가방 엄청 비쌌어."},
+        {en:"on the same page",ko:"같은 생각이다",ex:"Are we on the same page?",exKo:"우리 같은 생각인 거 맞지?"},
+        {en:"a no-brainer",ko:"당연한 선택",ex:"Taking that job was a no-brainer.",exKo:"그 일 하는 건 당연한 선택이었어."},
+        {en:"the last straw",ko:"더 이상 못 참겠다",ex:"That was the last straw for me.",exKo:"그게 내 마지막 인내심이었어."},
+        {en:"once in a blue moon",ko:"아주 드물게",ex:"I eat fast food once in a blue moon.",exKo:"나 패스트푸드 거의 안 먹어."},
+        {en:"let the cat out of the bag",ko:"비밀이 새다",ex:"Who let the cat out of the bag?",exKo:"누가 비밀을 말해버린 거야?"},
+        {en:"burn the midnight oil",ko:"밤새 일/공부하다",ex:"I burned the midnight oil studying.",exKo:"공부하느라 밤을 새웠어."},
+        {en:"bite the bullet",ko:"이를 악물고 하다",ex:"I just bit the bullet and apologized.",exKo:"그냥 이 악물고 사과했어."},
+        {en:"call it a day",ko:"오늘은 여기까지",ex:"Let's call it a day.",exKo:"오늘은 여기까지 하자."},
+        {en:"cut to the chase",ko:"본론으로 들어가다",ex:"Let me cut to the chase.",exKo:"바로 본론으로 갈게."},
+        {en:"go the extra mile",ko:"더 노력하다",ex:"She always goes the extra mile.",exKo:"그녀는 항상 한 발 더 나가."},
+        {en:"get out of hand",ko:"통제 불능이 되다",ex:"The party got out of hand.",exKo:"파티가 통제 불능이 됐어."},
+        {en:"hang in there",ko:"버텨, 힘내",ex:"Hang in there, it'll get better.",exKo:"버텨, 나아질 거야."},
+        {en:"in the same boat",ko:"같은 처지",ex:"We're all in the same boat.",exKo:"우리 다 같은 처지야."},
+        {en:"keep an eye on",ko:"지켜보다, 주시하다",ex:"Can you keep an eye on my bag?",exKo:"내 가방 좀 봐줄 수 있어?"},
+        {en:"miss the boat",ko:"기회를 놓치다",ex:"You missed the boat on that deal.",exKo:"너 그 기회 놓쳤어."},
+        {en:"pull someone's leg",ko:"놀리다, 장난치다",ex:"Are you pulling my leg?",exKo:"나 놀리는 거야?"},
+        {en:"ring a bell",ko:"어디서 들어본 것 같다",ex:"That name rings a bell.",exKo:"그 이름 어디서 들어본 것 같아."},
+        {en:"sleep on it",ko:"하루 더 생각하다",ex:"Let me sleep on it.",exKo:"하루 더 생각해볼게."},
+        {en:"the ball is in your court",ko:"이제 네 차례야",ex:"I've done my part. The ball is in your court.",exKo:"내 할 건 했어. 이제 네 차례야."},
+        {en:"up in the air",ko:"아직 미정이다",ex:"Our plans are still up in the air.",exKo:"계획이 아직 확정 안 됐어."},
+        {en:"wrap your head around",ko:"이해하다",ex:"I can't wrap my head around it.",exKo:"도저히 이해가 안 돼."},
+        {en:"beat around the bush",ko:"돌려 말하다",ex:"Stop beating around the bush.",exKo:"돌려 말하지 마."},
+        {en:"get the hang of",ko:"요령을 터득하다",ex:"I'm getting the hang of it.",exKo:"이제 좀 감이 잡혀."}
+      ];
+      var dayOfYear = Math.floor((new Date()-new Date(new Date().getFullYear(),0,0))/(1000*60*60*24));
+      var todayIdiom = IDIOMS[dayOfYear % IDIOMS.length];
+
       // Extract all 4 verbs from the 2 lesson sets
       var allVerbTags = [];
       if (lessons && lessons.length >= 1) {
@@ -1058,7 +1124,24 @@
             {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}).toUpperCase()}
           </div>
           <div style={{fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4}}>{greeting.t}</div>
-          <div style={{fontSize:14,color:C.muted,marginBottom:20}}>{greeting.s}</div>
+          <div style={{fontSize:14,color:C.muted,marginBottom:12}}>{greeting.s}</div>
+
+          <div onClick={function(){var el=document.getElementById("idiom-detail");if(el)el.style.display=el.style.display==="none"?"block":"block";el.style.maxHeight=el.style.maxHeight==="0px"?"200px":"0px";}} style={{background:C.surface,border:"1px solid "+C.yellow+"25",borderRadius:12,padding:"10px 14px",marginBottom:16,cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+              <span style={{fontSize:11,color:C.yellow,fontWeight:700,letterSpacing:1}}>{"💡 오늘의 표현"}</span>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:C.text}}>
+              <span style={{color:C.yellow}}>{"\""}{todayIdiom.en}{"\""}</span>
+              <span style={{fontSize:13,color:C.muted,fontWeight:400}}>{" = "}{todayIdiom.ko}</span>
+            </div>
+            <div id="idiom-detail" style={{maxHeight:0,overflow:"hidden",transition:"max-height 0.3s ease"}}>
+              <div style={{marginTop:8,padding:"8px 10px",background:C.bg,borderRadius:8}}>
+                <div style={{fontSize:13,color:C.text,fontStyle:"italic",marginBottom:4}}>{"\""}{todayIdiom.ex}{"\""}</div>
+                <div style={{fontSize:12,color:C.muted}}>{todayIdiom.exKo}</div>
+              </div>
+            </div>
+            <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>탭하면 예문 보기</div>
+          </div>
 
           <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"30",borderRadius:16,padding:20,marginBottom:20}}>
             <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6}}>STREAK</div>
@@ -2450,7 +2533,7 @@
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                         <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>인식된 텍스트</div>
-                        <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
+                        <button onClick={function(){navigator.clipboard.writeText(applySpeakerNames(fileTranscript)).then(function(){var b=event.target;b.textContent="복사됨 ✓";setTimeout(function(){b.textContent="전체 복사";},1500);});}} style={{fontSize:10,color:C.accent,background:"none",border:"1px solid "+C.accent+"40",borderRadius:6,padding:"2px 8px",cursor:"pointer"}}>전체 복사</button>
                       </div>
                       {extractSpeakers(fileTranscript).length>0&&(
                         <div style={{background:C.bg,borderRadius:10,padding:10,marginBottom:8}}>
@@ -2532,7 +2615,7 @@
                     <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                         <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"구간 "+(ytSegIdx+1)+" / "+(bgLoading?(ytDuration?("~"+Math.max(ytSegments.length,Math.round(ytDuration/30))):"..."):ytSegments.length)}{bgLoading?" 🔄":""}</div>
-                        <div style={{fontSize:10,color:C.muted}}>수정 가능</div>
+                        <button onClick={function(){navigator.clipboard.writeText(ytTranscript).then(function(){var b=event.target;b.textContent="복사됨 ✓";setTimeout(function(){b.textContent="전체 복사";},1500);});}} style={{fontSize:10,color:C.accent,background:"none",border:"1px solid "+C.accent+"40",borderRadius:6,padding:"2px 8px",cursor:"pointer"}}>전체 복사</button>
                       </div>
                       <div style={{height:4,background:C.border,borderRadius:99,marginBottom:12,overflow:"hidden"}}>
                         <div style={{height:"100%",width:((ytSegIdx+1)/ytSegments.length*100)+"%",background:C.accent,borderRadius:99,transition:"width 0.3s"}}/>
@@ -2612,6 +2695,19 @@
                               <span key={ch.id} style={{background:C.accent+"15",color:C.accent,padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600}}>{ch.title}</span>
                             );})}
                           </div>
+                          <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
+                          {recVideos.map(function(rv){return(
+                            <div key={rv.id} onClick={function(){
+                              setYtUrl("https://youtu.be/"+rv.id);
+                              setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
+                            }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
+                              <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{rv.date?" · "+rv.date:""}</div>
+                              </div>
+                            </div>
+                          );})}
                           {bbcRecs.length>0&&(
                             <div style={{marginBottom:12}}>
                               <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700,marginBottom:8}}>{"⚡ BBC 추천 영상"}</div>
@@ -2640,20 +2736,6 @@
                               );})}
                             </div>
                           )}
-                          <button disabled={recLoading} onClick={loadRandomRecs} style={{width:"100%",background:C.red+"20",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>{recLoading?"영상 찾는 중...":"🎲 랜덤 추천 받기"}</button>
-                          {recVideos.map(function(rv){return(
-                            <div key={rv.id} onClick={function(){
-                              setYtUrl("https://youtu.be/"+rv.id);
-                              // URL만 세팅하고 자막 가져오기 버튼 근처로 스크롤 (자동 fetch X)
-                              setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
-                            }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
-                              <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
-                              <div style={{flex:1}}>
-                                <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{rv.date?" · "+rv.date:""}</div>
-                              </div>
-                            </div>
-                          );})}
                         </div>
                       ):(
                         <div style={{fontSize:12,color:C.muted,textAlign:"center",padding:"20px 0"}}>
@@ -2745,7 +2827,7 @@
                     )}
                     <div style={{background:C.surface,border:"1px solid "+color+"40",borderLeft:"3px solid "+color,borderRadius:10,padding:14}}>
                       {t.original&&(
-                        <div style={{fontSize:12,color:C.muted,lineHeight:1.4,marginBottom:8,fontStyle:"italic",opacity:0.6}}>{(t.original||"").replace(/\*\*/g,"")}</div>
+                        <div style={{fontSize:13,color:C.muted,lineHeight:1.5,marginBottom:8,fontStyle:"italic",opacity:0.75}}>{highlightVerbs((t.original||"").replace(/\*\*/g,""),t.verbs_used)}</div>
                       )}
                       <div style={{fontSize:16,color:C.text,fontWeight:600,lineHeight:1.5,marginBottom:4}}>{renderHighlight(t.english,t.verbs_used)}</div>
                       {t.korean&&(
@@ -2783,7 +2865,7 @@
                         <span style={{fontSize:10,color:vColor,fontWeight:700}}>{isPhrasal?"구동사":"기본"}</span>
                         <span style={{fontSize:13,color:C.muted}}>{v.meaning}</span>
                       </div>
-                      {v.example&&<div onClick={function(e){speakEnglish(stripStars(v.example),e.currentTarget);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(v.example)}{"\""}</div>}
+                      {v.example&&<div style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2}}>{"\""}{stripStars(v.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -2803,7 +2885,7 @@
                         <span style={{color:C.blue,fontWeight:800,fontSize:16}}>{n.noun}</span>
                         <span style={{fontSize:13,color:C.muted}}>{n.meaning_ko}</span>
                       </div>
-                      {n.example&&<div onClick={function(e){speakEnglish(stripStars(n.example),e.currentTarget);}} style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2,cursor:"pointer"}}>{"🔊 \""}{stripStars(n.example)}{"\""}</div>}
+                      {n.example&&<div style={{fontSize:12,color:C.text,fontStyle:"italic",marginLeft:2}}>{"\""}{stripStars(n.example)}{"\""}</div>}
                     </div>
                   );})}
                   </div>}
@@ -3727,7 +3809,7 @@
             )}
           </div>
 
-          <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:90}}>
+          <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:120}}>
             {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} lbData={lbData} userId={user?user.uid:null}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
