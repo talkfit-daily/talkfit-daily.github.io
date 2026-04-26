@@ -2946,7 +2946,7 @@
                       </div>
                       <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{stripStars(vc.diff_ko)}</div>
                       {vc.examples&&vc.examples.map(function(ex,ei){return(
-                        <div key={ei} onClick={function(e){speakEnglish(stripStars(ex),e.currentTarget);}} style={{fontSize:12,color:C.muted,cursor:"pointer",marginBottom:3}}>{"🔊 "}{stripStars(ex)}</div>
+                        <div key={ei} style={{fontSize:12,color:C.muted,marginBottom:3}}>{stripStars(ex)}</div>
                       );})}
                     </div>
                   );})}
