@@ -30,7 +30,7 @@
   </style>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{background:#08090d;color:#e8eaf0;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;}
+    body{background:#08090d;color:#e8eaf0;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;overscroll-behavior-y:contain;}
     input,textarea,button{font-family:inherit;}
     a{color:inherit;}
     textarea::placeholder{color:#2a2f45;}
@@ -603,13 +603,12 @@
         quizzes.push({type:"fillblank", question:blank6, hint:ex6.korean, options:opts6, answer:b2.verb, verb:b2.verb});
       }
 
-      // Q7: situation quiz
+      // Q7: situation quiz — 오답은 다른 동사의 예문만 (같은 동사 예문 제외)
       var sitEx = allExamples[Math.floor(Math.random() * allExamples.length)];
-      var wrongEng = allExamples.filter(function(e){return e.ex.english !== sitEx.ex.english;}).map(function(e){return e.ex.english;});
-      wrongEng = wrongEng.concat(wrongSentences);
+      var wrongEng = allExamples.filter(function(e){return e.verb !== sitEx.verb && e.ex.english !== sitEx.ex.english;}).map(function(e){return e.ex.english;});
       var uniqueWrongEng = [];
       for (var we = 0; we < wrongEng.length; we++) {
-        if (uniqueWrongEng.indexOf(wrongEng[we]) === -1 && wrongEng[we] !== sitEx.ex.english) {
+        if (uniqueWrongEng.indexOf(wrongEng[we]) === -1) {
           uniqueWrongEng.push(wrongEng[we]);
         }
       }
@@ -1876,7 +1875,7 @@
         if (!filled.length) return;
         setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[tabId]=true; return n;});
         var v = lessons[tab.lessonIdx][tab.type];
-        var system = 'You are a strict but encouraging American English tutor.\n\nJudge if the student\'s sentences correctly use the given verb. Be strict:\n- If the sentence is gibberish, random letters, or doesn\'t make sense → verdict: "retry"\n- If the verb is not used or used completely wrong → verdict: "retry"\n- If the sentence has errors but shows effort and uses the verb → verdict: "pass"\n- If the sentence is good → verdict: "pass"\n\nCRITICAL RULES:\n- "corrected" MUST use the EXACT SAME given verb. NEVER replace it with a synonym (e.g. don\'t change "check out" to "grab", don\'t change "feel like" to "be in the mood"). Fix grammar/phrasing but KEEP the verb.\n- Keep corrected sentences short and close to the original structure.\n\nReturn ONLY valid JSON:\n{"verdict":"pass or retry","overall":"전체 피드백(한국어,2문장). retry면 왜 다시 써야하는지 설명","corrections":[{"original":"...","corrected":"...","explanation":"왜 이렇게 고쳤는지(한국어,1문장)"}],"bonus":"해당 동사를 활용한 실생활 예문 1개(영어, pass일때만, 12단어 이내)"}';
+        var system = 'You are a strict but encouraging American English tutor.\n\nJudge if the student\'s sentences correctly use the given verb. Be strict:\n- If the sentence is gibberish, random letters, or doesn\'t make sense → verdict: "retry"\n- If the verb is not used or used completely wrong → verdict: "retry"\n- If the sentence has errors but shows effort and uses the verb → verdict: "pass"\n- If the sentence is good → verdict: "pass"\n\nCRITICAL RULES:\n- "corrected" MUST use the EXACT SAME given verb. NEVER replace it with a synonym (e.g. don\'t change "check out" to "grab", don\'t change "feel like" to "be in the mood"). Fix grammar/phrasing but KEEP the verb.\n- Keep corrected sentences short and close to the original structure.\n- NEVER correct ONLY punctuation (commas, periods). If the only difference is a missing period or comma, the sentence is fine — set corrected = original. Focus on grammar, word choice, and natural phrasing.\n\nReturn ONLY valid JSON:\n{"verdict":"pass or retry","overall":"전체 피드백(한국어,2문장). retry면 왜 다시 써야하는지 설명","corrections":[{"original":"...","corrected":"...","explanation":"왜 이렇게 고쳤는지(한국어,1문장)"}],"bonus":"해당 동사를 활용한 실생활 예문 1개(영어, pass일때만, 12단어 이내)"}';
         callClaude(system, 'Verb: "'+v.verb+'" ('+v.meaning_ko+')\nSentences:\n'+filled.map(function(s,i){return (i+1)+". "+s;}).join("\n"))
         .then(function(raw){
           var pJson = raw;
