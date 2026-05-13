@@ -3047,7 +3047,13 @@
                 var remaining = fills.slice(2).concat(orders.slice(2));
                 while(picked.length<4&&remaining.length>0) picked.push(remaining.shift());
                 allQuestions = picked;
-                if(allQuestions.length===0) return null;
+                if(allQuestions.length===0) return (
+                  <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:16,padding:20,marginBottom:16,textAlign:"center"}}>
+                    <div style={{fontSize:14,color:C.text,marginBottom:8,fontWeight:700}}>{"📭 이 세션에서는 연습 문제를 만들 수 없어요"}</div>
+                    <div style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>{"문장이 짧거나 옛 데이터 구조여서 빈칸/순서 문제를 추출하지 못했어요. 새 대화로 다시 시도해보세요."}</div>
+                    <button onClick={function(){setPracticeMode(false);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);}} style={{width:"100%",background:C.orange,color:"#08090d",border:"none",borderRadius:12,padding:12,fontSize:14,fontWeight:800,cursor:"pointer"}}>{"← 돌아가기"}</button>
+                  </div>
+                );
                 var q = allQuestions[practiceIdx%allQuestions.length];
                 var isLast = practiceIdx>=allQuestions.length-1;
 
@@ -3507,7 +3513,7 @@
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
-              {"TalkFit v1.3.0 (Beta)"}<br/>
+              {"TalkFit v1.3.3 (Beta)"}<br/>
               {"© 2026 TalkFit. All rights reserved."}<br/>
               {"문의: krave.official.team@gmail.com"}<br/>
               <a href="/privacy.html" target="_blank" style={{color:C.accent,textDecoration:"underline"}}>개인정보처리방침</a>
