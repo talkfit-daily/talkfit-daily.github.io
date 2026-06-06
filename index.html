@@ -3021,29 +3021,39 @@
                   var kor = t.korean;
                   // 너무 짧은 문장 제외 (4단어 미만)
                   if(eng.split(" ").length<4) return;
-                  // 빈칸 채우기
+                  // 빈칸 채우기 (verbs_used 전체 순회 — 매칭 확률 ↑)
                   if(t.verbs_used&&t.verbs_used.length>0){
-                    var verb = t.verbs_used[0];
-                    var blank = makeVerbBlank(eng, verb.verb);
-                    if(blank!==eng) allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
+                    for(var vi=0;vi<t.verbs_used.length;vi++){
+                      var verb = t.verbs_used[vi];
+                      var blank = makeVerbBlank(eng, verb.verb);
+                      if(blank!==eng){
+                        allQuestions.push({type:"fill",korean:kor,sentence:blank,answer:verb.verb,english:eng});
+                        break;
+                      }
+                    }
                   }
-                  // 순서 맞추기 (4~8단어)
-                  if(eng.split(" ").length>=4&&eng.split(" ").length<=8){
+                  // 순서 맞추기 (4~12단어 — 유튜브 영문 문장 커버)
+                  if(eng.split(" ").length>=4&&eng.split(" ").length<=12){
                     var words = eng.split(" ");
                     var shuffled = [].concat(words);
                     for(var si=shuffled.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var tmp=shuffled[si];shuffled[si]=shuffled[sj];shuffled[sj]=tmp;}
                     allQuestions.push({type:"order",korean:kor,words:shuffled,answer:eng});
                   }
+                  // 한→영 번역 (모든 turn에서 1문제 보장 — fallback)
+                  allQuestions.push({type:"translate",korean:kor,answer:eng});
                 });
-                // 빈칸 2개 + 순서 2개, 최소 4문제 보장
+                // 빈칸 2개 + 순서 2개 + 번역으로 4문제 채움
                 var fills = allQuestions.filter(function(q){return q.type==="fill";});
                 var orders = allQuestions.filter(function(q){return q.type==="order";}).sort(function(a,b){return a.words.length-b.words.length;});
+                var translates = allQuestions.filter(function(q){return q.type==="translate";});
                 var picked = [];
                 // 빈칸 최대 2개
                 for(var fi=0;fi<Math.min(2,fills.length);fi++) picked.push(fills[fi]);
                 // 순서 최대 2개
                 for(var oi=0;oi<Math.min(2,orders.length);oi++) picked.push(orders[oi]);
-                // 4문제 미달이면 남은 것에서 채움
+                // 4문제 미달이면 번역으로 채움
+                for(var ti=0;ti<translates.length&&picked.length<4;ti++) picked.push(translates[ti]);
+                // 그래도 미달이면 남은 fill/order로 채움
                 var remaining = fills.slice(2).concat(orders.slice(2));
                 while(picked.length<4&&remaining.length>0) picked.push(remaining.shift());
                 allQuestions = picked;
@@ -3513,7 +3523,7 @@
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
-              {"TalkFit v1.3.3 (Beta)"}<br/>
+              {"TalkFit v1.3.4 (Beta)"}<br/>
               {"© 2026 TalkFit. All rights reserved."}<br/>
               {"문의: krave.official.team@gmail.com"}<br/>
               <a href="/privacy.html" target="_blank" style={{color:C.accent,textDecoration:"underline"}}>개인정보처리방침</a>
