@@ -34,9 +34,9 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "서버 설정 오류" });
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+  const callGemini = async (model) => {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,18 +53,27 @@ export default async function handler(req, res) {
         }),
       }
     );
+    const d = await r.json();
+    return { ok: r.ok, status: r.status, data: d };
+  };
 
-    const data = await response.json();
-    if (!response.ok) {
-      if (response.status === 429) {
-        return res.status(429).json({ error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요." });
-      }
-      return res.status(502).json({ error: "음성 인식 오류. 잠시 후 다시 시도해주세요." });
+  try {
+    let result = await callGemini("gemini-2.5-flash");
+    if (!result.ok && (result.status === 429 || result.status >= 500)) {
+      result = await callGemini("gemini-2.0-flash");
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!result.ok) {
+      const geminiMsg = result.data?.error?.message || "(no detail)";
+      if (result.status === 429) {
+        return res.status(429).json({ error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요.", detail: geminiMsg });
+      }
+      return res.status(502).json({ error: "음성 인식 오류. 잠시 후 다시 시도해주세요.", detail: geminiMsg, status: result.status });
+    }
+
+    const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     return res.status(200).json({ text });
   } catch (err) {
-    return res.status(500).json({ error: "서버 오류가 발생했어요." });
+    return res.status(500).json({ error: "서버 오류가 발생했어요.", detail: err.message });
   }
 }

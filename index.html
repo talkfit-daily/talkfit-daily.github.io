@@ -35,6 +35,7 @@
     a{color:inherit;}
     textarea::placeholder{color:#2a2f45;}
     @keyframes pulse1{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.8);opacity:0}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes dot{from{opacity:0.2}to{opacity:1}}
     @keyframes confettiFall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
     @keyframes correctFlash{0%{background:#7ee8a220}50%{background:#7ee8a240}100%{background:#7ee8a220}}
@@ -121,7 +122,7 @@
     const CREATOR_NAME = "by TalkFit";
 
     // ── STORAGE ─────────────────────────────────────────────────────
-    var PERSIST_KEYS = ["is_guest","theme","font_size","onboarding_done","speak_guide_seen","my_channels"];
+    var PERSIST_KEYS = ["is_guest","theme","font_size","onboarding_done","speak_guide_seen","my_channels","is_premium"];
     function _isGuest() {
       try { return JSON.parse(localStorage.getItem("tf_is_guest")); } catch { return false; }
     }
@@ -636,7 +637,12 @@
     }
 
     // ── CLAUDE API (via server proxy) ──────────────────────────────
+    function isPremiumUser() {
+      return load("is_premium") === true;
+    }
+
     var aiRemaining = (function(){
+      if (isPremiumUser()) return 9999;
       var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       var cached=load("ai_remaining_data");
       if(cached&&cached.date===todayK) return cached.count;
@@ -645,24 +651,163 @@
     var aiRemainingListeners = [];
     function onAiRemainingChange(fn) { aiRemainingListeners.push(fn); }
     function setAiRemaining(v) {
+      if (isPremiumUser()) {
+        aiRemaining = 9999;
+        aiRemainingListeners.forEach(function(fn){fn(9999);});
+        return;
+      }
       aiRemaining = v;
       var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       save("ai_remaining_data",{date:todayK,count:v});
       aiRemainingListeners.forEach(function(fn){fn(v);});
     }
 
+    function getMockClaudeResponse(system, user) {
+      if (user.indexOf("Generate today's lesson") !== -1) {
+        return JSON.stringify({
+          "verb": "head",
+          "meaning_ko": "향하다",
+          "pronounce": "/hed/",
+          "hint": "어느 방향으로 이동하거나 출발할 때 자주 씁니다.",
+          "verbs": [
+            {
+              "verb": "head out",
+              "meaning_ko": "출발하다, 자리를 뜨다",
+              "example_en": "I think I will head out now.",
+              "example_ko": "나 이제 출발할게.",
+              "pattern": "head out (for 장소/시간)",
+              "quiz_type": "reorder",
+              "quiz_data": {
+                "question": "나 이제 자리를 떠야겠어. (head / out / think / I / should / now)",
+                "options": ["I", "think", "I", "should", "head", "out", "now"],
+                "answer": ["I", "think", "I", "should", "head", "out", "now"],
+                "hint": "I think I should..."
+              },
+              "roleplay_sit": "친구가 파티에서 먼저 가보겠다고 말하는 상황",
+              "roleplay_partner": "Oh, are you leaving already?",
+              "roleplay_ideal": "Yeah, I think I'll head out now."
+            },
+            {
+              "verb": "head to",
+              "meaning_ko": "~로 향하다",
+              "example_en": "Let's head to the cafe.",
+              "example_ko": "카페로 가자.",
+              "pattern": "head to (장소)",
+              "quiz_type": "blank",
+              "quiz_data": {
+                "question": "우리는 지금 공항으로 가고 있어. We are [blank] to the airport.",
+                "options": ["heading"],
+                "answer": ["heading"],
+                "hint": "head에 -ing를 붙여 진행형을 만드세요."
+              },
+              "roleplay_sit": "주말에 약속 장소로 가기 위해 만난 상황",
+              "roleplay_partner": "Where should we go for lunch?",
+              "roleplay_ideal": "Let's head to the pizza place."
+            }
+          ]
+        });
+      }
+      if (user.indexOf("Evaluate:") !== -1) {
+        return JSON.stringify({
+          "score": 95,
+          "feedback_ko": "완벽합니다! 구동사 head out을 문맥에 맞게 아주 잘 사용하셨습니다. 발음도 훌륭합니다.",
+          "corrected": "Yeah, I think I'll head out now."
+        });
+      }
+      if (user.indexOf("한국어 대화") !== -1 || user.indexOf("이따가") !== -1 || user.indexOf("피곤") !== -1) {
+        if (user.indexOf("피곤") !== -1) {
+          return JSON.stringify({
+            "scenario": "피곤해서 먼저 귀가하겠다고 친구나 동료에게 말하는 상황",
+            "speakers": 1,
+            "turns": [
+              {
+                "speaker": "나",
+                "original": "나 오늘 너무 피곤해서 먼저 **들어갈게**.",
+                "english": "I'm so tired today, I think I'll **head out** first.",
+                "korean": "나 오늘 너무 피곤해서 먼저 **들어갈게**.",
+                "verbs_used": [
+                  {"verb": "head out", "type": "phrasal", "usage": "출발하다/떠나다"}
+                ]
+              }
+            ],
+            "key_verbs": [
+              {"verb": "head out", "type": "phrasal", "meaning": "출발하다, 자리를 뜨다", "example": "Let's head out before the traffic gets bad."}
+            ],
+            "key_nouns": [
+              {"noun": "energy", "meaning_ko": "에너지/기운", "example": "I have no energy left today."}
+            ],
+            "verb_compare": [
+              {"verbs": ["go home", "head out"], "diff_ko": "go home은 단순히 집으로 가는 동작에 집중하고, head out은 현재 있는 자리를 먼저 떠나는 뉘앙스가 강합니다.", "examples": ["I want to go home.", "I will head out now."]}
+            ],
+            "coach_tip": "먼저 자리를 뜰 때 'go' 대신 구동사 'head out'을 쓰면 훨씬 세련되고 네이티브다운 느낌을 줍니다."
+          });
+        }
+        return JSON.stringify({
+          "scenario": "이따가 모바일 메신저(카톡)로 연락을 주겠다는 일상적인 상황",
+          "speakers": 1,
+          "turns": [
+            {
+              "speaker": "나",
+              "original": "이따가 **카톡할게**!",
+              "english": "I'll **text** you later!",
+              "korean": "이따가 **카톡할게**!",
+              "verbs_used": [
+                {"verb": "text", "type": "basic", "usage": "문자하다"}
+              ]
+            }
+          ],
+          "key_verbs": [
+            {"verb": "text", "type": "basic", "meaning": "문자를 보내다", "example": "I'll text you when I get there."}
+          ],
+          "key_nouns": [
+            {"noun": "message", "meaning_ko": "메시지", "example": "Send me a message."}
+          ],
+          "verb_compare": [
+            {"verbs": ["text", "call"], "diff_ko": "text는 문자나 카카오톡 등 메시지를 보낼 때 사용하고, call은 전화를 걸 때 사용합니다.", "examples": ["I will text you.", "I will call you."]}
+          ],
+          "coach_tip": "한국인들이 '카톡할게'라고 할 때 영어로는 단순히 'text' 동사를 쓰면 완벽하게 의미가 전달됩니다. 'talk on KakaoTalk' 같은 어색한 표현 대신 원어민이 매일 쓰는 'text'를 입에 익혀보세요!"
+        });
+      }
+      return "Sure, that sounds great! Let me know if you need any translations or feedback.";
+    }
+
     async function callClaude(system, user) {
       var xp = (load("xp_state")||{xp:0}).xp;
       var lv = getLevel(xp);
-      var res = await fetch("/api/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ system: system, user: user, level: lv.level }),
-      });
-      var data = await res.json();
+      var res;
+      try {
+        res = await fetch("/api/claude", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ system: system, user: user, level: lv.level, isPremium: isPremiumUser() }),
+        });
+      } catch (e) {
+        if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+          console.warn("API offline on localhost. Returning mock data.");
+          return getMockClaudeResponse(system, user);
+        }
+        throw e;
+      }
+
+      var isMock = false;
+      var data = {};
       if (!res.ok) {
-        if (data.remaining !== undefined) setAiRemaining(data.remaining);
-        throw new Error(data.error || "AI 오류");
+        if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+          isMock = true;
+        } else {
+          try { data = await res.json(); } catch(err){}
+          if (data.remaining !== undefined) setAiRemaining(data.remaining);
+          if (res.status === 429 && window.__showPremiumModal) {
+            window.__showPremiumModal();
+          }
+          throw new Error(data.error || "AI 오류");
+        }
+      } else {
+        try { data = await res.json(); } catch(err){}
+      }
+
+      if (isMock) {
+        return getMockClaudeResponse(system, user);
       }
       if (data.remaining !== undefined) setAiRemaining(data.remaining);
       return data.text || "";
@@ -1040,6 +1185,101 @@
       );
     }
 
+    // ── PREMIUM MODAL ────────────────────────────────────────────────
+    function PremiumModal(props) {
+      var show = props.show;
+      var onClose = props.onClose;
+      var onUpgrade = props.onUpgrade;
+      var isPremium = props.isPremium;
+      var _p1 = useState("annual"); var selectedPlan = _p1[0]; var setSelectedPlan = _p1[1];
+      var _p2 = useState(false); var purchased = _p2[0]; var setPurchased = _p2[1];
+
+      if (!show) return null;
+
+      function handlePurchase() {
+        setPurchased(true);
+        setTimeout(function() {
+          if (typeof showConfetti === "function") showConfetti();
+          onUpgrade();
+          setPurchased(false);
+          onClose();
+        }, 1500);
+      }
+
+      return (
+        <div style={{position:"fixed",inset:0,background:"rgba(8,9,13,0.95)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(10px)",animation:"fadeIn 0.3s"}}>
+          <div style={{background:"linear-gradient(160deg, #10121a, #08090d)",border:"1px solid "+C.border,borderRadius:24,padding:24,maxWidth:360,width:"100%",animation:"levelUp 0.4s",position:"relative",boxShadow:"0 10px 30px rgba(0,0,0,0.5)",color:C.text}}>
+            <button onClick={onClose} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer"}}>{"✕"}</button>
+            
+            {purchased ? (
+              <div style={{textAlign:"center",padding:"40px 0"}}>
+                <div style={{fontSize:60,marginBottom:16,animation:"levelUp 0.5s"}}>{"👑"}</div>
+                <div style={{fontSize:20,fontWeight:900,color:C.accent,marginBottom:8}}>결제가 완료되었습니다!</div>
+                <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>
+                  이제 TalkFit Premium 멤버십으로<br/>
+                  <strong>무제한 AI 학습</strong>이 가능합니다. 🚀
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{textAlign:"center",marginBottom:20}}>
+                  <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"linear-gradient(135deg,#fbbf24,#ea580c)",padding:"4px 12px",borderRadius:20,marginBottom:10,boxShadow:"0 2px 10px rgba(234,88,12,0.2)"}}>
+                    <span style={{fontSize:11,fontWeight:900,color:"#fff"}}>{"TALKFIT PREMIUM"}</span>
+                  </div>
+                  <div style={{fontSize:22,fontWeight:900,color:C.text,lineHeight:1.2}}>원어민 수준의 회화,<br/>한계 없이 훈련하세요</div>
+                </div>
+
+                <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:24,textAlign:"left"}}>
+                  {[
+                    {icon:"🚀",title:"무제한 AI 교정 & 대화",desc:"하루 30회 제한 없이 무한 피드백 제공"},
+                    {icon:"🧠",title:"나만의 AI 레슨 무한 생성",desc:"대화 속 모르는 동사로 즉석 레슨 카드 생성"},
+                    {icon:"📊",title:"취약 동사 심층 분석",desc:"오답 패턴과 말해보카식 학습 통계 제공"},
+                    {icon:"✨",title:"평생 학습 기록 보존",desc:"기기 변경 시에도 모든 기록 안전하게 동기화"}
+                  ].map(function(f,i){return(
+                    <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                      <div style={{fontSize:18,marginTop:2}}>{f.icon}</div>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:C.text}}>{f.title}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>{f.desc}</div>
+                      </div>
+                    </div>
+                  );})}
+                </div>
+
+                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20,textAlign:"left"}}>
+                  <div onClick={function(){setSelectedPlan("annual");}} style={{position:"relative",background:selectedPlan==="annual"?C.accent+"08":C.surface,border:"1px solid "+(selectedPlan==="annual"?C.accent:C.border),borderRadius:14,padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all 0.2s"}}>
+                    <div style={{position:"absolute",top:-8,left:16,background:C.accent,color:"#08090d",fontSize:9,fontWeight:900,padding:"2px 8px",borderRadius:6}}>{"추천 & 50% 할인"}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:800,color:selectedPlan==="annual"?C.accent:C.text}}>연간 플랜 (12개월)</div>
+                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>연 58,800원 일시불 결제</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:15,fontWeight:900,color:C.text}}>월 4,900원</div>
+                      <div style={{fontSize:10,color:C.muted,textDecoration:"line-through"}}>월 9,900원</div>
+                    </div>
+                  </div>
+                  <div onClick={function(){setSelectedPlan("monthly");}} style={{background:selectedPlan==="monthly"?C.accent+"08":C.surface,border:"1px solid "+(selectedPlan==="monthly"?C.accent:C.border),borderRadius:14,padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all 0.2s"}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:800,color:selectedPlan==="monthly"?C.accent:C.text}}>월간 플랜</div>
+                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>매월 정기 결제, 언제든 해지 가능</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:15,fontWeight:900,color:C.text}}>월 9,900원</div>
+                    </div>
+                  </div>
+                </div>
+
+                <button onClick={handlePurchase} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 12px "+C.accent+"30"}}>
+                  {selectedPlan==="annual" ? "프리미엄 1년 시작하기" : "프리미엄 월간 플랜 시작하기"}
+                </button>
+                <div style={{fontSize:10,color:C.muted,textAlign:"center",marginTop:10}}>언제든지 설정에서 해지하실 수 있으며 7일간 전액 환불을 보장합니다.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     // ── HOME ────────────────────────────────────────────────────────
     function HomeScreen(props) {
       var todayDone=props.todayDone, lessons=props.lessons, onStart=props.onStart, onSpeak=props.onSpeak, onChat=props.onChat, lbData=props.lbData, userId=props.userId;
@@ -1286,7 +1526,7 @@
           )}
 
           <div style={{display:"flex",gap:10,marginTop:4}}>
-            {[{label:"학습한 날",value:streak+"일"},{label:"AI 남은 횟수",value:aiRemaining+"회"}].map(function(s,i){return(
+            {[{label:"학습한 날",value:streak+"일"},{label:"AI 남은 횟수",value:isPremiumUser()?"무제한":aiRemaining+"회"}].map(function(s,i){return(
               <div key={i} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px"}}>
                 <div style={{fontSize:18,fontWeight:800}}>{s.value}</div>
                 <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
@@ -3501,6 +3741,25 @@
             )}
           </div>
 
+          {/* 프리미엄 멤버십 관리 */}
+          <div style={{background:C.surface,border:"1px solid "+(props.isPremium?C.accent+"40":C.border),borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:props.isPremium?C.accent:C.text,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+              {"👑 TalkFit Premium"}
+              {props.isPremium && <span style={{fontSize:9,background:C.accent+"20",color:C.accent,padding:"2px 6px",borderRadius:4}}>활성화 중</span>}
+            </div>
+            {props.isPremium ? (
+              <div>
+                <div style={{fontSize:11,color:C.muted,marginBottom:12}}>무제한 AI 학습과 심층 분석을 이용하고 계십니다.</div>
+                <button onClick={props.onDowngrade} style={{width:"100%",background:"none",border:"1px solid "+C.border,color:C.muted,borderRadius:10,padding:10,fontSize:12,fontWeight:600,cursor:"pointer"}}>멤버십 해지 (데모)</button>
+              </div>
+            ) : (
+              <div>
+                <div style={{fontSize:11,color:C.muted,marginBottom:12}}>일 30회 한도를 없애고 모든 AI 레슨과 무제한 교정을 만나보세요!</div>
+                <button onClick={props.onUpgradeClick} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:"pointer"}}>Premium 시작하기</button>
+              </div>
+            )}
+          </div>
+
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
             <div style={{display:"flex",gap:8}}>
@@ -3523,7 +3782,7 @@
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
-              {"TalkFit v1.3.4 (Beta)"}<br/>
+              {"TalkFit v1.4.1 (Beta)"}<br/>
               {"© 2026 TalkFit. All rights reserved."}<br/>
               {"문의: krave.official.team@gmail.com"}<br/>
               <a href="/privacy.html" target="_blank" style={{color:C.accent,textDecoration:"underline"}}>개인정보처리방침</a>
@@ -3608,7 +3867,23 @@
       var _s6=useState(false); var loading=_s6[0]; var setLoading=_s6[1];
       var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
       var _s8=useState([]); var verbHistory=_s8[0]; var setVerbHistory=_s8[1];
-      var aiAvailable = true;
+      var _isPremium = useState(function(){return loadLocal("is_premium")||false;}); var isPremium = _isPremium[0]; var setIsPremium = _isPremium[1];
+      var _showPremium = useState(false); var showPremium = _showPremium[0]; var setShowPremium = _showPremium[1];
+      var aiAvailable = isPremium || aiLeft > 0;
+
+      useEffect(function(){
+        window.__showPremiumModal = function() {
+          setShowPremium(true);
+        };
+        return function(){ window.__showPremiumModal = null; };
+      }, []);
+
+      function handleUpgrade() {
+        setIsPremium(true);
+        saveLocal("is_premium", true);
+        if (user) saveCloud(user.uid, "is_premium", true);
+        setAiLeft(9999);
+      }
 
       var _authState = useState(null); var user = _authState[0]; var setUser = _authState[1];
       var _authLoading = useState(true); var authLoading = _authLoading[0]; var setAuthLoading = _authLoading[1];
@@ -3858,7 +4133,16 @@
                   <button onClick={function(){setIsGuest(false);saveLocal("is_guest",false);}} style={{background:C.accent+"20",border:"1px solid "+C.accent+"40",color:C.accent,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"로그인"}</button>
                 )}
                 {isAdmin && <button onClick={function(){setScreen("admin");}} style={{background:C.yellowDim,border:"1px solid "+C.yellow+"40",color:C.yellow,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>{"📊"}</button>}
-                <div style={{fontSize:10,color:aiLeft<=5?C.red:C.muted,background:aiLeft<=5?C.red+"15":C.surface,border:"1px solid "+(aiLeft<=5?C.red+"40":C.border),borderRadius:6,padding:"2px 6px"}}>{"AI "+aiLeft}</div>
+                {isPremium ? (
+                  <button onClick={function(){setShowPremium(true);}} style={{fontSize:10,color:"#fff",background:"linear-gradient(135deg,#fbbf24,#ea580c)",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontWeight:800,display:"flex",alignItems:"center",gap:3,boxShadow:"0 2px 10px rgba(234,88,12,0.3)"}}>
+                    {"PRO 👑"}
+                  </button>
+                ) : (
+                  <button onClick={function(){setShowPremium(true);}} style={{fontSize:10,color:aiLeft<=5?C.red:C.accent,background:aiLeft<=5?C.red+"15":C.accentDim,border:"1px solid "+(aiLeft<=5?C.red+"40":C.accent+"30"),borderRadius:6,padding:"3px 8px",cursor:"pointer",fontWeight:700,display:"flex",alignItems:"center",gap:3}}>
+                    <span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:aiLeft<=5?C.red:C.accent,animation:aiLeft<=5?"none":"pulse1 1.5s infinite"}}></span>
+                    {"AI "+aiLeft}
+                  </button>
+                )}
                 <div style={{fontSize:12,color:C.muted}}>{streak}{"🔥"}</div>
                 <button onClick={function(){setScreen("settings");}} style={{background:"none",border:"none",color:C.muted,padding:"6px",cursor:"pointer"}}>
                   {React.createElement("svg",{width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"},
@@ -3880,7 +4164,7 @@
             <div style={{display:screen==="speak"?"block":"none"}}><SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/></div>
             {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
             {screen==="admin"&&<AdminScreen/>}
-            {screen==="settings"&&<SettingsScreen onClose={function(){setScreen("home");setTab("home");}} user={user} onLogout={function(){signOutUser();setIsGuest(false);saveLocal("is_guest",false);setScreen("home");}}/>}
+            {screen==="settings"&&<SettingsScreen onClose={function(){setScreen("home");setTab("home");}} user={user} onLogout={function(){signOutUser();setIsGuest(false);saveLocal("is_guest",false);setScreen("home");}} isPremium={isPremium} onUpgradeClick={function(){setShowPremium(true);}} onDowngrade={function(){if(confirm("멤버십을 해지하시겠습니까? (다시 무료 모드로 변경됩니다)")){setIsPremium(false);saveLocal("is_premium",false);if(user)saveCloud(user.uid,"is_premium",false);setAiLeft(30);}}}/>}
           </div>
 
           {screen!=="practice"&&screen!=="admin"&&screen!=="chat"&&(
@@ -3903,6 +4187,7 @@
             </div>
           )}
           <PraiseModal data={praiseData} onClose={closePraise}/>
+          <PremiumModal show={showPremium} onClose={function(){setShowPremium(false);}} onUpgrade={handleUpgrade} isPremium={isPremium}/>
           {levelUpData&&(
             <div onClick={function(){setLevelUpData(null);}} style={{position:"fixed",inset:0,background:"#000d",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",animation:"splashFade 0.3s",cursor:"pointer"}}>
               <div style={{background:"linear-gradient(135deg,"+C.accent+"30,"+C.blue+"30)",border:"2px solid "+C.accent,borderRadius:24,padding:"40px 32px",textAlign:"center",maxWidth:340,animation:"levelUp 0.6s"}}>

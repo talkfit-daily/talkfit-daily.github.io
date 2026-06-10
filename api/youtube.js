@@ -58,30 +58,52 @@ export default async function handler(req) {
       if (oRes.ok) { const od = await oRes.json(); title = od.title || ""; }
     }
 
-    // 2. Gemini로 영상 음성 직접 인식
+    // 2. Gemini로 영상 음성 직접 인식 (2.5-flash → 2.0-flash 자동 fallback)
     if (!geminiKey) return new Response(JSON.stringify({ error: "서버 설정 오류" }), { status: 500, headers });
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: "You are a precise transcriber. Watch this YouTube video and transcribe ALL spoken dialogue exactly as said. Write Korean parts in Korean, English parts in English. Output ONLY the transcript, one line per sentence. Do NOT summarize, paraphrase, or add commentary. Do NOT add timestamps." }] },
-          contents: [{ role: "user", parts: [
-            { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}`, mimeType: "video/mp4" } },
-            { text: "이 영상에서 말하는 내용을 전부 있는 그대로 받아적어줘." }
-          ] }],
-          generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
-        }),
-      }
-    );
+    const callGemini = async (model) => {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: "You are a precise transcriber. Watch this YouTube video and transcribe ALL spoken dialogue exactly as said. Write Korean parts in Korean, English parts in English. Output ONLY the transcript, one line per sentence. Do NOT summarize, paraphrase, or add commentary. Do NOT add timestamps." }] },
+            contents: [{ role: "user", parts: [
+              { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}`, mimeType: "video/mp4" } },
+              { text: "이 영상에서 말하는 내용을 전부 있는 그대로 받아적어줘." }
+            ] }],
+            generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } },
+          }),
+        }
+      );
+      const d = await r.json();
+      return { ok: r.ok, status: r.status, data: d };
+    };
 
-    const gData = await geminiRes.json();
-    const transcribed = gData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    let result = await callGemini("gemini-2.5-flash");
+    if (!result.ok && (result.status === 429 || result.status >= 500)) {
+      result = await callGemini("gemini-2.0-flash");
+    }
+
+    if (!result.ok) {
+      const geminiMsg = result.data?.error?.message || "(no detail)";
+      if (result.status === 429) {
+        return new Response(JSON.stringify({ error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요.", detail: geminiMsg }), { status: 429, headers });
+      }
+      return new Response(JSON.stringify({ error: "영상 처리 오류", detail: geminiMsg, status: result.status }), { status: 502, headers });
+    }
+
+    const transcribed = result.data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     if (!transcribed) {
-      return new Response(JSON.stringify({ error: "영상 음성을 인식할 수 없어요. 다른 영상을 시도해주세요." }), { status: 404, headers });
+      const finishReason = result.data.candidates?.[0]?.finishReason || "";
+      const safetyRatings = result.data.candidates?.[0]?.safetyRatings;
+      return new Response(JSON.stringify({
+        error: "영상 음성을 인식할 수 없어요. 다른 영상을 시도해주세요.",
+        detail: `finishReason=${finishReason}`,
+        safetyRatings,
+      }), { status: 404, headers });
     }
 
     let transcript = transcribed;
@@ -89,6 +111,6 @@ export default async function handler(req) {
 
     return new Response(JSON.stringify({ title, language: "auto", transcript, videoId, source: "audio" }), { status: 200, headers });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "오류: " + (err.message || "") }), { status: 500, headers });
+    return new Response(JSON.stringify({ error: "오류: " + (err.message || ""), detail: err.message }), { status: 500, headers });
   }
 }

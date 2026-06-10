@@ -37,12 +37,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "입력이 너무 길어요. 짧게 줄여주세요." });
   }
 
-  // ── Rate Limiting (레벨별 차등) ──────────────────────────────────
+  // ── Rate Limiting (레벨별 차등 / 프리미엄 우회) ──────────────────
   const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
   const today = new Date().toISOString().slice(0, 10);
   const rlKey = `rl:${ip}:${today}`;
   const userLevel = parseInt(req.body?.level) || 1;
-  const dailyLimit = getDailyLimit(userLevel);
+  const isPremium = req.body?.isPremium === true;
+  const dailyLimit = isPremium ? 9999 : getDailyLimit(userLevel);
 
   if (!global._rlStore) global._rlStore = {};
   if (global._rlDate !== today) { global._rlStore = {}; global._rlDate = today; global._globalCount = 0; }
@@ -68,10 +69,10 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "서버 설정 오류" });
 
-  // ── Gemini API 호출 (Flash 2.0: 무료 tier 일 1500회) ─────────────
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+  // ── Gemini API 호출 (2.5-flash → 2.0-flash 자동 fallback) ────────
+  const callGemini = async (model) => {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,16 +83,28 @@ export default async function handler(req, res) {
         }),
       }
     );
+    const d = await r.json();
+    return { ok: r.ok, status: r.status, data: d };
+  };
 
-    const data = await response.json();
-    if (!response.ok) {
-      if (response.status === 429) {
-        return res.status(429).json({ error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요." });
-      }
-      return res.status(502).json({ error: "AI 서비스 일시 오류. 잠시 후 다시 시도해주세요." });
+  try {
+    let result = await callGemini("gemini-2.5-flash");
+    let modelUsed = "gemini-2.5-flash";
+
+    if (!result.ok && (result.status === 429 || result.status >= 500)) {
+      result = await callGemini("gemini-2.0-flash");
+      modelUsed = "gemini-2.0-flash";
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!result.ok) {
+      const geminiMsg = result.data?.error?.message || "(no detail)";
+      if (result.status === 429) {
+        return res.status(429).json({ error: "요청이 너무 많아요. 잠시 후 다시 시도해주세요.", detail: geminiMsg });
+      }
+      return res.status(502).json({ error: "AI 서비스 일시 오류. 잠시 후 다시 시도해주세요.", detail: geminiMsg, status: result.status });
+    }
+
+    const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     global._rlStore[rlKey] = count + 1;
     global._globalCount = (global._globalCount || 0) + 1;
 
@@ -99,8 +112,9 @@ export default async function handler(req, res) {
       text,
       remaining: dailyLimit - count - 1,
       dailyLimit: dailyLimit,
+      model: modelUsed,
     });
   } catch (err) {
-    return res.status(500).json({ error: "서버 오류가 발생했어요. 잠시 후 다시 시도해주세요." });
+    return res.status(500).json({ error: "서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.", detail: err.message });
   }
 }
