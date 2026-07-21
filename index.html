@@ -73,7 +73,56 @@
     <div class="splash-sub">쉬운 동사로 다 말한다</div>
   </div>
   <div id="root"></div>
-  <script>setTimeout(function(){var s=document.getElementById('splash');if(s)s.remove();},2000);</script>
+  <script>
+  // ── 부팅 실패 감지 ────────────────────────────────────────────────
+  // 이 앱은 React/Firebase/Babel 을 외부 CDN 에서 받아온다. 그중 하나라도 못 받으면
+  // 화면이 아무 안내 없이 완전 백지가 된다(유저는 앱이 죽은 줄 안다).
+  // 정해진 시간 안에 React 가 마운트되지 않으면 원인을 알려주고 다시 시도할 길을 준다.
+  (function () {
+    var MOUNT_TIMEOUT_MS = 12000;
+    var failedScripts = [];
+
+    // 스플래시는 기존대로 2초 후 제거
+    setTimeout(function () {
+      var s = document.getElementById("splash");
+      if (s) s.remove();
+    }, 2000);
+
+    // 어떤 스크립트가 실패했는지 수집 (capture 단계여야 error 이벤트를 잡을 수 있음)
+    window.addEventListener("error", function (e) {
+      var t = e && e.target;
+      if (t && t.tagName === "SCRIPT" && t.src) {
+        try { failedScripts.push(new URL(t.src).hostname); } catch (_) { failedScripts.push(t.src); }
+      }
+    }, true);
+
+    function mounted() {
+      var r = document.getElementById("root");
+      return !!(r && r.children.length > 0);
+    }
+
+    setTimeout(function () {
+      if (mounted()) return;
+
+      var offline = (navigator.onLine === false);
+      var why = offline
+        ? "인터넷에 연결되어 있지 않아요."
+        : failedScripts.length
+          ? "일부 파일을 불러오지 못했어요. (" + failedScripts.filter(function (v, i, a) { return a.indexOf(v) === i; }).join(", ") + ")"
+          : "앱을 불러오는 데 시간이 너무 오래 걸려요.";
+
+      document.getElementById("root").innerHTML =
+        '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;color:#e5e7eb;font-family:-apple-system,BlinkMacSystemFont,sans-serif">' +
+          '<div style="font-size:44px;margin-bottom:16px">📡</div>' +
+          '<div style="font-size:18px;font-weight:800;margin-bottom:10px">앱을 불러오지 못했어요</div>' +
+          '<div style="font-size:13px;color:#9ca3af;line-height:1.7;margin-bottom:24px;max-width:300px">' + why +
+            '<br/>연결을 확인하고 다시 시도해주세요.</div>' +
+          '<button onclick="location.reload()" style="background:#7ee8a2;color:#08090d;border:none;border-radius:12px;padding:14px 32px;font-size:15px;font-weight:800;cursor:pointer">다시 시도</button>' +
+          '<div style="font-size:11px;color:#6b7280;margin-top:20px">계속 안 되면 krave.official.team@gmail.com 으로 알려주세요</div>' +
+        '</div>';
+    }, MOUNT_TIMEOUT_MS);
+  })();
+  </script>
   <script defer src="https://va.vercel-scripts.com/v1/script.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -108,13 +157,52 @@
     // 브라우저 닫아도 로그인 유지 (Safari/iOS 포함)
     fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
+    // Capacitor 네이티브 플러그인 핸들 (웹에서는 undefined)
+    function nativeAuthPlugin() {
+      return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseAuthentication) || null;
+    }
+
+    // 사용자가 직접 취소한 경우인지 판별 (조용히 무시해야 함)
+    function isUserCancelled(e) {
+      var code = (e && e.code) || "";
+      var msg = ((e && e.message) || "").toLowerCase();
+      return code === "auth/popup-closed-by-user"
+          || code === "auth/cancelled-popup-request"
+          || msg.indexOf("cancel") !== -1
+          || msg.indexOf("1001") !== -1;   // iOS ASAuthorization 사용자 취소
+    }
+
     function signInWithGoogle() {
+      var plugin = nativeAuthPlugin();
+
+      // ── 네이티브(iOS 앱) ──────────────────────────────────────────
+      // capacitor://localhost 는 Google이 허용한 도메인이 아니라 팝업 방식이 동작하지 않는다.
+      // 네이티브 SDK로 로그인한 뒤, 받은 idToken을 Firebase JS SDK에 넘겨 세션을 일치시킨다.
+      if (IS_NATIVE && plugin) {
+        return plugin.signInWithGoogle()
+          .then(function(res) {
+            var idToken = res && res.credential && res.credential.idToken;
+            var accessToken = res && res.credential && res.credential.accessToken;
+            if (!idToken && !accessToken) throw new Error("Google 인증 정보를 받지 못했어요.");
+            var cred = firebase.auth.GoogleAuthProvider.credential(idToken || null, accessToken || null);
+            return fbAuth.signInWithCredential(cred);
+          })
+          .catch(function(e) {
+            if (!isUserCancelled(e)) {
+              console.error("Native Google login error:", e);
+              alert("로그인 오류: " + ((e && e.message) || "알 수 없는 오류"));
+            }
+            throw e;
+          });
+      }
+
+      // ── 웹 ────────────────────────────────────────────────────────
       var provider = new firebase.auth.GoogleAuthProvider();
       // Safari의 sessionStorage 차단 이슈 때문에 redirect 방식 제거, 팝업만 사용
       return fbAuth.signInWithPopup(provider).catch(function(e) {
         if (e.code === "auth/popup-blocked") {
           alert("팝업이 차단됐어요. 브라우저 주소창 옆 팝업 허용 버튼을 눌러주세요.");
-        } else if (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request") {
+        } else if (isUserCancelled(e)) {
           // 사용자가 직접 닫음 — 조용히 무시
         } else {
           console.error("Login error:", e);
@@ -123,8 +211,53 @@
         throw e;
       });
     }
-    function signOutUser() {
+
+    // ── Apple로 로그인 ───────────────────────────────────────────────
+    // App Store 심사 규정 4.8: 제3자 로그인(구글)을 제공하면 Apple 로그인도 함께 제공해야 함.
+    function signInWithApple() {
+      var plugin = nativeAuthPlugin();
+
+      if (IS_NATIVE && plugin) {
+        return plugin.signInWithApple({ skipNativeAuth: true })
+          .then(function(res) {
+            var c = res && res.credential;
+            if (!c || !c.idToken) throw new Error("Apple 인증 정보를 받지 못했어요.");
+            var provider = new firebase.auth.OAuthProvider("apple.com");
+            var cred = provider.credential({ idToken: c.idToken, rawNonce: c.nonce });
+            return fbAuth.signInWithCredential(cred);
+          })
+          .catch(function(e) {
+            if (!isUserCancelled(e)) {
+              console.error("Native Apple login error:", e);
+              alert("로그인 오류: " + ((e && e.message) || "알 수 없는 오류"));
+            }
+            throw e;
+          });
+      }
+
+      // 웹에서는 Firebase 팝업 방식
+      var webProvider = new firebase.auth.OAuthProvider("apple.com");
+      webProvider.addScope("email");
+      webProvider.addScope("name");
+      return fbAuth.signInWithPopup(webProvider).catch(function(e) {
+        if (!isUserCancelled(e)) {
+          console.error("Apple login error:", e);
+          alert("로그인 오류: " + (e.message || e.code || "알 수 없는 오류"));
+        }
+        throw e;
+      });
+    }
+
+    // 네이티브에서는 Firebase JS 세션과 네이티브 세션을 함께 정리해야 한다.
+    function signOutEverywhere() {
+      var plugin = nativeAuthPlugin();
+      if (IS_NATIVE && plugin) {
+        return plugin.signOut().catch(function(){}).then(function(){ return fbAuth.signOut(); });
+      }
       return fbAuth.signOut();
+    }
+    function signOutUser() {
+      return signOutEverywhere();
     }
 
     const ADMIN_KEY = "tf$9xQ2m7kW";
@@ -203,6 +336,10 @@
 
       // 4) Firebase Auth 계정 삭제 — 마지막에 수행 (앞 단계에 인증 필요)
       await u.delete();
+
+      // 5) 네이티브 세션도 정리 (남아 있으면 다음 실행 시 유령 로그인 상태가 됨)
+      var plugin = nativeAuthPlugin();
+      if (IS_NATIVE && plugin) { try { await plugin.signOut(); } catch (e) {} }
     }
 
     // ── XP + LEVEL SYSTEM ──────────────────────────────────────────
@@ -3956,6 +4093,15 @@
             <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             {loading ? "로그인 중..." : "Google로 시작하기"}
           </button>
+          {/* Apple로 로그인 — App Store 심사 규정 4.8에 따라 제3자 로그인 제공 시 필수.
+              iOS 네이티브에서만 노출 (웹에서는 Apple 로그인 설정이 별도로 필요) */}
+          {IS_NATIVE && (
+            <button onClick={props.onAppleLogin} disabled={loading}
+              style={{background:"#000",color:"#fff",border:"1px solid #fff3",borderRadius:12,padding:"14px 32px",fontSize:15,fontWeight:700,cursor:loading?"wait":"pointer",display:"flex",alignItems:"center",gap:10,marginTop:10,minWidth:260,justifyContent:"center"}}>
+              <svg width="18" height="20" viewBox="0 0 384 512" fill="#fff"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+              {loading ? "로그인 중..." : "Apple로 계속하기"}
+            </button>
+          )}
           <div style={{fontSize:11,color:C.muted,marginTop:14,lineHeight:1.6}}>{"로그인하면 기기가 바뀌어도"}<br/>{"학습 기록이 유지돼요"}</div>
           <div style={{display:"flex",alignItems:"center",gap:10,margin:"24px 0",width:"100%",maxWidth:280}}>
             <div style={{flex:1,height:1,background:C.border}}/>
@@ -4129,6 +4275,15 @@
         });
       };
 
+      var handleAppleLogin = function() {
+        setLoginLoading(true);
+        signInWithApple().catch(function(e){
+          console.error("Apple login error:", e);
+        }).finally(function(){
+          setLoginLoading(false);
+        });
+      };
+
       var handleStart = function() {
         track("lesson_start");
         if (!lessons) setLessons(getTodayLesson());
@@ -4186,7 +4341,7 @@
         </div>
       );
 
-      if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} loading={loginLoading} onGuest={function(){
+      if (!user&&!isGuest) return <LoginScreen onLogin={handleLogin} onAppleLogin={handleAppleLogin} loading={loginLoading} onGuest={function(){
         // 게스트 진입 시 이전 로그인 유저의 로컬 데이터 클리어
         var keys=Object.keys(localStorage).filter(function(k){return k.startsWith("tf_")&&k!=="tf_is_guest"&&k!=="tf_theme"&&k!=="tf_font_size"&&k!=="tf_onboarding_done";});
         keys.forEach(function(k){localStorage.removeItem(k);});
