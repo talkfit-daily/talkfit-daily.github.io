@@ -16,7 +16,9 @@
   <meta name="twitter:description" content="교재 영어 말고, 내가 진짜 하는 말. 내 카톡 대화를 미국식 영어로 변환해줘요."/>
   <meta name="theme-color" content="#08090d"/>
   <link rel="icon" href="/icon.svg" type="image/svg+xml"/>
-  <link rel="apple-touch-icon" href="/icon.svg"/>
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png"/>
+  <!-- iOS는 apple-touch-icon에 SVG를 지원하지 않음 — PNG 필수 -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
   <link rel="manifest" href="/manifest.json"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -96,6 +98,13 @@
     firebase.initializeApp(firebaseConfig);
     var fbAuth = firebase.auth();
     var fbDb = firebase.firestore();
+
+    // ── API BASE URL ────────────────────────────────────────────────
+    // 네이티브 앱(Capacitor)에서는 앱이 capacitor://localhost 에서 실행되므로
+    // "/api/..." 상대경로가 앱 번들 내부를 가리켜 실패한다. 절대경로로 전환 필요.
+    var IS_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+                    || location.protocol === "capacitor:" || location.protocol === "ionic:";
+    var API_BASE = IS_NATIVE ? "https://talkfit-daily-github-io.vercel.app" : "";
     // 브라우저 닫아도 로그인 유지 (Safari/iOS 포함)
     fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
@@ -165,6 +174,35 @@
       try {
         await fbDb.collection("users").doc(userId).collection("data").doc(key).set({ value: val, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
       } catch {}
+    }
+
+    // ── 계정 완전 삭제 (App Store Guideline 5.1.1(v) 필수 요건) ─────
+    // Firestore 사용자 데이터 + 리더보드 기록 + 로컬 데이터 + Firebase Auth 계정을 모두 제거.
+    // 실패 시 throw — 호출부에서 사용자에게 알림.
+    async function deleteAccountCompletely() {
+      var u = fbAuth.currentUser;
+      if (!u) throw new Error("로그인 상태가 아닙니다.");
+      var uid = u.uid;
+
+      // 1) users/{uid}/data/* 하위 문서 전체 삭제
+      var snap = await fbDb.collection("users").doc(uid).collection("data").get();
+      var batch = fbDb.batch();
+      snap.forEach(function(d){ batch.delete(d.ref); });
+      batch.delete(fbDb.collection("users").doc(uid));
+      // 2) 리더보드에서 제거
+      batch.delete(fbDb.collection("leaderboard").doc(uid));
+      await batch.commit();
+
+      // 3) 로컬 데이터 전체 삭제 (설정 포함 — 완전 초기화)
+      try {
+        Object.keys(localStorage).filter(function(k){return k.indexOf("tf_")===0;})
+          .forEach(function(k){ localStorage.removeItem(k); });
+        Object.keys(sessionStorage).filter(function(k){return k.indexOf("tf_")===0;})
+          .forEach(function(k){ sessionStorage.removeItem(k); });
+      } catch(e) {}
+
+      // 4) Firebase Auth 계정 삭제 — 마지막에 수행 (앞 단계에 인증 필요)
+      await u.delete();
     }
 
     // ── XP + LEVEL SYSTEM ──────────────────────────────────────────
@@ -261,6 +299,24 @@
     }
 
     // 연속 출석 (훈련 완료 시)
+    // ── 오늘의 학습 완료 처리 (스트릭) ───────────────────────────────
+    // v1.5.0 정책 변경: 동사 레슨 "또는" 회화 연습 중 하나만 해도 오늘 완료로 인정.
+    // (기존에는 둘 다 해야 해서 업계 최고 문턱이었고, 회화는 AI 장애 시 아예 불가능했음)
+    // 듀오링고가 동일한 완화(일일목표↔스트릭 분리)로 D14 +3.3%, 신규 스트릭 보유율 +19% 기록.
+    // 어느 경로로 들어와도 하루 한 번만 증가하도록 tk_state.todayDone으로 멱등 보장.
+    function markTodayLearned() {
+      var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+      var st = loadLocal("tk_state") || {};
+      // 날짜가 바뀌었으면 오늘 플래그 초기화
+      if (st.todayKey !== todayK) { st.todayDone = false; }
+      if (st.todayDone) return { alreadyDone: true, streak: st.streak || 0 };
+      st.todayDone = true;
+      st.todayKey = todayK;
+      st.streak = (st.streak || 0) + 1;
+      saveLocal("tk_state", st);
+      return { alreadyDone: false, streak: st.streak };
+    }
+
     function claimAttendanceBonus() {
       var todayK = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
       var att = load("attendance") || { lastDate: "", streak: 0, longestStreak: 0, totalDays: 0 };
@@ -458,7 +514,7 @@
       }
 
       ttsAbortController = new AbortController();
-      fetch("/api/tts", {
+      fetch(API_BASE+"/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: clean }),
@@ -636,9 +692,31 @@
       return quizzes;
     }
 
+    // ── AI 오류 → 유저 친화 문구 ─────────────────────────────────────
+    // 서비스 장애를 "네가 한도를 초과했다"로 보여주면 유저는 앱을 탓하지 않고 떠난다.
+    // 우리 문제일 때는 우리 문제라고 정직하게 말한다.
+    function friendlyAiError(e) {
+      if (!e) return { title: "잠시 문제가 생겼어요", body: "잠시 후 다시 시도해주세요." };
+      if (e.name === "TypeError" || (e.message||"").indexOf("Failed to fetch") !== -1) {
+        return { title: "인터넷 연결을 확인해주세요", body: "네트워크가 불안정한 것 같아요." };
+      }
+      if (e.isUserLimit) {
+        return { title: "오늘 AI 사용을 다 하셨어요", body: "내일 다시 채워집니다. 복습 탭에서 배운 걸 정리해보는 건 어때요?" };
+      }
+      if (e.isServiceDown) {
+        return { title: "AI가 잠시 쉬고 있어요", body: "저희 쪽 문제예요. 확인하고 있으니 잠시 후 다시 시도해주세요. 불편을 드려 죄송합니다." };
+      }
+      return { title: "잠시 문제가 생겼어요", body: "잠시 후 다시 시도해주세요." };
+    }
+
+    // ── PREMIUM 기능 플래그 ─────────────────────────────────────────
+    // App Store 1차 심사용: false. 구독 판매는 Apple IAP 연동 필수(Guideline 3.1.1)이며
+    // 현재 결제 플로우는 데모라 노출 시 반려됨. IAP 구현 후 true로 전환할 것.
+    var PREMIUM_ENABLED = false;
+
     // ── CLAUDE API (via server proxy) ──────────────────────────────
     function isPremiumUser() {
-      return load("is_premium") === true;
+      return PREMIUM_ENABLED && load("is_premium") === true;
     }
 
     var aiRemaining = (function(){
@@ -776,7 +854,7 @@
       var lv = getLevel(xp);
       var res;
       try {
-        res = await fetch("/api/claude", {
+        res = await fetch(API_BASE+"/api/claude", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ system: system, user: user, level: lv.level, isPremium: isPremiumUser() }),
@@ -797,10 +875,17 @@
         } else {
           try { data = await res.json(); } catch(err){}
           if (data.remaining !== undefined) setAiRemaining(data.remaining);
-          if (res.status === 429 && window.__showPremiumModal) {
+          if (PREMIUM_ENABLED && res.status === 429 && window.__showPremiumModal) {
             window.__showPremiumModal();
           }
-          throw new Error(data.error || "AI 오류");
+          // 에러에 분류 정보를 실어서 호출부가 유저 친화적 문구를 고를 수 있게 함
+          var aiErr = new Error(data.error || "AI 오류");
+          aiErr.httpStatus = res.status;
+          // remaining이 내려오면 "유저가 한도를 다 쓴 것", 아니면 "서버/외부API 장애"
+          aiErr.isUserLimit = (res.status === 429 && data.remaining !== undefined);
+          aiErr.isServiceDown = !aiErr.isUserLimit;
+          aiErr.detail = data.detail || "";
+          throw aiErr;
         }
       } else {
         try { data = await res.json(); } catch(err){}
@@ -1315,11 +1400,12 @@
         }
       })();
       var hour = new Date().getHours();
-      var greeting = hour<5?{t:"Still up?",s:"자기 전 영어 한 입 어때요"}
-        :hour<12?{t:"Good morning",s:"쉬운 동사로 다 말한다"}
-        :hour<18?{t:"Good afternoon",s:"점심 쉬는 틈에 15분 영어"}
-        :hour<22?{t:"Good evening",s:"오늘 하루 마무리 15분"}
-        :{t:"Late night study",s:"집중 잘 되는 시간이죠"};
+      // 영어를 못해서 온 사람에게 영어로 인사하지 않는다 (v1.5.0)
+      var greeting = hour<5?{t:"아직 안 주무셨네요",s:"자기 전 5분이면 충분해요"}
+        :hour<12?{t:"좋은 아침이에요",s:"오늘도 한 문장부터 시작해요"}
+        :hour<18?{t:"오후엔 5분만",s:"쉬는 틈에 딱 한 번"}
+        :hour<22?{t:"오늘 하루 어떠셨어요?",s:"그 말, 영어로 해볼까요"}
+        :{t:"조용한 시간이네요",s:"집중 잘 되는 시간이죠"};
 
       var IDIOMS = [
         {en:"be toast",ko:"끝장나다, 망하다",ex:"If the boss finds out, I'm toast.",exKo:"사장님이 알면 나 끝이야."},
@@ -1367,11 +1453,48 @@
 
       return (
         <div style={{padding:"32px 20px 24px"}}>
-          <div style={{fontSize:12,color:C.muted,letterSpacing:3,marginBottom:6}}>
-            {new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}).toUpperCase()}
+          <div style={{fontSize:12,color:C.muted,letterSpacing:2,marginBottom:6}}>
+            {new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})}
           </div>
           <div style={{fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4}}>{greeting.t}</div>
-          <div style={{fontSize:14,color:C.muted,marginBottom:12}}>{greeting.s}</div>
+          <div style={{fontSize:14,color:C.muted,marginBottom:18}}>{greeting.s}</div>
+
+          {/* ── 메인 CTA — 첫 화면에서 바로 보여야 함 (v1.5.0) ────────── */}
+          {todayDone?(
+            <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"40",borderRadius:16,padding:20,textAlign:"center",marginBottom:18}}>
+              <div style={{fontSize:28,marginBottom:6}}>{"✅"}</div>
+              <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>오늘 학습 완료!</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:14}}>더 하고 싶으면 아래에서 이어가세요</div>
+              <div onClick={onStart} style={{background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:10,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer"}}>{"한 번 더 학습하기"}</div>
+            </div>
+          ):(
+            <div onClick={onStart} role="button" tabIndex={0}
+                 onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")onStart();}}
+                 style={{background:C.surface,border:"1px solid "+C.yellow+"40",borderRadius:16,padding:20,marginBottom:18,cursor:"pointer"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"오늘의 학습"}</div>
+                <div style={{fontSize:11,color:C.muted}}>{"약 10분"}</div>
+              </div>
+              {allVerbTags.length>0&&(
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+                  {allVerbTags.map(function(vt,i){return(
+                    <span key={i} style={{background:vt.color+"20",color:vt.color,padding:"6px 14px",borderRadius:8,fontSize:17,fontWeight:800}}>{vt.verb}</span>
+                  );})}
+                </div>
+              )}
+              <div style={{background:C.yellow,color:"#08090d",borderRadius:12,padding:"15px 0",textAlign:"center",fontSize:16,fontWeight:800}}>{"시작하기 →"}</div>
+            </div>
+          )}
+
+          {/* 지표는 한 줄로 압축 — 시작을 방해하지 않도록 (v1.5.0) */}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,padding:"10px 14px",background:C.surface,border:"1px solid "+C.border,borderRadius:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:13,fontWeight:800,color:streak>0?C.accent:C.muted}}>{"🔥 "}{streak}{"일 연속"}</span>
+            <span style={{marginLeft:"auto",display:"flex",gap:4}}>
+              {days.map(function(d,i){return(
+                <div key={i} title={d} style={{width:14,height:14,borderRadius:4,background:weekDone[i]?C.accent:(i===today?C.accentDim:C.border)}}/>
+              );})}
+            </span>
+          </div>
 
           <div onClick={function(){var el=document.getElementById("idiom-detail");if(el)el.style.display=el.style.display==="none"?"block":"block";el.style.maxHeight=el.style.maxHeight==="0px"?"200px":"0px";}} style={{background:C.surface,border:"1px solid "+C.yellow+"25",borderRadius:12,padding:"10px 14px",marginBottom:16,cursor:"pointer"}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
@@ -1390,19 +1513,22 @@
             <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>탭하면 예문 보기</div>
           </div>
 
-          <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"30",borderRadius:16,padding:20,marginBottom:20}}>
-            <div style={{fontSize:11,color:C.accent,letterSpacing:3,marginBottom:6}}>STREAK</div>
-            <div style={{fontSize:48,fontWeight:900,color:C.accent,lineHeight:1}}>{streak}<span style={{fontSize:20,marginLeft:4}}>{"🔥"}</span></div>
-            <div style={{fontSize:12,color:C.muted,marginTop:4}}>연속 학습일</div>
-            <div style={{display:"flex",gap:6,marginTop:16}}>
-              {days.map(function(d,i){return(
-                <div key={i} style={{textAlign:"center"}}>
-                  <div style={{width:28,height:28,borderRadius:8,background:i===today?(todayDone?C.accent:C.accentDim):(weekDone[i]?C.accent+"60":C.border),border:i===today?"2px solid "+C.accent:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:weekDone[i]||i===today?C.accent:C.muted,fontWeight:700}}>
-                    {weekDone[i]?"\u2713":i===today&&todayDone?"\u2713":""}
-                  </div>
-                  <div style={{fontSize:9,color:C.muted,marginTop:3}}>{d}</div>
-                </div>
-              );})}
+          {/* 다른 방법으로 배우기 — 메인 CTA를 방해하지 않도록 아래로 (v1.5.0) */}
+          <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10}}>{"다른 방법으로 배우기"}</div>
+          <div style={{display:"flex",gap:10,marginBottom:20}}>
+            <div onClick={onSpeak} role="button" tabIndex={0}
+                 onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")onSpeak();}}
+                 style={{flex:1,background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,padding:"14px 12px",cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:20,marginBottom:6}}>{"\uD83C\uDFA4"}</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{"\uB0B4 \uB9D0 \uBC14\uAFB8\uAE30"}</div>
+              <div style={{fontSize:10,color:C.muted}}>{"\uB179\uC74C\u00B7\uCE74\uD1A1\u00B7\uC720\uD29C\uBE0C"}</div>
+            </div>
+            <div onClick={onChat} role="button" tabIndex={0}
+                 onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")onChat();}}
+                 style={{flex:1,background:C.surface,border:"1px solid "+C.blue+"30",borderRadius:14,padding:"14px 12px",cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:20,marginBottom:6}}>{"\uD83D\uDCAC"}</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{"AI\uC640 \uB300\uD654"}</div>
+              <div style={{fontSize:10,color:C.muted}}>{"\uC790\uC720 \uC5F0\uC2B5"}</div>
             </div>
           </div>
 
@@ -1458,72 +1584,44 @@
             if(comboToday)missions.combo3=true;
             save("daily_missions_"+todayK,missions);
             var done=(missions.verbDone?1:0)+(missions.speakDone?1:0)+(missions.combo3?1:0);
+            // v1.5.0: "0/3 미달성" 대신 "해낸 것"을 먼저 보여준다.
+            // 듀오링고가 2025년 벌점(하트)→보상(에너지)으로 뒤집은 것과 같은 방향.
+            var items=[
+              {k:"verbDone",label:"\uB3D9\uC0AC \uB808\uC2A8",reward:"+10 XP"},
+              {k:"speakDone",label:"\uB0B4 \uB9D0 \uBC14\uAFB8\uAE30",reward:"+15 XP"},
+              {k:"combo3",label:"3\uC5F0\uC18D \uC815\uB2F5",reward:"+5 XP"}
+            ];
+            var doneItems=items.filter(function(m){return missions[m.k];});
+            var todoItems=items.filter(function(m){return !missions[m.k];});
             return(
-              <div style={{background:C.surface,border:"1px solid "+C.orange+"30",borderRadius:12,padding:14,marginBottom:16}}>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:11,color:C.orange,letterSpacing:2,fontWeight:700}}>{"🎯 오늘의 미션"}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{done}/3</div>
+                  <div style={{fontSize:11,color:C.muted,letterSpacing:2,fontWeight:700}}>{"\uC624\uB298 \uD574\uB0B8 \uAC83"}</div>
+                  {done>0&&<div style={{fontSize:11,color:C.accent,fontWeight:700}}>{"+"}{done}{"\uAC1C \uB2EC\uC131"}</div>}
                 </div>
-                {[
-                  {k:"verbDone",label:"동사 레슨 완료",reward:"+10 XP"},
-                  {k:"speakDone",label:"회화 연습 1회 완료",reward:"+15 XP"},
-                  {k:"combo3",label:"3연속 정답",reward:"+5 XP"}
-                ].map(function(m,i){return(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",opacity:missions[m.k]?0.5:1}}>
-                    <span style={{fontSize:14}}>{missions[m.k]?"✅":"⬜"}</span>
-                    <span style={{flex:1,fontSize:13,color:C.text,textDecoration:missions[m.k]?"line-through":"none"}}>{m.label}</span>
-                    <span style={{fontSize:11,color:C.orange,fontWeight:700}}>{m.reward}</span>
+                {done===0&&(
+                  <div style={{fontSize:12,color:C.muted,lineHeight:1.7,paddingBottom:4}}>
+                    {"\uC544\uBB34\uAC70\uB098 \uD558\uB098\uB9CC \uD574\uB3C4 \uC624\uB298\uC740 \uC131\uACF5\uC774\uC5D0\uC694."}
+                  </div>
+                )}
+                {doneItems.map(function(m,i){return(
+                  <div key={"d"+i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0"}}>
+                    <span style={{fontSize:14}}>{"\u2705"}</span>
+                    <span style={{flex:1,fontSize:13,color:C.text,fontWeight:600}}>{m.label}</span>
+                    <span style={{fontSize:11,color:C.accent,fontWeight:700}}>{m.reward}</span>
+                  </div>
+                );})}
+                {todoItems.map(function(m,i){return(
+                  <div key={"t"+i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",opacity:0.55}}>
+                    <span style={{fontSize:14,color:C.muted}}>{"\u00B7"}</span>
+                    <span style={{flex:1,fontSize:13,color:C.muted}}>{m.label}</span>
+                    <span style={{fontSize:11,color:C.muted}}>{m.reward}</span>
                   </div>
                 );})}
               </div>
             );
           })()}
 
-          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:10}}>{"오늘의 15분"}</div>
-
-          {todayDone?(
-            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:20,textAlign:"center",marginBottom:14}}>
-              <div style={{fontSize:24,marginBottom:8}}>{"✅"}</div>
-              <div style={{fontWeight:700,marginBottom:4}}>오늘 완료!</div>
-              <div style={{fontSize:12,color:C.muted}}>내일 또 만나요</div>
-            </div>
-          ):(
-            <div>
-              <div onClick={onStart} style={{background:C.surface,border:"1px solid "+C.yellow+"40",borderRadius:16,padding:20,marginBottom:10,cursor:"pointer",transition:"transform 0.1s"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:11,color:C.yellow,letterSpacing:2,fontWeight:700}}>{"오늘의 동사 레슨"}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{"~10분"}</div>
-                </div>
-                {allVerbTags.length>0&&(
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                    {allVerbTags.map(function(vt,i){return(
-                      <span key={i} style={{background:vt.color+"20",color:vt.color,padding:"4px 10px",borderRadius:8,fontSize:13,fontWeight:800}}>{vt.verb}</span>
-                    );})}
-                  </div>
-                )}
-                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>{"뜻 → 예문 → 패턴 → 퀴즈 → 롤플레이 → 내 문장 쓰기"}</div>
-                <div style={{marginTop:10,background:C.yellow,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>{"학습 시작 →"}</div>
-              </div>
-
-              <div onClick={onSpeak} style={{background:C.surface,border:"1px solid "+C.accent+"40",borderRadius:16,padding:20,marginBottom:10,cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:11,color:C.accent,letterSpacing:2,fontWeight:700}}>{"내 대화로 배우기"}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{"~5분"}</div>
-                </div>
-                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>내 카톡/녹음/유튜브 → 영어 변환 + 연습</div>
-                <div style={{marginTop:10,background:C.accent,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>{"녹음 시작 →"}</div>
-              </div>
-
-              <div onClick={onChat} style={{background:C.surface,border:"1px solid "+C.blue+"40",borderRadius:16,padding:20,marginBottom:14,cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:11,color:C.blue,letterSpacing:2,fontWeight:700}}>{"AI 영어 대화"}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{"자유 연습"}</div>
-                </div>
-                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>AI와 영어로 채팅하며 자연스럽게 연습</div>
-                <div style={{marginTop:10,background:C.blue,color:"#08090d",borderRadius:10,padding:"10px 0",textAlign:"center",fontSize:14,fontWeight:800}}>{"대화 시작 →"}</div>
-              </div>
-            </div>
-          )}
 
           <div style={{display:"flex",gap:10,marginTop:4}}>
             {[{label:"학습한 날",value:streak+"일"},{label:"AI 남은 횟수",value:isPremiumUser()?"무제한":aiRemaining+"회"}].map(function(s,i){return(
@@ -2125,9 +2223,9 @@
           var parsed = JSON.parse(pJson.trim());
           setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[tabId]=parsed; return n;});
         }).catch(function(e){
-          var msg = "AI 피드백을 가져오지 못했어요. 잠시 후 다시 시도해주세요.";
-          if (e.message && e.message.indexOf("limit") !== -1) msg = "오늘 AI 사용 횟수를 초과했어요. 내일 다시 시도해주세요!";
-          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[tabId]={overall:msg,corrections:[],bonus:""}; return n;});
+          var fe = friendlyAiError(e);
+          console.error("TalkFit AI feedback error:", e && e.message, e && e.detail);
+          setFeedback(function(f){var n={}; for(var k in f)n[k]=f[k]; n[tabId]={overall:fe.title+"\n"+fe.body,corrections:[],bonus:""}; return n;});
         }).finally(function(){
           setIsLoading(function(l){var n={}; for(var k in l)n[k]=l[k]; n[tabId]=false; return n;});
         });
@@ -2429,7 +2527,7 @@
       useEffect(function(){
         if(bbcRecs.length>0) return;
         setBbcLoading(true);
-        fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:BBC_DEFAULT.id})})
+        fetch(API_BASE+"/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:BBC_DEFAULT.id})})
         .then(function(r){return r.json();}).then(function(d){
           var vids=(d.videos||[]).filter(function(v){return !v.duration||v.duration>=60;}).map(function(v){v.channel="BBC Learning English";return v;});
           setBbcRecs(vids);save("bbc_cached_recs",vids);
@@ -2455,7 +2553,7 @@
       function searchChannels() {
         if (!chSearch.trim()) return;
         setChSearching(true);
-        fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"search",query:chSearch.trim()})})
+        fetch(API_BASE+"/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"search",query:chSearch.trim()})})
         .then(function(r){return r.json();}).then(function(d){setChResults(d.channels||[]);})
         .catch(function(){}).finally(function(){setChSearching(false);});
       }
@@ -2476,7 +2574,7 @@
         if (myChannels.length===0) return;
         setRecLoading(true);
         var randomCh = myChannels[Math.floor(Math.random()*myChannels.length)];
-        fetch("/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:randomCh.id})})
+        fetch(API_BASE+"/api/ytchannel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"random",channelId:randomCh.id})})
         .then(function(r){return r.json();}).then(function(d){setRecVideos((d.videos||[]).map(function(v){v.channel=randomCh.title;return v;}));})
         .catch(function(){}).finally(function(){setRecLoading(false);});
       }
@@ -2568,7 +2666,7 @@
         var reader = new FileReader();
         reader.onload = function() {
           var base64 = reader.result.split(",")[1];
-          fetch("/api/transcribe", {
+          fetch(API_BASE+"/api/transcribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ audio: base64, mimeType: file.type || "audio/webm" })
@@ -2675,11 +2773,10 @@
           setHistory(next);
           fetchAltSituations(parsed);
         }).catch(function(e){
-          var msg = "분석 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.";
-          if (e.message && e.message.indexOf("limit") !== -1) msg = "오늘 AI 사용 횟수를 초과했어요. 내일 다시 시도해주세요!";
-          if (e.message) msg = msg + " [" + e.message + "]";
-          console.error("TalkFit analyze error:", e);
-          setResult({scenario:"분석 실패",speakers:1,turns:[],key_verbs:[],coach_tip:msg});
+          var fe = friendlyAiError(e);
+          // 원인은 콘솔에만 (유저에게 raw 에러를 노출하지 않음)
+          console.error("TalkFit analyze error:", e && e.message, e && e.detail);
+          setResult({scenario:fe.title,speakers:1,turns:[],key_verbs:[],coach_tip:fe.body});
         }).finally(function(){setIsLoading(false);});
       };
 
@@ -2693,18 +2790,9 @@
 
           {!result && (
             <div>
-              {!loadLocal("speak_guide_seen")&&(
-                <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"30",borderRadius:12,padding:14,marginBottom:16}}>
-                  <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:8}}>{"💡 이렇게 사용하세요"}</div>
-                  <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
-                    {"1. 내가 한 말을 녹음하거나 타이핑하세요"}<br/>
-                    {"2. '쉬운 영어로 변환' 버튼을 누르면 AI가 분석해요"}<br/>
-                    {"3. 원어민이 쓰는 쉬운 동사 표현을 배워요"}<br/>
-                    {"4. 연습 문제까지 풀면 회화 미션 완료! +15 XP"}
-                  </div>
-                  <button onClick={function(){saveLocal("speak_guide_seen",true);}} style={{marginTop:8,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer"}}>{"다시 안 보기"}</button>
-                </div>
-              )}
+              {/* v1.5.0: 상단 4줄 안내 제거 — 모드별 안내와 중복이었고,
+                  녹음 버튼에 닿기까지 안내문 8줄을 읽혀서 시작을 막고 있었음.
+                  경쟁 앱은 모두 설명 없이 바로 시작시킨다. */}
               <div style={{display:"flex",gap:8,marginBottom:20}}>
                 {[{id:"record",label:"\uD83C\uDFA4 \uB179\uC74C",desc:"\uB300\uD654 \uB179\uC74C"},{id:"type",label:"\u2328\uFE0F \uC785\uB825",desc:"\uC9C1\uC811 \uD0C0\uC774\uD551"},{id:"file",label:"\uD83D\uDCC1 \uD30C\uC77C",desc:"\uB179\uC74C \uD30C\uC77C"},{id:"youtube",label:"YouTube",desc:"영상 학습",ytIcon:true}].map(function(t){return(
                   <div key={t.id} onClick={function(){if(!recording)setMode(t.id);}} style={{flex:1,padding:"10px",borderRadius:10,textAlign:"center",cursor:recording?"not-allowed":"pointer",background:mode===t.id?C.accent+"20":C.surface,border:"1px solid "+(mode===t.id?C.accent+"60":C.border),opacity:recording&&mode!==t.id?0.4:1}}>
@@ -2723,15 +2811,12 @@
               {mode==="record" && (
                 <div>
                   {!recording&&!transcript&&(
-                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:16}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"🎤 이렇게 하세요"}</div>
-                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:16}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. 아래 버튼을 눌러 녹음 시작"}<br/>
                         {"2. 한국어로 자유롭게 말하기 (대화, 전화, 혼잣말 다 OK)"}<br/>
                         {"3. 버튼 다시 눌러 녹음 중지"}<br/>
                         {"4. \"쉬운 영어로 변환\" 버튼 누르면 AI가 분석!"}
-                      </div>
-                    </div>
+                      </div></div></details>
                   )}
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:20}}>
                     <button onClick={recording?stopRec:startRec} style={{width:88,height:88,borderRadius:"50%",border:"none",cursor:"pointer",background:recording?C.red:C.accent,color:"#08090d",fontSize:30,boxShadow:recording?"0 0 40px "+C.red+"60":"0 8px 32px "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}>
@@ -2759,14 +2844,11 @@
               {mode==="type" && (
                 <div style={{marginBottom:16}}>
                   {!textInput.trim()&&(
-                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"⌨️ 이렇게 하세요"}</div>
-                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. 오늘 했던 대화를 한국어로 적기"}<br/>
                         {"2. 카톡 대화, 혼잣말, 일기 다 OK"}<br/>
                         {"3. \"쉬운 영어로 변환\" 버튼 누르면 끝!"}
-                      </div>
-                    </div>
+                      </div></div></details>
                   )}
                   <textarea value={textInput} onChange={function(e){setTextInput(e.target.value);}} rows={6} placeholder={"예시:\n야 오늘 점심 뭐 먹을래?\n나 어제 먹은 데 또 가자\n거기 줄 길지 않을까?"} style={{width:"100%",background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,color:C.text,fontSize:14,lineHeight:1.8,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:textInput.length>1500?C.red:C.muted,marginTop:6,padding:"0 4px"}}>
@@ -2779,14 +2861,11 @@
               {mode==="file" && (
                 <div style={{marginBottom:16}}>
                   {!fileTranscript&&!fileLoading&&(
-                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"📁 이렇게 하세요"}</div>
-                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. 녹음 파일 선택 (mp3, m4a, wav 등)"}<br/>
                         {"2. AI가 자동으로 텍스트 변환 + 화자 구별"}<br/>
                         {"3. \"쉬운 영어로 변환\" 버튼으로 학습 시작!"}
-                      </div>
-                    </div>
+                      </div></div></details>
                   )}
                   <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:12}}>
                     <input type="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.aac" onChange={handleFileUpload} style={{fontSize:13,color:C.text,marginBottom:8,width:"100%"}}/>
@@ -2831,15 +2910,12 @@
               {mode==="youtube" && (
                 <div style={{marginBottom:16}}>
                   {!ytTranscript&&!ytLoading&&ytSegments.length===0&&(
-                    <div style={{background:C.accent+"10",border:"1px solid "+C.accent+"20",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:6}}>{"▶️ 이렇게 하세요"}</div>
-                      <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. YouTube 링크 붙여넣기"}<br/>
                         {"2. \"자막 가져오기\" 버튼 누르기"}<br/>
                         {"3. 자막 확인 후 \"쉬운 영어로 변환\""}<br/>
                         {"또는 아래 추천 영상을 바로 선택!"}
-                      </div>
-                    </div>
+                      </div></div></details>
                   )}
                   <div style={{display:"flex",gap:8,marginBottom:12}}>
                     <input value={ytUrl} onChange={function(e){setYtUrl(e.target.value);}} placeholder="https://youtube.com/watch?v=..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"12px 14px",color:C.text,fontSize:14,outline:"none",fontFamily:"inherit"}}/>
@@ -3345,15 +3421,14 @@
                             setPracticeMode(false);
                             var tk=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
                             saveLocal("speak_done_"+tk,true);
-                            if(loadLocal("verb_done_"+tk)){
-                              var st=loadLocal("tk_state")||{};
-                              if(!st.todayDone){st.todayDone=true;st.streak=(st.streak||0)+1;st.todayKey=tk;saveLocal("tk_state",st);
-                                // 출석 보너스
-                                var bonus=claimAttendanceBonus();
-                                if(bonus&&window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});window.__showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""});},800);
-                                } else if(window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});},800);}
-                              }
-                            }
+                            // v1.5.0: 회화 연습만 완료해도 오늘 학습 인정 (동사 레슨 조건 제거)
+                            var res=markTodayLearned();
+                            if(!res.alreadyDone){
+                              var bonus=claimAttendanceBonus();
+                              if(bonus&&window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});window.__showPraise({type:"streak",streak:bonus.streak,bonus:bonus.bonus,milestoneBonus:bonus.milestoneBonus||0,milestoneText:bonus.milestoneText||""});},800);
+                              } else if(window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});},800);}
+                            } else if(window.__showPraise){setTimeout(function(){window.__showPraise({type:"speak",bonus:0});},800);}
+                            if(window.__refreshStreak) window.__refreshStreak();
                           }
                           else{setPracticeIdx(practiceIdx+1);setPracticeAnswer("");setPracticeCheck(null);}
                         }} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:14,fontWeight:800,cursor:"pointer"}}>{isLast?"연습 완료! 🎉":"다음 →"}</button>
@@ -3685,6 +3760,9 @@
       var _fb=useState(""); var fbText=_fb[0]; var setFbText=_fb[1];
       var _fbSent=useState(false); var fbSent=_fbSent[0]; var setFbSent=_fbSent[1];
       var _fbSending=useState(false); var fbSending=_fbSending[0]; var setFbSending=_fbSending[1];
+      // 계정 삭제 2단계 확인용 (0=미노출, 1=확인창)
+      var _delStep=useState(0); var delStep=_delStep[0]; var setDelStep=_delStep[1];
+      var _delBusy=useState(false); var delBusy=_delBusy[0]; var setDelBusy=_delBusy[1];
       function submitFeedback(){
         if(!fbText.trim()||fbSending)return;
         setFbSending(true);
@@ -3721,6 +3799,43 @@
                 </div>
               </div>
               <button onClick={function(){if(confirm("로그아웃 하시겠어요?"))props.onLogout();}} style={{width:"100%",background:"none",border:"1px solid "+C.red+"40",color:C.red,borderRadius:10,padding:12,fontSize:13,fontWeight:600,cursor:"pointer"}}>로그아웃</button>
+
+              {/* 계정 삭제 — App Store Guideline 5.1.1(v): 앱 내에서 삭제 시작 가능해야 함 */}
+              <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+C.border}}>
+                {delStep===0&&(
+                  <button onClick={function(){setDelStep(1);}} style={{width:"100%",background:"none",border:"none",color:C.muted,fontSize:11,textDecoration:"underline",cursor:"pointer",padding:4}}>계정 삭제</button>
+                )}
+                {delStep===1&&(
+                  <div style={{background:C.red+"12",border:"1px solid "+C.red+"40",borderRadius:10,padding:14}}>
+                    <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:6}}>{"⚠️ 정말 계정을 삭제할까요?"}</div>
+                    <div style={{fontSize:11,color:C.muted,lineHeight:1.7,marginBottom:12}}>
+                      {"다음 데이터가 영구 삭제되며 복구할 수 없습니다:"}<br/>
+                      {"· 학습 기록, XP, 레벨, 연속 학습일"}<br/>
+                      {"· 회화 분석 기록과 나만의 동사 목록"}<br/>
+                      {"· 랭킹 등록 정보"}<br/>
+                      {"· 계정 정보 (이메일, 프로필)"}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button disabled={delBusy} onClick={function(){setDelStep(0);}} style={{flex:1,background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:10,padding:11,fontSize:12,fontWeight:700,cursor:"pointer"}}>취소</button>
+                      <button disabled={delBusy} onClick={async function(){
+                        setDelBusy(true);
+                        try {
+                          await deleteAccountCompletely();
+                          alert("계정이 삭제되었습니다. 그동안 이용해주셔서 감사합니다.");
+                          location.reload();
+                        } catch(e) {
+                          setDelBusy(false);
+                          if (e && e.code === "auth/requires-recent-login") {
+                            alert("보안을 위해 다시 로그인한 후 삭제할 수 있어요.\n로그아웃 후 다시 로그인해주세요.");
+                          } else {
+                            alert("삭제 중 문제가 생겼어요.\n" + ((e&&e.message)||"") + "\n\n문제가 계속되면 krave.official.team@gmail.com 으로 연락주세요.");
+                          }
+                        }
+                      }} style={{flex:1,background:delBusy?C.border:C.red,border:"none",color:delBusy?C.muted:"#fff",borderRadius:10,padding:11,fontSize:12,fontWeight:800,cursor:"pointer"}}>{delBusy?"삭제 중...":"영구 삭제"}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -3741,8 +3856,8 @@
             )}
           </div>
 
-          {/* 프리미엄 멤버십 관리 */}
-          <div style={{background:C.surface,border:"1px solid "+(props.isPremium?C.accent+"40":C.border),borderRadius:12,padding:16,marginBottom:14}}>
+          {/* 프리미엄 멤버십 관리 — PREMIUM_ENABLED=false 시 미노출 (App Store IAP 미연동) */}
+          {PREMIUM_ENABLED && <div style={{background:C.surface,border:"1px solid "+(props.isPremium?C.accent+"40":C.border),borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:props.isPremium?C.accent:C.text,marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
               {"👑 TalkFit Premium"}
               {props.isPremium && <span style={{fontSize:9,background:C.accent+"20",color:C.accent,padding:"2px 6px",borderRadius:4}}>활성화 중</span>}
@@ -3758,7 +3873,7 @@
                 <button onClick={props.onUpgradeClick} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:"pointer"}}>Premium 시작하기</button>
               </div>
             )}
-          </div>
+          </div>}
 
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
@@ -3782,10 +3897,12 @@
           <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
-              {"TalkFit v1.4.1 (Beta)"}<br/>
+              {"TalkFit v1.5.0 (Beta)"}<br/>
               {"© 2026 TalkFit. All rights reserved."}<br/>
               {"문의: krave.official.team@gmail.com"}<br/>
               <a href="/privacy.html" target="_blank" style={{color:C.accent,textDecoration:"underline"}}>개인정보처리방침</a>
+              {" · "}
+              <a href="/terms.html" target="_blank" style={{color:C.accent,textDecoration:"underline"}}>이용약관</a>
             </div>
           </div>
 
@@ -3867,7 +3984,8 @@
       var _s6=useState(false); var loading=_s6[0]; var setLoading=_s6[1];
       var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
       var _s8=useState([]); var verbHistory=_s8[0]; var setVerbHistory=_s8[1];
-      var _isPremium = useState(function(){return loadLocal("is_premium")||false;}); var isPremium = _isPremium[0]; var setIsPremium = _isPremium[1];
+      // PREMIUM_ENABLED=false면 기존에 데모 구독을 켰던 유저도 무조건 false (PRO 배지 잔존 방지)
+      var _isPremium = useState(function(){return PREMIUM_ENABLED && (loadLocal("is_premium")||false);}); var isPremium = _isPremium[0]; var setIsPremium = _isPremium[1];
       var _showPremium = useState(false); var showPremium = _showPremium[0]; var setShowPremium = _showPremium[1];
       var aiAvailable = isPremium || aiLeft > 0;
 
@@ -3875,7 +3993,15 @@
         window.__showPremiumModal = function() {
           setShowPremium(true);
         };
-        return function(){ window.__showPremiumModal = null; };
+        // 회화 연습 완료(SpeakScreen)에서 스트릭이 오르면 홈이 즉시 반영되도록 브릿지
+        window.__refreshStreak = function() {
+          var st = loadLocal("tk_state") || {};
+          if (st.todayKey === todayKey()) {
+            setStreak(st.streak || 0);
+            setTodayDone(!!st.todayDone);
+          }
+        };
+        return function(){ window.__showPremiumModal = null; window.__refreshStreak = null; };
       }, []);
 
       function handleUpgrade() {
@@ -4020,14 +4146,15 @@
         }
         var newHistory = [].concat(verbHistory,[{verbs:allVerbs,date:todayKey()}]);
         saveLocal("verb_done_"+todayKey(), true);
-        var speakDone = loadLocal("speak_done_"+todayKey());
-        var fullyDone = !!speakDone;
-        var newStreak = fullyDone ? streak+1 : streak;
-        setStreak(newStreak); setTodayDone(fullyDone); setVerbHistory(newHistory);
-        persist({streak:newStreak,todayDone:fullyDone,history:newHistory,lessons:lessons});
+        // v1.5.0: 동사 레슨만 완료해도 오늘 학습 인정 (회화 연습 조건 제거)
+        var res = markTodayLearned();
+        var newStreak = res.streak;
+        var fullyDone = !res.alreadyDone;
+        setStreak(newStreak); setTodayDone(true); setVerbHistory(newHistory);
+        persist({streak:newStreak,todayDone:true,history:newHistory,lessons:lessons});
         // 레슨 완료 칭찬
         showPraise({type:"lesson", bonus:0});
-        // 둘 다 완료 시 출석 보너스
+        // 오늘 첫 완료일 때만 출석 보너스
         if (fullyDone) {
           var bonus = claimAttendanceBonus();
           if (bonus) {
@@ -4187,7 +4314,7 @@
             </div>
           )}
           <PraiseModal data={praiseData} onClose={closePraise}/>
-          <PremiumModal show={showPremium} onClose={function(){setShowPremium(false);}} onUpgrade={handleUpgrade} isPremium={isPremium}/>
+          {PREMIUM_ENABLED && <PremiumModal show={showPremium} onClose={function(){setShowPremium(false);}} onUpgrade={handleUpgrade} isPremium={isPremium}/>}
           {levelUpData&&(
             <div onClick={function(){setLevelUpData(null);}} style={{position:"fixed",inset:0,background:"#000d",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",animation:"splashFade 0.3s",cursor:"pointer"}}>
               <div style={{background:"linear-gradient(135deg,"+C.accent+"30,"+C.blue+"30)",border:"2px solid "+C.accent,borderRadius:24,padding:"40px 32px",textAlign:"center",maxWidth:340,animation:"levelUp 0.6s"}}>

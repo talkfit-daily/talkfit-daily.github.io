@@ -4,6 +4,10 @@ const ALLOWED_ORIGINS = [
   "https://talkfit-daily-github-io.vercel.app",
   "https://talkfit-daily.github.io",
   "http://localhost:3000",
+  // Capacitor 네이티브 앱 (iOS WKWebView / Android WebView)
+  "capacitor://localhost",
+  "ionic://localhost",
+  "http://localhost",
 ];
 
 export default async function handler(req, res) {

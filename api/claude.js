@@ -6,6 +6,10 @@ const ALLOWED_ORIGINS = [
   "https://talkfit-daily.github.io",
   "http://localhost:3000",
   "http://localhost:5173",
+  // Capacitor 네이티브 앱 (iOS WKWebView / Android WebView)
+  "capacitor://localhost",
+  "ionic://localhost",
+  "http://localhost",
 ];
 
 // 일일 AI 한도 — 무료: 20회 고정, 프리미엄: 추후 확장
