@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   try {
     let result = await callGemini("gemini-2.5-flash");
     if (!result.ok && (result.status === 429 || result.status >= 500)) {
-      result = await callGemini("gemini-2.0-flash");
+      result = await callGemini("gemini-2.5-flash-lite");
     }
 
     if (!result.ok) {
