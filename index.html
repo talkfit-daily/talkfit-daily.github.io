@@ -3758,9 +3758,9 @@
                     <div style={{fontSize:11,color:C.muted}}>{practiceIdx+1}/{allQuestions.length}</div>
                   </div>
                   <div style={{fontSize:14,color:C.text,marginBottom:12,lineHeight:1.6}}>
-                    {q.type==="fill"&&<div><div style={{fontSize:14,color:C.text,marginBottom:8}}>{q.korean}</div><div style={{fontSize:16,fontWeight:600,color:C.muted}}>{q.sentence}</div></div>}
-                    {q.type==="translate"&&<div style={{fontSize:16,fontWeight:600}}>{q.korean}</div>}
-                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:12}}>{q.korean}</div><div style={{marginBottom:10,fontSize:15,color:practiceAnswer?C.text:C.muted,background:C.bg,borderRadius:10,padding:"12px 14px",minHeight:44,lineHeight:1.6}}>{practiceAnswer||"단어를 눌러 문장을 만드세요"}{practiceAnswer&&<span style={{cursor:"pointer",marginLeft:8,color:C.red,fontSize:12}} onClick={function(){var words=practiceAnswer.trim().split(" ");words.pop();setPracticeAnswer(words.join(" "));}}>{"← 지우기"}</span>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
+                    {q.type==="fill"&&<div><div style={{fontSize:14,color:C.text,marginBottom:8}}>{(q.korean||"").replace(/\*\*/g,"")}</div><div style={{fontSize:16,fontWeight:600,color:C.muted}}>{q.sentence}</div></div>}
+                    {q.type==="translate"&&<div style={{fontSize:16,fontWeight:600}}>{(q.korean||"").replace(/\*\*/g,"")}</div>}
+                    {q.type==="order"&&<div><div style={{fontSize:16,fontWeight:600,marginBottom:12}}>{(q.korean||"").replace(/\*\*/g,"")}</div><div style={{marginBottom:10,fontSize:15,color:practiceAnswer?C.text:C.muted,background:C.bg,borderRadius:10,padding:"12px 14px",minHeight:44,lineHeight:1.6}}>{practiceAnswer||"단어를 눌러 문장을 만드세요"}{practiceAnswer&&<span style={{cursor:"pointer",marginLeft:8,color:C.red,fontSize:12}} onClick={function(){var words=practiceAnswer.trim().split(" ");words.pop();setPracticeAnswer(words.join(" "));}}>{"← 지우기"}</span>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{q.words.map(function(w,wi){
                       var selected = (practiceAnswer||"").split(" ").filter(function(s){return s;});
                       var usedCount = selected.filter(function(s){return s===w;}).length;
                       var totalCount = q.words.slice(0,wi+1).filter(function(ww){return ww===w;}).length;
