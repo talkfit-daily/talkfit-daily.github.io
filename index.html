@@ -3683,6 +3683,21 @@
               )}
 
               {practiceMode&&(function(){
+                // 빈칸 만들기 — 이 함수가 다른 컴포넌트 스코프에만 있어 여기선 안 보였음(렌더 크래시 원인). 로컬로 정의.
+                function makeVerbBlank(sentence, verb) {
+                  var parts = verb.split(" ");
+                  var base = parts[0];
+                  var irregulars = {find:"found|finds|finding",get:"got|gets|getting",take:"took|takes|taking",make:"made|makes|making",go:"went|goes|going",have:"had|has|having",come:"came|comes|coming",give:"gave|gives|giving",put:"put|puts|putting",run:"ran|runs|running",say:"said|says|saying",think:"thought|thinks|thinking",know:"knew|knows|knowing",see:"saw|sees|seeing",keep:"kept|keeps|keeping",tell:"told|tells|telling",feel:"felt|feels|feeling",leave:"left|leaves|leaving",call:"called|calls|calling",turn:"turned|turns|turning",set:"set|sets|setting",show:"showed|shows|showing",end:"ended|ends|ending",look:"looked|looks|looking",work:"worked|works|working",break:"broke|breaks|breaking",hold:"held|holds|holding",bring:"brought|brings|bringing",let:"let|lets|letting",stand:"stood|stands|standing",hear:"heard|hears|hearing",try:"tried|tries|trying"};
+                  var forms = base + (irregulars[base] ? "|" + irregulars[base] : "|" + base + "s|" + base + "ed|" + base + "ing");
+                  var pattern;
+                  if (parts.length > 1) {
+                    pattern = new RegExp("\\b(" + forms + ")\\s+" + parts.slice(1).join("\\s+").replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + "\\b", "i");
+                  } else {
+                    pattern = new RegExp("\\b(" + forms + ")\\b", "i");
+                  }
+                  var result = sentence.replace(pattern, "______");
+                  return result !== sentence ? result : sentence.replace(new RegExp(verb.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),"i"), "______");
+                }
                 var allQuestions = [];
                 result.turns.forEach(function(t){
                   if(!t.english||!t.korean) return;
