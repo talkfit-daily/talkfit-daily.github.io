@@ -4712,6 +4712,23 @@
         }
         var newHistory = [].concat(verbHistory,[{verbs:allVerbs,date:todayKey()}]);
         saveLocal("verb_done_"+todayKey(), true);
+        // 오늘 배운 동사를 장기 복습(SRS)에 등록 — 매일 배운 동사가 간격 복습으로 돌아오게.
+        // (이게 없으면 회화를 안 한 유저는 복습 탭이 계속 비어, 정작 배운 동사가 잊혀짐)
+        (function(){
+          var tk = todayKey();
+          var myVerbs = load("my_encountered_verbs") || [];
+          var addOne = function(v, vtype){
+            if (!v || !v.verb) return;
+            var mean = v.meaning_ko || v.meaning || "";
+            if (!mean) return;
+            var ex = v.good_example || (v.examples && v.examples[0] && (v.examples[0].english || v.examples[0].en)) || "";
+            var ex0 = myVerbs.find(function(x){ return x.verb === v.verb; });
+            if (ex0) { ex0.count = (ex0.count||1) + 1; ex0.lastSeen = tk; if (!ex0.meaning) ex0.meaning = mean; if (!ex0.example) ex0.example = ex; }
+            else { myVerbs.push({ verb:v.verb, type:vtype, meaning:mean, example:ex, count:1, firstSeen:tk, lastSeen:tk, source:"레슨" }); }
+          };
+          if (lessons) { for (var mi=0; mi<lessons.length; mi++){ addOne(lessons[mi].basic, "basic"); addOne(lessons[mi].phrasal, "phrasal"); } }
+          save("my_encountered_verbs", myVerbs);
+        })();
         // v1.5.0: 동사 레슨만 완료해도 오늘 학습 인정 (회화 연습 조건 제거)
         var res = markTodayLearned();
         var newStreak = res.streak;
