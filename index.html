@@ -285,6 +285,18 @@
     function load(key) { return loadLocal(key); }
     function save(key, val) { saveLocal(key, val); }
 
+    // 테스트용: ?reset / ?fresh → 저장된 학습기록 비우고 '처음 시작하는 앱'처럼.
+    try {
+      var _rq = new URLSearchParams(location.search);
+      if (_rq.has("reset") || _rq.has("fresh")) {
+        [localStorage, sessionStorage].forEach(function (st) {
+          Object.keys(st).filter(function (k) { return k.indexOf("tf_") === 0; })
+                .forEach(function (k) { st.removeItem(k); });
+        });
+        if (history.replaceState) history.replaceState(null, "", location.pathname); // 새로고침 재리셋 방지
+      }
+    } catch (e) { /* 시크릿 모드 등 */ }
+
     async function loadCloud(userId, key) {
       try {
         var doc = await fbDb.collection("users").doc(userId).collection("data").doc(key).get();
