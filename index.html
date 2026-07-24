@@ -1885,6 +1885,19 @@
             <div style={{fontSize:16,color:C.muted,flexShrink:0}}>{"\u2192"}</div>
           </div>
 
+          {/* \uc571 \ucc28\ubcc4\uc810 \u2014 \ub9e4\uc77c \ucc59\uaca8\uc8fc\ub294 \uc54c\ub9bc(\uae4c\uba39\uae30 \uc804\uc5d0) */}
+          <div style={{background:"linear-gradient(145deg,#111a24,#0a0d13)",border:"1px solid "+C.border,borderRadius:16,padding:"22px 20px",marginBottom:20}}>
+            <div style={{fontSize:11.5,fontWeight:800,letterSpacing:1.2,color:C.accent,marginBottom:6}}>{"\ud83d\udcf2 TalkFit \uc571\uc5d0\uc11c\ub9cc"}</div>
+            <div style={{fontSize:20,fontWeight:800,lineHeight:1.34,marginBottom:17,color:C.text,letterSpacing:-0.3}}>{"\ub9e4\uc77c 5\ubd84,"}<br/><span style={{color:C.accent}}>{"\uae4c\uba39\uae30 \uc804\uc5d0 \uc54c\ub824\ub4dc\ub824\uc694"}</span></div>
+            <div style={{display:"flex",flexDirection:"column",gap:13,marginBottom:20}}>
+              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\ud83d\udd14"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{"\uc624\ub298 \uc544\uc9c1 \uc548 \ud558\uc168\uc5b4\uc694"}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>{"\uc790\uae30 \uc804\uc5d0 \ub531 \ud55c \ubc88, 5\ubd84\ub9cc \ucf55 \uc54c\ub9bc"}</div></div></div>
+              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\ud83d\udd25"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{"\uc5f0\uc18d \ub04a\uae30\uae30 \uc804\uc5d0"}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>{"\uacf5\ub4e4\uc778 \uc2a4\ud2b8\ub9ad, \ub193\uce58\uc9c0 \uc54a\uac8c \ubbf8\ub9ac"}</div></div></div>
+              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\ud83d\udd01"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{"\uae4c\uba39\uc744 \ub54c\ucbe4 \ubcf5\uc2b5"}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>{"\ubc30\uc6b4 \ud45c\ud604\uc744 \ub531 \ub9de\uac8c \ub2e4\uc2dc \uaebc\ub0b4\uc918\uc694"}</div></div></div>
+            </div>
+            <button onClick={function(){var url="https://talkfit-daily-github-io.vercel.app",text="\ub0b4\uac00 \ud558\uace0 \uc2f6\uc740 \ub9d0\uc744 30\ucd08\uc5d0 \ubbf8\uad6d\uc2dd \uc601\uc5b4\ub85c \u2014 \ub179\uc74c\u00b7\uce74\ud1a1\u00b7\uc720\ud29c\ube0c\ub97c \uc26c\uc6b4 \uc601\uc5b4\ub85c, \uac00\uc785 \uc5c6\uc774.";try{if(navigator.share){navigator.share({title:"TalkFit",text:text,url:url});}else{navigator.clipboard.writeText(text+"\n"+url);var b=event.currentTarget;var o=b.textContent;b.textContent="\ub9c1\ud06c \ubcf5\uc0ac\ub410\uc5b4\uc694 \u2713";setTimeout(function(){b.textContent=o;},1700);}}catch(e){}}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:13,padding:15,fontSize:14.5,fontWeight:800,cursor:"pointer"}}>{"\uce5c\uad6c\uc5d0\uac8c TalkFit \uacf5\uc720\ud558\uae30"}</button>
+            <div style={{fontSize:11.5,color:C.muted,textAlign:"center",marginTop:11}}>{"\uc6f9\uc740 \uc9c0\uae08 \uc5f0\uc2b5 \u00b7 \uc571\uc740 \ub9e4\uc77c \ucc59\uaca8\uc90c \u00b7 \uc571 \uace7 \ucd9c\uc2dc"}</div>
+          </div>
+
           {(function(){
             var xp=getXP();var lv=getLevel(xp);var progress=Math.min(100,((xp-lv.min)/(lv.max-lv.min))*100);
             var st=load("xp_state")||{};
