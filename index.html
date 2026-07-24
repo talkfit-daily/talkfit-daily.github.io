@@ -3851,11 +3851,32 @@
       var todaySpeak = (speakHistory||[]).filter(function(s){return s.date===todayKey;});
       var hasContent = todayVerbs.length > 0 || todaySpeak.length > 0;
 
-      if (!hasContent) return (
+      // ── SRS: 지난 학습 동사 간격 복습 ────────────────────────────
+      // 까먹기 전에 다시 보여준다. 많이 본 동사일수록 복습 간격이 길어진다(라이트너식).
+      var _srsRev = useState({}); var srsRev = _srsRev[0]; var setSrsRev = _srsRev[1];
+      var _srsAhead = useState(false); var showAhead = _srsAhead[0]; var setShowAhead = _srsAhead[1];
+      var srsAll = (load("my_encountered_verbs")||[]).filter(function(v){return v&&v.verb&&v.meaning;});
+      function daysSince(ds){ if(!ds) return 999; var a=new Date(ds+"T00:00:00Z"), b=new Date(todayK+"T00:00:00Z"); var d=Math.round((b-a)/86400000); return isNaN(d)?999:d; }
+      var SRS_IV=[1,2,4,7,14,30,60];
+      function srsIv(v){ return SRS_IV[Math.min((v.count||1)-1, SRS_IV.length-1)]; }
+      function bySeen(a,b){ return (a.lastSeen||"").localeCompare(b.lastSeen||""); }
+      var srsDue = srsAll.filter(function(v){ return v.lastSeen!==todayK && daysSince(v.lastSeen) >= srsIv(v); }).sort(bySeen).slice(0,10);
+      var srsAheadList = srsAll.filter(function(v){ return v.lastSeen!==todayK && daysSince(v.lastSeen) < srsIv(v); }).sort(bySeen).slice(0,10);
+      var dueRemaining = srsDue.filter(function(v){return !srsRev[v.verb];});
+      var aheadRemaining = srsAheadList.filter(function(v){return !srsRev[v.verb];});
+      var srsShow = dueRemaining.length>0 ? dueRemaining : (showAhead ? aheadRemaining : []);
+      var hasSrs = srsAll.length > 0;
+      function markReviewed(verb){
+        var all = load("my_encountered_verbs")||[];
+        var it = all.find(function(v){return v.verb===verb;});
+        if(it){ it.lastSeen = todayK; it.count=(it.count||1)+1; save("my_encountered_verbs", all); }
+      }
+
+      if (!hasContent && !hasSrs) return (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",color:C.muted,gap:12}}>
           <div style={{fontSize:36}}>{"🔄"}</div>
-          <div style={{fontSize:14}}>오늘 학습한 내용이 없어요</div>
-          <div style={{fontSize:12}}>홈에서 학습을 시작해보세요!</div>
+          <div style={{fontSize:14}}>아직 복습할 내용이 없어요</div>
+          <div style={{fontSize:12}}>홈에서 학습을 시작하면 여기에 복습 카드가 쌓여요!</div>
         </div>
       );
 
@@ -4009,6 +4030,60 @@
                   )}
                 </div>
               );})}
+            </div>
+          )}
+
+          {hasSrs&&(
+            <div style={{marginTop:hasContent?30:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <div style={{fontSize:11,color:C.blue,letterSpacing:2,fontWeight:700}}>{"🔁 지난 학습 복습"}</div>
+                {dueRemaining.length>0&&<div style={{fontSize:10,color:C.blue,background:C.blue+"18",padding:"3px 9px",borderRadius:8,fontWeight:700}}>{"복습할 때 "+dueRemaining.length+"개"}</div>}
+              </div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.55}}>{"까먹기 전에 다시 봐요. 카드를 탭해서 뜻을 먼저 떠올려보세요."}</div>
+
+              {srsShow.map(function(v){
+                var rKey="rv_"+v.verb;
+                var isOpen=revealed[rKey];
+                var isPh=(v.type==="phrasal"||(v.verb||"").indexOf(" ")!==-1);
+                var color=isPh?C.accent:C.yellow;
+                return(
+                <div key={v.verb} style={{background:C.surface,border:"1px solid "+(isOpen?color+"60":C.border),borderRadius:16,padding:18,marginBottom:12,transition:"border 0.2s"}}>
+                  <div onClick={function(){toggleReveal(rKey);}} style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:22,fontWeight:900,color:color}}>{v.verb}</div>
+                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <div style={{fontSize:10,color:C.muted,background:isPh?C.accentDim:C.yellowDim,padding:"2px 8px",borderRadius:6}}>{isPh?"구동사":"기본"}</div>
+                      {v.count>1&&<div style={{fontSize:10,color:C.muted,background:C.border,padding:"2px 7px",borderRadius:6}}>{v.count+"회"}</div>}
+                      <div style={{fontSize:16,color:C.muted}}>{isOpen?"▲":"▼"}</div>
+                    </div>
+                  </div>
+                  {!isOpen?(
+                    <div style={{marginTop:8,fontSize:12,color:C.muted}}>{"뜻이 뭐였죠? 탭해서 확인"}</div>
+                  ):(
+                    <div style={{marginTop:12}}>
+                      <div style={{fontSize:15,color:C.text,fontWeight:700,marginBottom:v.example?10:14}}>{v.meaning}</div>
+                      {v.example&&(
+                        <div style={{background:color+"10",border:"1px solid "+color+"25",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+                          <div style={{fontSize:14,color:C.text,fontWeight:600}}>{stripStars(v.example)}</div>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(stripStars(v.example),e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                        </div>
+                      )}
+                      <button onClick={function(e){e.stopPropagation();markReviewed(v.verb);setSrsRev(function(s){var n={};for(var k in s)n[k]=s[k];n[v.verb]=true;return n;});}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:10,padding:12,fontSize:13,fontWeight:800,cursor:"pointer"}}>{"✓ 기억했어요"}</button>
+                    </div>
+                  )}
+                </div>
+                );
+              })}
+
+              {srsShow.length===0&&(
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:"28px 20px",textAlign:"center"}}>
+                  <div style={{fontSize:34,marginBottom:8}}>{"🎉"}</div>
+                  <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:6}}>{"오늘 복습할 건 다 끝냈어요!"}</div>
+                  <div style={{fontSize:12,color:C.muted,lineHeight:1.55,marginBottom:aheadRemaining.length>0?18:0}}>{"까먹을 때쯤 다시 알려드릴게요. 꾸준함이 실력이 돼요."}</div>
+                  {aheadRemaining.length>0&&!showAhead&&(
+                    <button onClick={function(){setShowAhead(true);}} style={{background:"none",border:"1px solid "+C.blue+"50",color:C.blue,borderRadius:10,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>{"미리 복습하기 ("+aheadRemaining.length+")"}</button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
