@@ -17,7 +17,7 @@
   <meta name="twitter:title" content="쉬운 동사로 다 말한다 — TalkFit"/>
   <meta name="twitter:description" content="내 말을 30초에 미국식 영어로. 가입 없음·무료."/>
   <meta name="twitter:image" content="https://talkfit-daily-github-io.vercel.app/og.png"/>
-  <meta name="theme-color" content="#08090d"/>
+  <meta name="theme-color" content="#ffffff"/>
   <link rel="icon" href="/icon.svg" type="image/svg+xml"/>
   <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png"/>
   <!-- iOS는 apple-touch-icon에 SVG를 지원하지 않음 — PNG 필수 -->
@@ -28,14 +28,14 @@
   <meta name="apple-mobile-web-app-title" content="TalkFit"/>
   <style>
     @keyframes splashFade{0%{opacity:1}80%{opacity:1}100%{opacity:0}}
-    #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#08090d;animation:splashFade 2s forwards}
+    #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;animation:splashFade 2s forwards}
     #splash svg{width:120px;height:120px}
-    #splash .splash-text{margin-top:16px;font-size:22px;font-weight:900;color:#7ee8a2;letter-spacing:-0.5px}
+    #splash .splash-text{margin-top:16px;font-size:22px;font-weight:900;color:#10b981;letter-spacing:-0.5px}
     #splash .splash-sub{margin-top:6px;font-size:12px;color:#4a5068}
   </style>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{background:#08090d;color:#e8eaf0;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;overscroll-behavior-y:contain;}
+    body{background:#ffffff;color:#0f172a;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;overscroll-behavior-y:contain;}
     input,textarea,button{font-family:inherit;}
     a{color:inherit;}
     textarea::placeholder{color:#2a2f45;}
@@ -781,8 +781,8 @@
       var listenOpts = [listenEx.ex.korean].concat(uniqueWrong.sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
       quizzes.push({type:"listening", audio_text:listenEx.ex.english, options:listenOpts, answer:listenEx.ex.korean, verb:listenEx.verb});
 
-      // Q4: meaning quiz for phrasal verb (same lesson set)
-      var p2 = lessons[0].phrasal;
+      // Q4: meaning quiz for phrasal verb — 마지막 세트 사용(세트 2·3 동사도 반드시 출제되게, 커버리지 버그 수정)
+      var p2 = lessons[lessons.length-1].phrasal;
       var correctM2 = p2.meaning_ko.split(",")[0].trim();
       var opts4 = [correctM2].concat(wrongMeanings.filter(function(w){return w!==correctM2;}).sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
       quizzes.push({type:"meaning", question:'"'+p2.verb+'" 의 뜻은?', options:opts4, answer:correctM2, verb:p2.verb});
@@ -1629,7 +1629,7 @@
 
       return (
         <div style={{position:"fixed",inset:0,background:"rgba(8,9,13,0.95)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(10px)",animation:"fadeIn 0.3s"}}>
-          <div style={{background:"linear-gradient(160deg, #10121a, #08090d)",border:"1px solid "+C.border,borderRadius:24,padding:24,maxWidth:360,width:"100%",animation:"levelUp 0.4s",position:"relative",boxShadow:"0 10px 30px rgba(0,0,0,0.5)",color:C.text}}>
+          <div style={{background:"linear-gradient(160deg,"+C.surface+","+C.bg+")",border:"1px solid "+C.border,borderRadius:24,padding:24,maxWidth:360,width:"100%",animation:"levelUp 0.4s",position:"relative",boxShadow:"0 10px 30px rgba(0,0,0,0.15)",color:C.text}}>
             <button onClick={onClose} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer"}}>{"✕"}</button>
             
             {purchased ? (
@@ -1887,7 +1887,7 @@
           </div>
 
           {/* \uc571 \ucc28\ubcc4\uc810 \u2014 \ub9e4\uc77c \ucc59\uaca8\uc8fc\ub294 \uc54c\ub9bc(\uae4c\uba39\uae30 \uc804\uc5d0) */}
-          <div style={{background:"linear-gradient(145deg,#111a24,#0a0d13)",border:"1px solid "+C.border,borderRadius:16,padding:"22px 20px",marginBottom:20}}>
+          <div style={{background:"linear-gradient(145deg,"+C.accent+"14,"+C.surface+")",border:"1px solid "+C.accent+"30",borderRadius:16,padding:"22px 20px",marginBottom:20}}>
             <div style={{fontSize:11.5,fontWeight:800,letterSpacing:1.2,color:C.accent,marginBottom:6}}>{"\ud83d\udcf2 TalkFit \uc571\uc5d0\uc11c\ub9cc"}</div>
             <div style={{fontSize:20,fontWeight:800,lineHeight:1.34,marginBottom:17,color:C.text,letterSpacing:-0.3}}>{"\uae4c\uba39\uae30 \uc804\uc5d0,"}<br/><span style={{color:C.accent}}>{"\ub9e4\uc77c \ub098\ub97c \ub9d0\ud558\uac8c"}</span></div>
             <div style={{display:"flex",flexDirection:"column",gap:13,marginBottom:20}}>
@@ -2735,8 +2735,8 @@
         setInput("");
         setIsLoading(true);
 
-        var conversationHistory = newMessages.map(function(m){return (m.role==="ai"?"AI: ":"Student: ")+m.text;}).join("\n");
-        var system = 'You are a friendly American English conversation partner. Rules:\n- Keep responses SHORT (1-2 sentences)\n- Use natural American English\n- If the student makes mistakes, add [교정: correction in Korean]\n- Ask follow-up questions to continue\nReturn ONLY valid JSON:\n{"response":"English reply","correction":"교정 (or empty string)"}';
+        var conversationHistory = newMessages.slice(-12).map(function(m){return (m.role==="ai"?"AI: ":"Student: ")+m.text;}).join("\n");
+        var system = 'You are a friendly American English conversation partner. Rules:\n- Keep responses SHORT (1-2 sentences)\n- Use natural American English\n- If the student makes mistakes, add [교정: correction in Korean]\n- React naturally like a real friend: sometimes just comment, agree, or share a quick reaction. Only about 1 in 3 replies should end with a question, and never ask two questions in a row.\nReturn ONLY valid JSON:\n{"response":"English reply","correction":"교정 (or empty string)"}';
         callClaude(system, 'Conversation so far:\n'+conversationHistory+'\n\nRespond to the student\'s last message naturally.')
         .then(function(raw){
           var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
@@ -4657,7 +4657,7 @@
               {aiLoading ? (
                 <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:"16px 14px",marginBottom:16,textAlign:"center",color:C.muted,fontSize:14}}>{"🤖 AI 코치가 확인하는 중…"}</div>
               ) : aiFb ? (
-                <div style={{background:"linear-gradient(145deg,#111a24,#0a0d13)",border:"1px solid "+C.accent+"44",borderRadius:16,padding:"16px",marginBottom:16}}>
+                <div style={{background:"linear-gradient(145deg,"+C.accent+"14,"+C.surface+")",border:"1px solid "+C.accent+"44",borderRadius:16,padding:"16px",marginBottom:16}}>
                   <div style={{display:"flex",gap:8,marginBottom:11,flexWrap:"wrap"}}>
                     <span style={{fontSize:12,fontWeight:800,padding:"4px 10px",borderRadius:99,background:aiFb.meaning_ok?C.accent+"22":C.orange+"22",color:aiFb.meaning_ok?C.accent:C.orange}}>{(aiFb.meaning_ok?"✅ ":"⚠️ ")+"뜻 "+(aiFb.meaning_ok?"통했어요":"살짝 달라요")}</span>
                     <span style={{fontSize:12,fontWeight:800,padding:"4px 10px",borderRadius:99,background:aiFb.natural?C.accent+"22":C.orange+"22",color:aiFb.natural?C.accent:C.orange}}>{(aiFb.natural?"✅ ":"⚠️ ")+"자연스러움"}</span>
