@@ -233,7 +233,7 @@
           .catch(function(e) {
             if (!isUserCancelled(e)) {
               console.error("Native Apple login error:", e);
-              alert("Apple 로그인에 실패했어요. 다시 시도하거나 Google로 로그인해주세요.");
+              alert("Apple 로그인에 실패했어요. 잠시 후 다시 시도해주세요.");
             }
             throw e;
           });
@@ -1900,14 +1900,14 @@
           {/* \uc571 \ucc28\ubcc4\uc810 \u2014 \ub9e4\uc77c \ucc59\uaca8\uc8fc\ub294 \uc54c\ub9bc(\uae4c\uba39\uae30 \uc804\uc5d0) */}
           <div style={{background:"linear-gradient(145deg,#111a24,#0a0d13)",border:"1px solid "+C.border,borderRadius:16,padding:"22px 20px",marginBottom:20}}>
             <div style={{fontSize:11.5,fontWeight:800,letterSpacing:1.2,color:C.accent,marginBottom:6}}>{"\ud83d\udcf2 TalkFit \uc571\uc5d0\uc11c\ub9cc"}</div>
-            <div style={{fontSize:20,fontWeight:800,lineHeight:1.34,marginBottom:17,color:C.text,letterSpacing:-0.3}}>{"\ub9e4\uc77c 5\ubd84,"}<br/><span style={{color:C.accent}}>{"\uae4c\uba39\uae30 \uc804\uc5d0 \uc54c\ub824\ub4dc\ub824\uc694"}</span></div>
+            <div style={{fontSize:20,fontWeight:800,lineHeight:1.34,marginBottom:17,color:C.text,letterSpacing:-0.3}}>{"\uae4c\uba39\uae30 \uc804\uc5d0,"}<br/><span style={{color:C.accent}}>{"\ub9e4\uc77c \ub098\ub97c \ub9d0\ud558\uac8c"}</span></div>
             <div style={{display:"flex",flexDirection:"column",gap:13,marginBottom:20}}>
-              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\ud83d\udd14"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{"\uc624\ub298 \uc544\uc9c1 \uc548 \ud558\uc168\uc5b4\uc694"}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>{"\uc790\uae30 \uc804\uc5d0 \ub531 \ud55c \ubc88, 5\ubd84\ub9cc \ucf55 \uc54c\ub9bc"}</div></div></div>
+              <div style={{display:"flex",gap:12,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\ud83d\udd14"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{"\uc624\ub298 \uc544\uc9c1 \uc548 \ud558\uc168\uc5b4\uc694"}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>{"\uc790\uae30 \uc804\uc5d0 \ub531 \ud55c \ubc88, \ucf55 \uc54c\ub9bc"}</div></div></div>
               <div style={{display:"flex",gap:12,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\ud83d\udd25"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{"\uc5f0\uc18d \ub04a\uae30\uae30 \uc804\uc5d0"}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>{"\uacf5\ub4e4\uc778 \uc2a4\ud2b8\ub9ad, \ub193\uce58\uc9c0 \uc54a\uac8c \ubbf8\ub9ac"}</div></div></div>
               <div style={{display:"flex",gap:12,alignItems:"flex-start"}}><span style={{fontSize:18}}>{"\ud83d\udd01"}</span><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:C.text}}>{"\uae4c\uba39\uc744 \ub54c\ucbe4 \ubcf5\uc2b5"}</div><div style={{fontSize:12,color:C.muted,marginTop:2}}>{"\ubc30\uc6b4 \ud45c\ud604\uc744 \ub531 \ub9de\uac8c \ub2e4\uc2dc \uaebc\ub0b4\uc918\uc694"}</div></div></div>
             </div>
             <button onClick={function(){var url="https://talkfit-daily-github-io.vercel.app",text="\ub0b4\uac00 \ud558\uace0 \uc2f6\uc740 \ub9d0\uc744 30\ucd08\uc5d0 \ubbf8\uad6d\uc2dd \uc601\uc5b4\ub85c \u2014 \ub179\uc74c\u00b7\uce74\ud1a1\u00b7\uc720\ud29c\ube0c\ub97c \uc26c\uc6b4 \uc601\uc5b4\ub85c, \uac00\uc785 \uc5c6\uc774.";try{if(navigator.share){navigator.share({title:"TalkFit",text:text,url:url});}else{navigator.clipboard.writeText(text+"\n"+url);var b=event.currentTarget;var o=b.textContent;b.textContent="\ub9c1\ud06c \ubcf5\uc0ac\ub410\uc5b4\uc694 \u2713";setTimeout(function(){b.textContent=o;},1700);}}catch(e){}}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:13,padding:15,fontSize:14.5,fontWeight:800,cursor:"pointer"}}>{"\uce5c\uad6c\uc5d0\uac8c TalkFit \uacf5\uc720\ud558\uae30"}</button>
-            <div style={{fontSize:11.5,color:C.muted,textAlign:"center",marginTop:11}}>{"\uc6f9\uc740 \uc9c0\uae08 \uc5f0\uc2b5 \u00b7 \uc571\uc740 \ub9e4\uc77c \ucc59\uaca8\uc90c \u00b7 \uc571 \uace7 \ucd9c\uc2dc"}</div>
+            <div style={{fontSize:11.5,color:C.muted,textAlign:"center",marginTop:11}}>{"\uc6f9\uc740 \ub9db\ubcf4\uae30 \u00b7 \uc571\uc740 \ub9e4\uc77c \ub9d0\ud558\ub294 \uc2b5\uad00"}</div>
           </div>
 
           {(function(){
@@ -4463,6 +4463,16 @@
       var _a = useState(0), idx = _a[0], setIdx = _a[1];
       var _b = useState("prompt"), phase = _b[0], setPhase = _b[1];
       var _c = useState(null), finalStreak = _c[0], setFinalStreak = _c[1];
+      var _d = useState(""), interim = _d[0], setInterim = _d[1];
+      var _e = useState(null), result = _e[0], setResult = _e[1];
+      var saidRef = useRef("");
+      var recRef = useRef(null);
+      var listenerRef = useRef(null);
+      var _af = useState(null), aiFb = _af[0], setAiFb = _af[1];
+      var _al = useState(false), aiLoading = _al[0], setAiLoading = _al[1];
+      var nativeSR = (typeof window!=="undefined" && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) || null;
+      var webSR = (typeof window!=="undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition)) || null;
+      var canRecognize = (IS_NATIVE && nativeSR) ? true : ((!IS_NATIVE && webSR) ? true : false);
 
       if (!todays.length) return <div style={{padding:40,textAlign:"center",color:C.muted}}>{"준비된 상황이 없어요."}</div>;
 
@@ -4473,6 +4483,97 @@
           var isKey = bare && kw.indexOf(bare) !== -1;
           return <span key={i} style={{fontSize:15,fontWeight:700,padding:"6px 12px",borderRadius:9,background:isKey?C.accent:C.accentDim,color:isKey?"#08090d":C.accent}}>{w}</span>;
         });
+      }
+
+      function normWords(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").split(" ").filter(function(w){return w;}); }
+      var SPK_STOP = {a:1,an:1,the:1,to:1,of:1,in:1,on:1,at:1,is:1,am:1,are:1,was:1,were:1,be:1,i:1,you:1,it:1,and:1,or:1,my:1,me:1,we:1,us:1,this:1,that:1,for:1,so:1,do:1,does:1,did:1,ll:1,ve:1,re:1};
+      // 모범답안 전체 대비 얼마나 겹치는지(coverage)로 채점 — 흔한 핵심단어 하나만 맞아도 통과하던 문제 방지.
+      function scoreIt(sit, said){
+        var saidW = normWords(said);
+        var saidStr = " "+saidW.join(" ")+" ";
+        var saidSet={}; saidW.forEach(function(w){saidSet[w]=1;});
+        var content = normWords(sit.en).filter(function(w){return !SPK_STOP[w] && w.length>1;});
+        var hit = content.filter(function(w){return saidSet[w];});
+        var coverage = content.length ? hit.length/content.length : 0;
+        var keyPhrase = (sit.key||"").toLowerCase().replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim();
+        var keyHit = keyPhrase ? (saidStr.indexOf(" "+keyPhrase+" ")!==-1) : false;
+        var keys = keyPhrase ? keyPhrase.split(" ").filter(function(w){return w;}) : content.slice(0,3);
+        var matched=[], missing=[];
+        keys.forEach(function(k){ if(saidSet[k]) matched.push(k); else missing.push(k); });
+        var verdict, emoji, tone;
+        if(!saidW.length){ verdict="안 들렸어요. 다시 말해볼까요?"; emoji="🎤"; tone=C.muted; }
+        else if(coverage < 0.4 && !keyHit){ verdict="음, 상황이랑 좀 다른 것 같아요. 모범답안 보고 다시 해볼까요?"; emoji="🤔"; tone=C.muted; }
+        else if(coverage >= 0.75){ verdict="완벽해요! 모범답안대로 말했어요"; emoji="🎉"; tone=C.accent; }
+        else if(keyHit && coverage >= 0.4){ verdict="좋아요! 핵심 '"+keyPhrase+"' 살려서 말했어요"; emoji="👏"; tone=C.accent; }
+        else if(coverage >= 0.5){ verdict="좋아요! 거의 비슷하게 말했어요"; emoji="👏"; tone=C.orange; }
+        else { verdict="조금 더 모범답안에 가깝게 — 핵심은 '"+keyPhrase+"'"; emoji="💪"; tone=C.orange; }
+        return {said:said||"", keys:keys, matched:matched, missing:missing, coverage:coverage, verdict:verdict, emoji:emoji, tone:tone};
+      }
+      function stopRecognizer(){
+        if(IS_NATIVE && nativeSR){
+          try{ nativeSR.stop(); }catch(e){}
+          var lh=listenerRef.current;
+          if(lh){ try{ Promise.resolve(lh).then(function(h){ if(h&&h.remove)h.remove(); }).catch(function(){}); }catch(e){} listenerRef.current=null; }
+        } else if(recRef.current){
+          try{ recRef.current.stop(); }catch(e){} recRef.current=null;
+        }
+      }
+      function startListening(sit){
+        saidRef.current=""; setInterim(""); setResult(null); setPhase("listening");
+        if(IS_NATIVE && nativeSR){
+          var begin=function(){
+            try{
+              var lh=nativeSR.addListener("partialResults", function(data){
+                var m = data && data.matches && data.matches[0];
+                if(m){ saidRef.current=m; setInterim(m); }
+              });
+              listenerRef.current=lh;
+              nativeSR.start({language:"en-US", partialResults:true, popup:false}).catch(function(){});
+            }catch(e){}
+          };
+          if(nativeSR.requestPermissions){ nativeSR.requestPermissions().then(begin).catch(begin); }
+          else if(nativeSR.requestPermission){ nativeSR.requestPermission().then(begin).catch(begin); }
+          else begin();
+        } else if(webSR){
+          try{
+            var rec=new webSR(); rec.lang="en-US"; rec.continuous=true; rec.interimResults=true;
+            rec.onresult=function(e){ var all=""; for(var i=0;i<e.results.length;i++){ all+=e.results[i][0].transcript; } saidRef.current=all.trim(); setInterim(all.trim()); };
+            rec.onerror=function(){};
+            rec.onend=function(){};
+            rec.start(); recRef.current=rec;
+          }catch(err){ finishListening(sit); }
+        }
+      }
+      function askAiFeedback(sit, saidNow){
+        setAiFb(null);
+        if(!props.aiAvailable || !(saidNow||"").trim() || typeof callClaude!=="function"){ return; }
+        setAiLoading(true);
+        var sys='You are a warm, encouraging Korean English-speaking coach. You get a Korean everyday situation, a model English answer, and what the learner ACTUALLY said (from phone speech recognition, which may have small transcription errors — be forgiving of those). Judge whether the learner conveyed the RIGHT MEANING for the situation and whether it sounds NATURAL. Reply in KOREAN, warm and short. Return ONLY valid JSON: {"meaning_ok":true or false,"natural":true or false,"better":"a more natural English way to say what THEY were trying to say (empty string if theirs is already natural)","comment":"one warm coaching sentence in Korean about their attempt","cheer":"a very short Korean cheer"}';
+        var usr="상황: "+sit.ko+"\n모범답안: "+sit.en+"\n학습자가 말한 것: "+saidNow;
+        callClaude(sys, usr).then(function(txt){
+          var obj=null;
+          try{
+            var m=(txt||"").match(/```json\s*([\s\S]*?)```/); var raw=m?m[1]:(txt||"");
+            var a=raw.indexOf("{"), b=raw.lastIndexOf("}");
+            if(a!==-1&&b!==-1&&b>a) obj=JSON.parse(raw.slice(a,b+1));
+          }catch(e){ obj=null; }
+          setAiFb(obj); setAiLoading(false);
+        }).catch(function(){ setAiLoading(false); });
+      }
+      function finishListening(sit){
+        stopRecognizer();
+        setTimeout(function(){
+          var saidNow = saidRef.current||"";
+          setResult(scoreIt(sit, saidNow));
+          setPhase("feedback");
+          askAiFeedback(sit, saidNow);
+        }, 300);
+      }
+      function cancelListening(){ stopRecognizer(); saidRef.current=""; setInterim(""); setAiFb(null); setAiLoading(false); setPhase("prompt"); }
+      function advance(){
+        stopRecognizer(); saidRef.current=""; setInterim(""); setResult(null); setAiFb(null); setAiLoading(false);
+        if (idx+1 >= todays.length) { var s = (props.onComplete && props.onComplete()); setFinalStreak(typeof s==="number"?s:(props.streak||0)); setPhase("done"); }
+        else { setIdx(idx+1); setPhase("prompt"); }
       }
 
       if (phase === "done") {
@@ -4503,12 +4604,69 @@
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:20,padding:22,boxShadow:"0 10px 26px -16px rgba(0,0,0,0.7)"}}>
                 <span style={{display:"inline-block",fontSize:11,fontWeight:800,color:C.accent,background:C.accentDim,padding:"4px 11px",borderRadius:99,marginBottom:14}}>{it.tag}</span>
                 <div style={{fontSize:21,fontWeight:800,lineHeight:1.45}}>{it.ko}</div>
-                <div style={{marginTop:20,textAlign:"center",fontSize:13.5,color:C.muted,fontWeight:600}}>{"🎤 먼저 "}<b style={{color:C.text}}>{"영어로 직접"}</b>{" 말해보세요"}</div>
+                <div style={{marginTop:20,textAlign:"center",fontSize:13.5,color:C.muted,fontWeight:600}}>{canRecognize?"🎤 영어로 말하면 ":"🎤 먼저 "}<b style={{color:C.text}}>{canRecognize?"채점해드려요":"영어로 직접"}</b>{canRecognize?"":" 말해보세요"}</div>
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12,marginTop:22}}>
-                <button onClick={function(){setPhase("reveal");speakEnglish(it.en);}} style={{width:96,height:96,borderRadius:"50%",border:"none",background:C.accent,color:"#08090d",fontSize:32,cursor:"pointer",boxShadow:"0 10px 34px -6px "+C.accent+"99"}}>{"🎤"}</button>
-                <div style={{fontSize:13,color:C.muted}}>{"말했으면 탭 · 정답 확인"}</div>
+                <button onClick={function(){ if(canRecognize){ startListening(it); } else { setPhase("reveal"); speakEnglish(it.en); } }} style={{width:96,height:96,borderRadius:"50%",border:"none",background:C.accent,color:"#08090d",fontSize:32,cursor:"pointer",boxShadow:"0 10px 34px -6px "+C.accent+"99"}}>{"🎤"}</button>
+                <div style={{fontSize:13,color:C.muted}}>{canRecognize?"탭하고 영어로 말하세요":"말했으면 탭 · 정답 확인"}</div>
+                {!canRecognize ? <div style={{fontSize:11.5,color:C.muted,textAlign:"center",lineHeight:1.5,maxWidth:270}}>{"이 기기에선 음성 채점이 안 돼요 · 앱에서 말하고 채점받기"}</div> : null}
                 <button onClick={function(){setPhase("reveal");speakEnglish(it.en);}} style={{background:"none",border:"none",color:C.muted,fontSize:12.5,textDecoration:"underline",cursor:"pointer"}}>{"모르겠어요 · 정답 보기"}</button>
+              </div>
+            </div>
+          ) : phase === "listening" ? (
+            <div style={{textAlign:"center",padding:"8px 0"}}>
+              <div style={{fontSize:12,letterSpacing:2,color:C.accent,fontWeight:800,margin:"6px 0 18px"}}>{"● 듣는 중 · 영어로 말하세요"}</div>
+              <div style={{width:110,height:110,borderRadius:"50%",background:C.accent,color:"#08090d",fontSize:40,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",boxShadow:"0 0 0 10px "+C.accent+"22, 0 0 44px -4px "+C.accent+"aa"}}>{"🎤"}</div>
+              <div style={{minHeight:52,fontSize:18,fontWeight:700,lineHeight:1.4,color:interim?C.text:C.muted,margin:"0 auto 22px",maxWidth:320}}>{interim||"말하면 여기에 보여요…"}</div>
+              <button onClick={function(){finishListening(it);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 8px 20px -8px "+C.accent+"99"}}>{"■ 다 말했어요"}</button>
+              <button onClick={cancelListening} style={{marginTop:12,background:"none",border:"none",color:C.muted,fontSize:12.5,textDecoration:"underline",cursor:"pointer"}}>{"취소"}</button>
+            </div>
+          ) : phase === "feedback" ? (
+            <div>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:"12px 14px",marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:1,color:C.muted,marginBottom:6}}>{"🗣️ 내가 말한 것"}</div>
+                <div style={{fontSize:15,fontWeight:600,lineHeight:1.5,color:(result&&result.said)?C.text:C.muted}}>{(result&&result.said)?result.said:"(안 들렸어요)"}</div>
+              </div>
+              {aiLoading ? (
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:"16px 14px",marginBottom:16,textAlign:"center",color:C.muted,fontSize:14}}>{"🤖 AI 코치가 확인하는 중…"}</div>
+              ) : aiFb ? (
+                <div style={{background:"linear-gradient(145deg,#111a24,#0a0d13)",border:"1px solid "+C.accent+"44",borderRadius:16,padding:"16px",marginBottom:16}}>
+                  <div style={{display:"flex",gap:8,marginBottom:11,flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,fontWeight:800,padding:"4px 10px",borderRadius:99,background:aiFb.meaning_ok?C.accent+"22":C.orange+"22",color:aiFb.meaning_ok?C.accent:C.orange}}>{(aiFb.meaning_ok?"✅ ":"⚠️ ")+"뜻 "+(aiFb.meaning_ok?"통했어요":"살짝 달라요")}</span>
+                    <span style={{fontSize:12,fontWeight:800,padding:"4px 10px",borderRadius:99,background:aiFb.natural?C.accent+"22":C.orange+"22",color:aiFb.natural?C.accent:C.orange}}>{(aiFb.natural?"✅ ":"⚠️ ")+"자연스러움"}</span>
+                  </div>
+                  {aiFb.comment ? <div style={{fontSize:14.5,lineHeight:1.6,color:C.text,marginBottom:aiFb.better?12:2}}>{aiFb.comment}</div> : null}
+                  {aiFb.better ? (
+                    <div style={{background:C.accentDim,borderRadius:12,padding:"12px 13px",marginTop:4}}>
+                      <div style={{fontSize:11,fontWeight:800,color:C.accent,marginBottom:6}}>{"💡 이렇게 말하면 더 자연스러워요"}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{flex:1,fontSize:17,fontWeight:800,lineHeight:1.35,color:C.text}}>{aiFb.better}</div>
+                        <button onClick={function(){speakEnglish(aiFb.better);}} style={{flex:"0 0 auto",background:"none",border:"none",fontSize:20,cursor:"pointer",padding:0}}>{"🔊"}</button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {aiFb.cheer ? <div style={{fontSize:13,color:C.accent,fontWeight:700,marginTop:12}}>{aiFb.cheer}</div> : null}
+                </div>
+              ) : (
+                <div style={{marginBottom:16}}>
+                  <div style={{textAlign:"center",margin:"2px 0 12px"}}>
+                    <div style={{fontSize:40,marginBottom:6}}>{result?result.emoji:"🎤"}</div>
+                    <div style={{fontSize:17,fontWeight:800,lineHeight:1.4,color:result?result.tone:C.text}}>{result?result.verdict:""}</div>
+                  </div>
+                  {(result&&result.keys&&result.keys.length) ? (
+                    <div style={{display:"flex",flexWrap:"wrap",gap:7,justifyContent:"center"}}>
+                      {result.keys.map(function(k,i){ var ok=result.matched.indexOf(k)!==-1; return <span key={i} style={{fontSize:14,fontWeight:700,padding:"6px 12px",borderRadius:9,background:ok?C.accent:C.surface,color:ok?"#08090d":C.muted,border:ok?"none":"1px solid "+C.border}}>{(ok?"✓ ":"")+k}</span>; })}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+              <div style={{fontSize:12,letterSpacing:2,color:C.muted,fontWeight:700,margin:"4px 0 8px"}}>{"이렇게 말하면 돼요 (모범답안)"}</div>
+              <div style={{fontSize:24,fontWeight:800,lineHeight:1.3,marginBottom:4}}>{it.en}</div>
+              <div style={{fontSize:14,color:C.muted,marginBottom:16}}>{it.enko}</div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={function(){speakEnglish(it.en);}} style={{flex:"0 0 auto",background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:14,padding:"15px 18px",fontSize:15,cursor:"pointer"}}>{"🔊"}</button>
+                <button onClick={function(){startListening(it);}} style={{flex:"0 0 auto",background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:14,padding:"15px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>{"🎤 다시"}</button>
+                <button onClick={advance} style={{flex:1,background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:15,fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 8px 20px -8px "+C.accent+"99"}}>{idx+1>=todays.length?"완료 →":"다음 →"}</button>
               </div>
             </div>
           ) : (
@@ -4913,7 +5071,7 @@
 
           <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:120}}>
             {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
-            {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} streak={streak}/>}
+            {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} streak={streak} aiAvailable={aiAvailable}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
             {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} onMore={handleMoreLesson} aiAvailable={aiAvailable}/>}
