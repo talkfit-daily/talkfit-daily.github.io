@@ -35,7 +35,7 @@
   </style>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{background:#ffffff;color:#0f172a;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;overscroll-behavior-y:contain;}
+    body{background:#f3f5f8;color:#111827;font-family:'DM Sans','Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;margin:0;overscroll-behavior-y:contain;}
     input,textarea,button{font-family:inherit;}
     a{color:inherit;}
     textarea::placeholder{color:#2a2f45;}
@@ -1530,12 +1530,12 @@
       text:"#eef1f5",muted:"#727c92",
     };
     var C_LIGHT = {
-      bg:"#ffffff",surface:"#f5f6fa",border:"#e0e3eb",
-      accent:"#10b981",accentDim:"#10b98115",
-      blue:"#3b82f6",blueDim:"#3b82f615",
-      yellow:"#d97706",yellowDim:"#d9770615",
+      bg:"#f3f5f8",surface:"#ffffff",border:"#edf0f4",
+      accent:"#10b981",accentDim:"#10b98114",
+      blue:"#3b82f6",blueDim:"#3b82f614",
+      yellow:"#d97706",yellowDim:"#d9770614",
       orange:"#ea580c",red:"#dc2626",
-      text:"#0f172a",muted:"#64748b",
+      text:"#111827",muted:"#8b94a4",
     };
     var C = (load("theme")==="dark") ? C_DARK : C_LIGHT;  // 기본 라이트(토스 스타일), 명시적으로 dark 선택 시만 다크
     // 폰트 크기는 앱 루트 zoom으로 적용 (data-app-root)
@@ -1792,8 +1792,8 @@
           <div style={{fontSize:12,color:C.muted,letterSpacing:2,marginBottom:6}}>
             {new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})}
           </div>
-          <div style={{fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4}}>{greeting.t}</div>
-          <div style={{fontSize:14,color:C.muted,marginBottom:18}}>{greeting.s}</div>
+          <div style={{fontSize:30,fontWeight:800,lineHeight:1.25,marginBottom:5,letterSpacing:-0.5}}>{greeting.t}</div>
+          <div style={{fontSize:14.5,color:C.muted,marginBottom:22}}>{greeting.s}</div>
 
           {/* ── 오늘의 학습 — 하나의 흐름(물흐르듯): 오늘의 나 → 단어 학습 → 복습 (v1.8.x) ────── */}
           {(function(){
@@ -1805,7 +1805,7 @@
             var doneCount=(meDone?1:0)+(learnDone?1:0)+(applyDone?1:0);
             var btn=bothDone?"오늘 다 했어요 ✅ · 복습하기":(doneCount>0?"이어서 계속 →":"오늘 시작 →");
             return (
-              <div style={{background:"linear-gradient(135deg,"+C.accent+"22,"+C.accent+"06)",border:"1px solid "+C.accent+"50",borderRadius:22,padding:22,marginBottom:16,boxShadow:"0 14px 32px -16px "+C.accent+"66"}}>
+              <div style={{background:C.surface,borderRadius:24,padding:"24px 22px",marginBottom:18,boxShadow:"0 10px 30px -14px rgba(17,24,39,0.12)"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
                   <span style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:0.5}}>{bothDone?"오늘의 학습 · 완료 🎉":"오늘의 학습"}</span>
                   <span style={{fontSize:11,color:C.muted}}>{"약 20분"}</span>
