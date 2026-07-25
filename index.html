@@ -1538,6 +1538,8 @@
       text:"#111827",muted:"#8b94a4",
     };
     var C = (load("theme")==="dark") ? C_DARK : C_LIGHT;  // 기본 라이트(토스 스타일), 명시적으로 dark 선택 시만 다크
+    // 토스식 카드 소프트 섀도우 — 회색 페이지 위 흰 카드를 은은하게 띄운다(딱딱한 테두리 대신).
+    var SH = (C===C_LIGHT) ? "0 6px 20px -14px rgba(17,24,39,0.14)" : "0 8px 24px -12px rgba(0,0,0,0.5)";
     // 폰트 크기는 앱 루트 zoom으로 적용 (data-app-root)
     var BE_VERBS = ["am","is","are","was","were","be","been","being","'m","'s","'re"];
     function filterBeVerbs(verbs) { return (verbs||[]).filter(function(v){ return BE_VERBS.indexOf((v.verb||"").toLowerCase()) === -1; }); }
@@ -1847,7 +1849,7 @@
           {/* 오늘의 학습 시작은 위 통합 흐름 카드가 담당 — 중복 "시작하기" 버튼 제거 (v1.8.x) */}
 
           {/* 지표는 한 줄로 압축 — 시작을 방해하지 않도록 (v1.5.0) */}
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,padding:"10px 14px",background:C.surface,border:"1px solid "+C.border,borderRadius:12,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,padding:"10px 14px",background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,flexWrap:"wrap"}}>
             <span style={{fontSize:13,fontWeight:800,color:streak>0?C.accent:C.muted}}>{"🔥 "}{streak}{"일 연속"}</span>
             <span style={{marginLeft:"auto",display:"flex",gap:4}}>
               {days.map(function(d,i){return(
@@ -1907,7 +1909,7 @@
             var comboActive=(Date.now()-lastCorrect<5*60*1000)&&combo>=3;
             var att=load("attendance")||{};
             return (
-              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 16px",marginBottom:16}}>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:"12px 16px",marginBottom:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{background:C.accent+"20",color:C.accent,padding:"2px 8px",borderRadius:6,fontSize:12,fontWeight:800}}>Lv.{lv.level}</span>
@@ -1961,7 +1963,7 @@
             var doneItems=items.filter(function(m){return missions[m.k];});
             var todoItems=items.filter(function(m){return !missions[m.k];});
             return(
-              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:14,marginBottom:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                   <div style={{fontSize:11,color:C.muted,letterSpacing:2,fontWeight:700}}>{"\uC624\uB298 \uD574\uB0B8 \uAC83"}</div>
                   {done>0&&<div style={{fontSize:11,color:C.accent,fontWeight:700}}>{"+"}{done}{"\uAC1C \uB2EC\uC131"}</div>}
@@ -1992,7 +1994,7 @@
 
           <div style={{display:"flex",gap:10,marginTop:4}}>
             {[{label:"학습한 날",value:streak+"일"},{label:"AI 남은 횟수",value:isPremiumUser()?"무제한":aiRemaining+"회"}].map(function(s,i){return(
-              <div key={i} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px"}}>
+              <div key={i} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:"12px 14px"}}>
                 <div style={{fontSize:18,fontWeight:800}}>{s.value}</div>
                 <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
               </div>
@@ -2178,7 +2180,7 @@
               <div style={{fontSize:18,color:C.text,marginBottom:6,fontWeight:600}}>{current.meaning_ko}</div>
               <div style={{fontSize:14,color:C.muted,marginBottom:24,lineHeight:1.6}}>{current.meaning_en}</div>
               {current.meanings?.length>0&&(
-                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:20}}>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:20}}>
                   <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:12}}>주요 의미 {current.meanings.length}가지</div>
                   {current.meanings.map(function(m,i){return(
                     <div key={i} style={{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}}>
@@ -2199,7 +2201,7 @@
               <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:12}}>REAL EXAMPLES</div>
               <div style={{fontSize:20,fontWeight:800,marginBottom:16}}>미국인이 실제로 쓰는 문장</div>
               {current.examples?.map(function(ex,i){return(
-                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:12}}>
                   <div style={{fontSize:11,color:C.muted,marginBottom:8}}>상황 {i+1}: {ex.situation}</div>
                   <div style={{fontSize:15,color:C.text,fontWeight:600,marginBottom:6,lineHeight:1.5}}>{ex.english}</div>
                   <div style={{fontSize:13,color:C.muted}}>{ex.korean}</div>
@@ -2216,7 +2218,7 @@
           {step===2&&(
             <div>
               <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:12}}>SENTENCE PATTERN</div>
-              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:12}}>
                 <div style={{fontSize:12,color:C.red,marginBottom:8}}>{"❌ 어색해요"}</div>
                 <div style={{fontSize:14,color:C.red,padding:"10px 12px",background:C.red+"10",borderRadius:8,fontStyle:"italic"}}>"{current.bad_example}"</div>
                 {current.bad_reason&&<div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>{"→ "}{current.bad_reason}</div>}
@@ -2501,7 +2503,7 @@
                 <div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>{situation.context_en}</div>
               </div>
 
-              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:12}}>
                 <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:6}}>이 동사를 써보세요</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {targetVerbs.map(function(v,i){return(
@@ -2528,7 +2530,7 @@
 
               {evaluation&&(
                 <div>
-                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
+                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                       <div style={{fontSize:11,color:C.orange,letterSpacing:2}}>평가</div>
                       <div style={{fontSize:18}}>{Array(evaluation.score||0).fill("★").join("")}{Array(5-(evaluation.score||0)).fill("☆").join("")}</div>
@@ -2645,7 +2647,7 @@
           </div>
           <div style={{display:"flex",gap:10,marginBottom:20}}>
             {[{e:"😃",k:"reaction_good",l:"좋았어요"},{e:"😐",k:"reaction_mid",l:"그냥그래요"},{e:"😞",k:"reaction_bad",l:"별로였어요"}].map(function(r){return(
-              <button key={r.k} onClick={function(){track(r.k);onComplete();}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"14px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:4,alignItems:"center",minWidth:72}}>
+              <button key={r.k} onClick={function(){track(r.k);onComplete();}} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:"14px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:4,alignItems:"center",minWidth:72}}>
                 <span style={{fontSize:24}}>{r.e}</span>
                 <span style={{fontSize:10,color:C.muted}}>{r.l}</span>
               </button>
@@ -2703,7 +2705,7 @@
                 <div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{fb.overall}</div>
               </div>
               {fb.corrections?.map(function(c,i){return(
-                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:10}}>
+                <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:14,marginBottom:10}}>
                   <div style={{fontSize:11,color:C.muted,marginBottom:6}}>문장 {i+1}</div>
                   {c.original!==c.corrected&&<div style={{fontSize:13,color:C.red,textDecoration:"line-through",marginBottom:4,opacity:0.7}}>{c.original}</div>}
                   <div style={{fontSize:14,color:color,fontWeight:600,marginBottom:6}}>{"✓ "}{c.corrected}</div>
@@ -2826,7 +2828,7 @@
           <div style={{padding:"12px 20px 24px",borderTop:"1px solid "+C.border,display:"flex",gap:8}}>
             <textarea value={input} onChange={function(e){setInput(e.target.value);}} onKeyDown={handleKeyDown}
               onFocus={function(){setTimeout(function(){if(chatEndRef.current)chatEndRef.current.scrollIntoView({behavior:"smooth"});},300);}}
-              rows={1} placeholder="Type in English..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:"12px 14px",color:C.text,fontSize:14,lineHeight:1.4,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}
+              rows={1} placeholder="Type in English..." style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:"12px 14px",color:C.text,fontSize:14,lineHeight:1.4,resize:"none",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}
             />
             <button onClick={sendMessage} disabled={isLoading||!input.trim()} style={{background:input.trim()?C.accent:C.border,color:input.trim()?"#08090d":C.muted,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>
               {"→"}
@@ -3231,7 +3233,7 @@
               {mode==="record" && (
                 <div>
                   {!recording&&!transcript&&(
-                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:16}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,marginBottom:16}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. 아래 버튼을 눌러 녹음 시작"}<br/>
                         {"2. 한국어로 자유롭게 말하기 (대화, 전화, 혼잣말 다 OK)"}<br/>
                         {"3. 버튼 다시 눌러 녹음 중지"}<br/>
@@ -3264,7 +3266,7 @@
               {mode==="type" && (
                 <div style={{marginBottom:16}}>
                   {!textInput.trim()&&(
-                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. 오늘 했던 대화를 한국어로 적기"}<br/>
                         {"2. 카톡 대화, 혼잣말, 일기 다 OK"}<br/>
                         {"3. \"쉬운 영어로 변환\" 버튼 누르면 끝!"}
@@ -3281,7 +3283,7 @@
               {mode==="file" && (
                 <div style={{marginBottom:16}}>
                   {!fileTranscript&&!fileLoading&&(
-                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. 녹음 파일 선택 (mp3, m4a, wav 등)"}<br/>
                         {"2. AI가 자동으로 텍스트 변환 + 화자 구별"}<br/>
                         {"3. \"쉬운 영어로 변환\" 버튼으로 학습 시작!"}
@@ -3330,7 +3332,7 @@
               {mode==="youtube" && (
                 <div style={{marginBottom:16}}>
                   {!ytTranscript&&!ytLoading&&ytSegments.length===0&&(
-                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+                    <details style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,marginBottom:12}}><summary style={{fontSize:12,color:C.muted,padding:"10px 14px",cursor:"pointer",listStyle:"none"}}>{"\u2753 \uC5B4\uB5BB\uAC8C \uD558\uB098\uC694?"}</summary><div style={{padding:"0 14px 12px"}}><div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
                         {"1. YouTube 링크 붙여넣기"}<br/>
                         {"2. \"자막 가져오기\" 버튼 누르기"}<br/>
                         {"3. 자막 확인 후 \"쉬운 영어로 변환\""}<br/>
@@ -3473,7 +3475,7 @@
                             <div key={rv.id} onClick={function(){
                               setYtUrl("https://youtu.be/"+rv.id);
                               setTimeout(function(){var el=document.getElementById("yt-fetch-btn");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});},200);
-                            }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
+                            }} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:12,marginBottom:8,cursor:"pointer",display:"flex",gap:12,alignItems:"center"}}>
                               <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                               <div style={{flex:1}}>
                                 <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
@@ -3522,7 +3524,7 @@
                     <div style={{marginTop:8}}>
                       <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>저장된 영상</div>
                       {savedYt.map(function(item,i){return(
-                        <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+                        <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:14,marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                           <div onClick={function(){loadYtLesson(item);}} style={{flex:1,cursor:"pointer"}}>
                             <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{item.title||"YouTube 영상"}{item.currentMin>0?" ("+(item.currentMin)+"-"+(item.currentMin+5)+"분)":""}</div>
                             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -3559,7 +3561,7 @@
           {result&&(
             <div>
               {result.scenario&&(
-                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:16}}>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:14,marginBottom:16}}>
                   <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:4}}>상황</div>
                   <div style={{fontSize:14,color:C.text,fontWeight:600}}>{result.scenario}</div>
                 </div>
@@ -3805,7 +3807,7 @@
                   <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:16,padding:20,marginBottom:16,textAlign:"center"}}>
                     <div style={{fontSize:14,color:C.text,marginBottom:8,fontWeight:700}}>{"📭 이 세션에서는 연습 문제를 만들 수 없어요"}</div>
                     <div style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>{"문장이 짧거나 옛 데이터 구조여서 빈칸/순서 문제를 추출하지 못했어요. 새 대화로 다시 시도해보세요."}</div>
-                    <button onClick={function(){setPracticeMode(false);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);}} style={{width:"100%",background:C.surface,color:C.text,border:"1px solid "+C.border,borderRadius:12,padding:12,fontSize:14,fontWeight:800,cursor:"pointer"}}>{"← 돌아가기"}</button>
+                    <button onClick={function(){setPracticeMode(false);setPracticeIdx(0);setPracticeAnswer("");setPracticeCheck(null);}} style={{width:"100%",background:C.surface,color:C.text,border:"1px solid "+C.border,borderRadius:16,padding:12,fontSize:14,fontWeight:800,cursor:"pointer"}}>{"← 돌아가기"}</button>
                   </div>
                 );
                 var q = allQuestions[practiceIdx%allQuestions.length];
@@ -4136,7 +4138,7 @@
               })}
 
               {srsShow.length===0&&(
-                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:"28px 20px",textAlign:"center"}}>
+                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:"28px 20px",textAlign:"center"}}>
                   <div style={{fontSize:34,marginBottom:8}}>{"🎉"}</div>
                   <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:6}}>{"오늘 복습할 건 다 끝냈어요!"}</div>
                   <div style={{fontSize:12,color:C.muted,lineHeight:1.55,marginBottom:aheadRemaining.length>0?18:0}}>{"까먹을 때쯤 다시 알려드릴게요. 꾸준함이 실력이 돼요."}</div>
@@ -4228,7 +4230,7 @@
                 {showBoard&&lbData.length>=3&&(function(){
                   var showCount=Math.max(3,Math.floor(lbData.length*0.01));
                   return(
-                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,overflow:"hidden"}}>
+                  <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,overflow:"hidden"}}>
                     {lbData.slice(0,showCount).map(function(u,i){
                       var isMe=userId&&u.id===userId;
                       var medal=i<3?["🥇","🥈","🥉"][i]:"";
@@ -4268,7 +4270,7 @@
 
           {history.length>0&&(<div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10,fontWeight:700}}>{"📚 학습 기록"}</div>)}
           {[].concat(history).reverse().map(function(item,i){return(
-            <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:14,marginBottom:10}}>
+            <div key={i} style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:14,marginBottom:10}}>
               <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{item.date}</div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {item.verbs?item.verbs.map(function(v,vi){return(
@@ -4329,7 +4331,7 @@
           <div style={{fontSize:22,fontWeight:800,marginBottom:24}}>설정</div>
 
           {props.user&&(
-            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:14}}>
               <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"👤 계정"}</div>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
                 {props.user.photoURL&&<img src={props.user.photoURL} style={{width:36,height:36,borderRadius:"50%"}} referrerPolicy="no-referrer"/>}
@@ -4415,7 +4417,7 @@
             )}
           </div>}
 
-          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🌗 테마"}</div>
             <div style={{display:"flex",gap:8}}>
               {[{v:"dark",l:"다크"},{v:"light",l:"라이트"}].map(function(o){return(
@@ -4424,7 +4426,7 @@
             </div>
           </div>
 
-          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"🔤 글자 크기"}</div>
             <div style={{display:"flex",gap:8}}>
               {[{v:"small",l:"작게",sz:12},{v:"normal",l:"보통",sz:14},{v:"large",l:"크게",sz:17}].map(function(o){return(
@@ -4434,7 +4436,7 @@
             <div style={{fontSize:11,color:C.muted,marginTop:8,textAlign:"center"}}>{"현재: "+(fontSize==="large"?"크게":fontSize==="small"?"작게":"보통")}</div>
           </div>
 
-          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:14}}>
+          <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>{"ℹ️ 정보"}</div>
             <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
               {"TalkFit v1.7.0 (Beta)"}<br/>
@@ -4663,7 +4665,7 @@
             <div style={{fontSize:22,fontWeight:800,lineHeight:1.4,marginBottom:8}}>{"오늘 "+todays.length+"개, 다 아는 단어로 말했어요"}</div>
             <div style={{fontSize:14,color:C.muted,lineHeight:1.6,marginBottom:20,whiteSpace:"pre-line"}}>{"고르기가 아니라 입으로 꺼내는 연습.\n이게 실제 회화에서 쓰는 근육이에요."}</div>
             <div style={{display:"inline-block",fontSize:14,fontWeight:800,color:C.orange,background:C.orange+"20",padding:"8px 18px",borderRadius:99,marginBottom:22}}>{"🔥 "+(finalStreak!=null?finalStreak:(props.streak||0))+"일 연속"}</div>
-            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:"18px 20px",textAlign:"left",marginBottom:20}}>
+            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:"18px 20px",textAlign:"left",marginBottom:20}}>
               <div style={{fontSize:11,fontWeight:800,letterSpacing:1.5,color:C.accent,marginBottom:8}}>{"왜 이게 느는가"}</div>
               <div style={{fontSize:14,lineHeight:1.65,color:C.text}}>{"당신은 이미 충분히 알아요. 단어가 부족한 게 아니라, 3초 안에 꺼내는 연습이 없었을 뿐. 매일 5개씩 당신의 진짜 상황을 말하면 — 어느 순간 입이 먼저 나갑니다."}</div>
             </div>
