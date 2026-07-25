@@ -2114,7 +2114,18 @@
       };
 
       var nextQuiz = function() {
-        if (quizIdx < quizzes.length - 1) {
+        // 말해보카식: 틀린 문제는 큐 끝에 다시 넣어 '맞힐 때까지' 나온다 (대충 넘기기 방지).
+        // 무한루프 방지로 1회만 재출제(_retry).
+        var cur = quizzes[quizIdx];
+        var correct = cur.type==="arrange"
+          ? (arrangeSelected.join(" ").toLowerCase() === (cur.answer||"").toLowerCase())
+          : (selected === cur.answer);
+        var q = quizzes;
+        if (!correct && !cur._retry) {
+          q = quizzes.concat([Object.assign({}, cur, {_retry:true})]);
+          setQuizzes(q);
+        }
+        if (quizIdx < q.length - 1) {
           setQuizIdx(function(i){return i+1;}); setSelected(null); setAnswered(false);
           setArrangeSelected([]); setArrangeChecked(false);
         } else {
@@ -2373,11 +2384,18 @@
                 </div>
               )}
 
-              {(answered||arrangeChecked)&&(
-                <button onClick={nextQuiz} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginTop:8}}>
-                  {quizIdx<quizzes.length-1?"다음 문제 →":"결과 보기 →"}
-                </button>
-              )}
+              {(answered||arrangeChecked)&&(function(){
+                var cur=quizzes[quizIdx];
+                var wrongNow = cur.type==="arrange" ? (arrangeSelected.join(" ").toLowerCase()!==(cur.answer||"").toLowerCase()) : (selected!==cur.answer);
+                return (
+                <div>
+                  {wrongNow&&!cur._retry&&<div style={{fontSize:12.5,color:C.orange,fontWeight:700,textAlign:"center",marginBottom:8}}>{"🔁 확실히 익히도록 이 문제는 뒤에서 다시 나와요"}</div>}
+                  <button onClick={nextQuiz} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginTop:8}}>
+                    {quizIdx<quizzes.length-1?"다음 문제 →":"결과 보기 →"}
+                  </button>
+                </div>
+                );
+              })()}
             </div>
           )}
 
