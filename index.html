@@ -1541,7 +1541,7 @@
       orange:"#ea580c",red:"#dc2626",
       text:"#0f172a",muted:"#64748b",
     };
-    var C = (load("theme")==="light") ? C_LIGHT : C_DARK;
+    var C = (load("theme")==="dark") ? C_DARK : C_LIGHT;  // 기본 라이트(토스 스타일), 명시적으로 dark 선택 시만 다크
     // 폰트 크기는 앱 루트 zoom으로 적용 (data-app-root)
     var BE_VERBS = ["am","is","are","was","were","be","been","being","'m","'s","'re"];
     function filterBeVerbs(verbs) { return (verbs||[]).filter(function(v){ return BE_VERBS.indexOf((v.verb||"").toLowerCase()) === -1; }); }
@@ -4223,7 +4223,7 @@
 
     // ── SETTINGS ────────────────────────────────────────────────────
     function SettingsScreen(props){
-      var _t=useState(load("theme")||"dark"); var theme=_t[0]; var setTheme=_t[1];
+      var _t=useState(load("theme")||"light"); var theme=_t[0]; var setTheme=_t[1];
       var _f=useState(load("font_size")||"normal"); var fontSize=_f[0]; var setFontSize=_f[1];
       var _fb=useState(""); var fbText=_fb[0]; var setFbText=_fb[1];
       var _fbSent=useState(false); var fbSent=_fbSent[0]; var setFbSent=_fbSent[1];
@@ -5025,7 +5025,7 @@
       ];
 
       return (
-        <div data-app-root style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column",zoom:(function(){var fs=load("font_size")||"normal";return fs==="large"?1.15:(fs==="small"?0.88:1);})()}}>
+        <div data-app-root style={(function(){var fs=load("font_size")||"normal";var z=fs==="large"?1.15:(fs==="small"?0.88:1);return {maxWidth:"min(430px, "+(100/z).toFixed(1)+"vw)",margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column",zoom:z};})()}>
           <div style={{position:(screen==="settings"?"static":"sticky"),top:0,zIndex:10,background:C.bg+"ee",backdropFilter:"blur(12px)",borderBottom:"1px solid "+C.border,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{fontWeight:900,fontSize:16,letterSpacing:-0.5,display:"flex",alignItems:"center",gap:8}}>
               {React.createElement("svg",{width:24,height:24,viewBox:"0 0 512 512"},
