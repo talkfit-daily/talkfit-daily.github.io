@@ -5067,7 +5067,7 @@
             {onboardStep < steps.length - 1 ? (
               <button onClick={function(){setOnboardStep(onboardStep+1);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"다음 →"}</button>
             ) : (
-              <button onClick={function(){setShowOnboarding(false);if(user)saveLocal("onboarding_done","v2");startDaily();}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"바로 시작하기 🚀"}</button>
+              <button onClick={function(){setShowOnboarding(false);if(user)saveLocal("onboarding_done","v2");}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"시작하기 🚀"}</button>
             )}
             {onboardStep < steps.length - 1 && (
               <button onClick={function(){setShowOnboarding(false);if(user)saveLocal("onboarding_done","v2");}} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer"}}>{"건너뛰기"}</button>
