@@ -2719,7 +2719,7 @@
               {fb.verdict==="retry"?(
                 <button onClick={function(){
                   setFeedback(function(f){var n={};for(var k in f)n[k]=f[k];n[activeVerbId]=null;return n;});
-                  setSentences(function(s){var n={};for(var k in s)n[k]=[].concat(s[k]);n[activeVerbId]=["",""];return n;});
+                  setSentences(function(s){var n={};for(var k in s)n[k]=[].concat(s[k]);n[activeVerbId]=[""];return n;});
                 }} style={{width:"100%",background:C.red,color:"white",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
                   {"다시 쓰기 ✏️"}
                 </button>
