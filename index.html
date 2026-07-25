@@ -2436,22 +2436,24 @@
         allVerbs.push(lessons[li].basic.verb);
         allVerbs.push(lessons[li].phrasal.verb);
       }
+      // 한 응답에 6개를 다 쓰라는 건 원어민도 못 함 → 1~2개만 타깃으로 집중(자연스러움·유창성).
+      var targetVerbs = allVerbs.slice(0, 2);
 
       useEffect(function(){
-        var system = 'Create a realistic everyday situation for English practice. The student should use these verbs: [' + allVerbs.join(", ") + ']. Return ONLY valid JSON:\n{"situation_ko":"카페에서 음료 주문하기","context_en":"You are at a coffee shop ordering a drink.","starter":"Hi! What can I get for you today?","target_verbs":' + JSON.stringify(allVerbs) + '}';
-        callClaude(system, 'Generate an everyday roleplay situation using these verbs: ' + allVerbs.join(", ") + '. Make it feel natural and conversational.')
+        var system = 'Create a realistic everyday situation for English practice. The student should naturally use these 1-2 verbs: [' + targetVerbs.join(", ") + ']. Return ONLY valid JSON:\n{"situation_ko":"카페에서 음료 주문하기","context_en":"You are at a coffee shop ordering a drink.","starter":"Hi! What can I get for you today?","target_verbs":' + JSON.stringify(targetVerbs) + '}';
+        callClaude(system, 'Generate an everyday roleplay situation where using these verbs feels natural: ' + targetVerbs.join(", ") + '. Keep it simple and conversational.')
         .then(function(raw){
           var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
           setSituation(parsed);
         }).catch(function(){
-          setSituation({situation_ko:"카페에서 친구와 대화하기",context_en:"You run into a friend at a coffee shop. They ask how you've been.",starter:"Hey! Long time no see! How have you been?",target_verbs:allVerbs});
+          setSituation({situation_ko:"카페에서 친구와 대화하기",context_en:"You run into a friend at a coffee shop. They ask how you've been.",starter:"Hey! Long time no see! How have you been?",target_verbs:targetVerbs});
         }).finally(function(){setIsLoading(false);});
       }, []);
 
       var handleSubmit = function() {
         if (!userResponse.trim()) return;
         setEvalLoading(true);
-        var system = 'Evaluate this English roleplay response. Situation: ' + situation.context_en + '. Starter: "' + situation.starter + '". Student responded: "' + userResponse + '". Target verbs: ' + JSON.stringify(allVerbs) + '.\nReturn ONLY valid JSON:\n{"score":3,"feedback":"한국어 피드백 2문장","corrected":"자연스러운 버전","used_verbs":["get"],"missed_verbs":["get over"]}';
+        var system = 'Evaluate this English roleplay response. Situation: ' + situation.context_en + '. Starter: "' + situation.starter + '". Student responded: "' + userResponse + '". Target verbs: ' + JSON.stringify(targetVerbs) + '.\nBe encouraging. Do not require all verbs — using even one naturally is good.\nReturn ONLY valid JSON:\n{"score":3,"feedback":"한국어 피드백 2문장","corrected":"자연스러운 버전","used_verbs":["get"],"missed_verbs":["get over"]}';
         callClaude(system, 'Evaluate: "' + userResponse + '"')
         .then(function(raw){
           var parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
@@ -2482,9 +2484,9 @@
               </div>
 
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:12,padding:16,marginBottom:12}}>
-                <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:6}}>사용할 동사</div>
+                <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:6}}>이 동사를 써보세요</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {allVerbs.map(function(v,i){return(
+                  {targetVerbs.map(function(v,i){return(
                     <span key={i} style={{background:C.accent+"20",color:C.accent,padding:"4px 10px",borderRadius:8,fontSize:13,fontWeight:700}}>{v}</span>
                   );})}
                 </div>
@@ -4515,9 +4517,17 @@
         var saidW = normWords(said);
         var saidStr = " "+saidW.join(" ")+" ";
         var saidSet={}; saidW.forEach(function(w){saidSet[w]=1;});
-        var content = normWords(sit.en).filter(function(w){return !SPK_STOP[w] && w.length>1;});
+        var modelAll = normWords(sit.en);
+        var content = modelAll.filter(function(w){return !SPK_STOP[w] && w.length>1;});
         var hit = content.filter(function(w){return saidSet[w];});
         var coverage = content.length ? hit.length/content.length : 0;
+        // 어순 반영: 인접 단어쌍(bigram) 일치율 — "store the to going I"가 정답과 동점 되던 문제 방지
+        function bg(a){ var r=[]; for(var i=0;i<a.length-1;i++) r.push(a[i]+"|"+a[i+1]); return r; }
+        var mbg=bg(modelAll), sbg={}; bg(saidW).forEach(function(x){sbg[x]=1;});
+        var order = mbg.length ? mbg.filter(function(x){return sbg[x];}).length/mbg.length : coverage;
+        // 너무 짧은 답 감점 — 모범답안 길이의 60%도 안 되면 커버리지가 높아도 신뢰를 낮춘다
+        var lenRatio = modelAll.length ? Math.min(1, saidW.length/Math.max(1, modelAll.length*0.6)) : 1;
+        var score = (coverage*0.55 + order*0.45) * (0.72 + 0.28*lenRatio);
         var keyPhrase = (sit.key||"").toLowerCase().replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim();
         var keyHit = keyPhrase ? (saidStr.indexOf(" "+keyPhrase+" ")!==-1) : false;
         var keys = keyPhrase ? keyPhrase.split(" ").filter(function(w){return w;}) : content.slice(0,3);
@@ -4525,12 +4535,12 @@
         keys.forEach(function(k){ if(saidSet[k]) matched.push(k); else missing.push(k); });
         var verdict, emoji, tone;
         if(!saidW.length){ verdict="안 들렸어요. 다시 말해볼까요?"; emoji="🎤"; tone=C.muted; }
-        else if(coverage < 0.4 && !keyHit){ verdict="음, 상황이랑 좀 다른 것 같아요. 모범답안 보고 다시 해볼까요?"; emoji="🤔"; tone=C.muted; }
-        else if(coverage >= 0.75){ verdict="완벽해요! 모범답안대로 말했어요"; emoji="🎉"; tone=C.accent; }
-        else if(keyHit && coverage >= 0.4){ verdict="좋아요! 핵심 '"+keyPhrase+"' 살려서 말했어요"; emoji="👏"; tone=C.accent; }
-        else if(coverage >= 0.5){ verdict="좋아요! 거의 비슷하게 말했어요"; emoji="👏"; tone=C.orange; }
+        else if(score < 0.38 && !keyHit){ verdict="음, 상황이랑 좀 다른 것 같아요. 모범답안 보고 다시 해볼까요?"; emoji="🤔"; tone=C.muted; }
+        else if(score >= 0.72){ verdict="완벽해요! 자연스럽게 말했어요"; emoji="🎉"; tone=C.accent; }
+        else if(keyHit && score >= 0.4){ verdict="좋아요! 핵심 '"+keyPhrase+"' 살려서 말했어요"; emoji="👏"; tone=C.accent; }
+        else if(score >= 0.5){ verdict="좋아요! 거의 비슷하게 말했어요 — 어순만 조금 더"; emoji="👏"; tone=C.orange; }
         else { verdict="조금 더 모범답안에 가깝게 — 핵심은 '"+keyPhrase+"'"; emoji="💪"; tone=C.orange; }
-        return {said:said||"", keys:keys, matched:matched, missing:missing, coverage:coverage, verdict:verdict, emoji:emoji, tone:tone};
+        return {said:said||"", keys:keys, matched:matched, missing:missing, coverage:coverage, score:score, verdict:verdict, emoji:emoji, tone:tone};
       }
       function stopRecognizer(){
         if(IS_NATIVE && nativeSR){
@@ -4571,7 +4581,7 @@
         setAiFb(null);
         if(!props.aiAvailable || !(saidNow||"").trim() || typeof callClaude!=="function"){ return; }
         setAiLoading(true);
-        var sys='You are a warm, encouraging Korean English-speaking coach. You get a Korean everyday situation, a model English answer, and what the learner ACTUALLY said (from phone speech recognition, which may have small transcription errors — be forgiving of those). Judge whether the learner conveyed the RIGHT MEANING for the situation and whether it sounds NATURAL. Reply in KOREAN, warm and short. Return ONLY valid JSON: {"meaning_ok":true or false,"natural":true or false,"better":"a more natural English way to say what THEY were trying to say (empty string if theirs is already natural)","comment":"one warm coaching sentence in Korean about their attempt","cheer":"a very short Korean cheer"}';
+        var sys='You are a warm, encouraging Korean English-speaking coach. You get a Korean everyday situation, a model English answer, and what the phone HEARD the learner say via speech recognition. Judge whether the learner conveyed the RIGHT MEANING for the situation and whether it sounds NATURAL. ALSO: where what the phone heard clearly diverges from the intended target words in a way that looks like a pronunciation slip (not just a synonym or a minor STT glitch), gently flag AT MOST 1-2 words that may not have come out clearly, framed softly in Korean like [이 단어가 또렷하게 안 들렸어요] — never as a mistake or [틀렸어요]. If nothing clearly stands out, leave it empty (do NOT invent one). Reply in KOREAN, warm and short. Return ONLY valid JSON: {"meaning_ok":true or false,"natural":true or false,"better":"a more natural English way to say what THEY were trying to say (empty string if theirs is already natural)","comment":"one warm coaching sentence in Korean about their attempt","cheer":"a very short Korean cheer","pronounce_hint":"1-2 words that may not have been clear with the soft Korean framing, or empty string"}';
         var usr="상황: "+sit.ko+"\n모범답안: "+sit.en+"\n학습자가 말한 것: "+saidNow;
         callClaude(sys, usr).then(function(txt){
           var obj=null;
@@ -4663,6 +4673,12 @@
                     <span style={{fontSize:12,fontWeight:800,padding:"4px 10px",borderRadius:99,background:aiFb.natural?C.accent+"22":C.orange+"22",color:aiFb.natural?C.accent:C.orange}}>{(aiFb.natural?"✅ ":"⚠️ ")+"자연스러움"}</span>
                   </div>
                   {aiFb.comment ? <div style={{fontSize:14.5,lineHeight:1.6,color:C.text,marginBottom:aiFb.better?12:2}}>{aiFb.comment}</div> : null}
+                  {aiFb.pronounce_hint ? (
+                    <div style={{background:C.yellowDim,border:"1px solid "+C.yellow+"33",borderRadius:12,padding:"10px 12px",marginTop:10,display:"flex",gap:8,alignItems:"flex-start"}}>
+                      <span style={{fontSize:15,flexShrink:0}}>{"👂"}</span>
+                      <div style={{fontSize:13,lineHeight:1.55,color:C.text}}>{aiFb.pronounce_hint}</div>
+                    </div>
+                  ) : null}
                   {aiFb.better ? (
                     <div style={{background:C.accentDim,borderRadius:12,padding:"12px 13px",marginTop:4}}>
                       <div style={{fontSize:11,fontWeight:800,color:C.accent,marginBottom:6}}>{"💡 이렇게 말하면 더 자연스러워요"}</div>
@@ -4676,6 +4692,7 @@
                 </div>
               ) : (
                 <div style={{marginBottom:16}}>
+                  {!props.aiAvailable ? <div style={{textAlign:"center",marginBottom:10}}><span style={{fontSize:11.5,color:C.muted,background:C.surface,border:"1px solid "+C.border,borderRadius:99,padding:"5px 12px"}}>{"🤖 AI 코치는 내일 다시 · 지금은 기본 채점이에요"}</span></div> : null}
                   <div style={{textAlign:"center",margin:"2px 0 12px"}}>
                     <div style={{fontSize:40,marginBottom:6}}>{result?result.emoji:"🎤"}</div>
                     <div style={{fontSize:17,fontWeight:800,lineHeight:1.4,color:result?result.tone:C.text}}>{result?result.verdict:""}</div>
