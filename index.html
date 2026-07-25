@@ -2565,7 +2565,7 @@
       var initFeedback = {};
       var initLoading = {};
       for (var vti = 0; vti < verbTabs.length; vti++) {
-        initSentences[verbTabs[vti].id] = ["",""];
+        initSentences[verbTabs[vti].id] = [""];  // 동사당 1문장 — 12문장 타이핑 과부하 완화(완주율↑)
         initFeedback[verbTabs[vti].id] = null;
         initLoading[verbTabs[vti].id] = false;
       }
@@ -2655,6 +2655,12 @@
                 {feedback[t.id]&&<div style={{fontSize:9,color:t.c,marginTop:2}}>{"✓"}</div>}
               </div>
             );})}
+          </div>
+
+          {/* 백지 대신 예시 앵커 — 이 문장처럼 단어만 바꿔 생산(슬롯 변주) */}
+          <div style={{background:C.accentDim,border:"1px solid "+color+"30",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
+            <div style={{fontSize:11,color:color,fontWeight:800,marginBottom:4}}>{"💡 이 문장처럼 · 단어만 바꿔서"}</div>
+            <div style={{fontSize:13.5,color:C.text,fontWeight:600,lineHeight:1.5}}>{current.good_example||(current.examples&&current.examples[0]&&(current.examples[0].english||current.examples[0].en))||("\""+current.verb+"\"를 넣어 한 문장")}</div>
           </div>
 
           {sent.map(function(s,i){return(
