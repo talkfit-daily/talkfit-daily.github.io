@@ -2381,28 +2381,28 @@
             </div>
           )}
 
-          {step===3&&quizDone&&(
+          {step===3&&quizDone&&(function(){
+            var learnedVerbs=[];
+            if(lessons){for(var i=0;i<lessons.length;i++){if(lessons[i].basic)learnedVerbs.push(lessons[i].basic.verb);if(lessons[i].phrasal)learnedVerbs.push(lessons[i].phrasal.verb);}}
+            var perfect=correctCount===quizzes.length;
+            return (
             <div style={{textAlign:"center",padding:"20px 0"}}>
-              <div style={{fontSize:64,marginBottom:12}}>{correctCount===quizzes.length?"🎉":"👏"}</div>
-              <div style={{fontSize:24,fontWeight:900,marginBottom:8}}>{correctCount}/{quizzes.length} 정답!</div>
-              <div style={{fontSize:14,color:C.muted,marginBottom:8}}>
-                {correctCount===quizzes.length?"퍼펙트! 보너스 +30 XP":"잘했어요! 다음엔 더 잘할 수 있어요"}
-              </div>
-              <div style={{display:"flex",justifyContent:"center",gap:12,marginBottom:24}}>
-                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"10px 16px"}}>
-                  <div style={{fontSize:20,fontWeight:800,color:C.accent}}>{getXP()}</div>
-                  <div style={{fontSize:10,color:C.muted}}>Total XP</div>
+              <div style={{fontSize:56,marginBottom:10}}>{"🎉"}</div>
+              {/* 성장 가시화: 시험 점수가 아니라 '오늘 익힌 표현'을 성취로 (말해보카식) */}
+              <div style={{fontSize:22,fontWeight:900,marginBottom:6,lineHeight:1.35}}>{"오늘 "+learnedVerbs.length+"개 표현을 익혔어요"}</div>
+              <div style={{fontSize:13.5,color:C.muted,marginBottom:18}}>{"이제 이 표현들, 실제 상황에서 써볼 차례예요"}</div>
+              {learnedVerbs.length>0&&(
+                <div style={{display:"flex",flexWrap:"wrap",gap:7,justifyContent:"center",marginBottom:20}}>
+                  {learnedVerbs.map(function(v,i){return <span key={i} style={{background:C.accentDim,border:"1px solid "+C.accent+"40",color:C.accent,padding:"7px 13px",borderRadius:99,fontSize:14,fontWeight:800}}>{"✓ "+v}</span>;})}
                 </div>
-                <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"10px 16px"}}>
-                  <div style={{fontSize:20,fontWeight:800,color:C.yellow}}>Lv.{getLevel(getXP()).level}</div>
-                  <div style={{fontSize:10,color:C.muted}}>{getLevel(getXP()).name}</div>
-                </div>
-              </div>
+              )}
+              <div style={{fontSize:12,color:C.muted,marginBottom:22}}>{(perfect?"퍼펙트 +30 XP · ":"정답 "+correctCount+"/"+quizzes.length+" · ")+"Lv."+getLevel(getXP()).level+" "+getLevel(getXP()).name}</div>
               <button onClick={onNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
                 {aiAvailable?"롤플레이 하러 가기 →":"오늘 학습 완료"}
               </button>
             </div>
-          )}
+            );
+          })()}
 
           {step<3&&(
             <div style={{display:"flex",gap:8}}>
