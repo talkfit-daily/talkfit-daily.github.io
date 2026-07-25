@@ -1799,20 +1799,35 @@
           <div style={{fontSize:28,fontWeight:800,lineHeight:1.2,marginBottom:4}}>{greeting.t}</div>
           <div style={{fontSize:14,color:C.muted,marginBottom:18}}>{greeting.s}</div>
 
-          {/* ── 오늘의 나 (핵심 루프) — 매일 이걸 먼저 ─────────────────── */}
-          {props.onTodayMe && (
-            <div onClick={props.onTodayMe} role="button" tabIndex={0}
-                 onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onTodayMe();}}
-                 style={{background:"linear-gradient(135deg,"+C.accent+"26,"+C.accent+"08)",border:"1px solid "+C.accent+"55",borderRadius:20,padding:20,marginBottom:14,cursor:"pointer",boxShadow:"0 12px 28px -14px "+C.accent+"66"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                <span style={{fontSize:12.5,fontWeight:800,color:C.accent,letterSpacing:1}}>{props.todayMeDone?"◎ 오늘의 나  ✓":"◎ 오늘의 나"}</span>
-                <span style={{fontSize:11,color:C.muted}}>{"약 5분"}</span>
+          {/* ── 오늘의 학습 — 하나의 흐름(물흐르듯): 오늘의 나 → 단어 학습 → 복습 (v1.8.x) ────── */}
+          {(function(){
+            var meDone=!!props.todayMeDone, learnDone=!!props.verbDone, bothDone=meDone&&learnDone;
+            var steps=[{n:1,done:meDone,t:"오늘의 나 — 내 하루를 영어로 말하기",s:"진짜 상황 5개 · 약 5분"},
+                       {n:2,done:learnDone,t:"단어 학습 — 배우고 롤플레이·문장 쓰기",s:"오늘의 동사 4개 · 약 10분"}];
+            var btn=bothDone?"오늘 다 했어요 ✅ · 복습하기":(meDone?"이어서 계속 →":"오늘 시작 →");
+            return (
+              <div style={{background:"linear-gradient(135deg,"+C.accent+"22,"+C.accent+"06)",border:"1px solid "+C.accent+"50",borderRadius:22,padding:22,marginBottom:16,boxShadow:"0 14px 32px -16px "+C.accent+"66"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                  <span style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:0.5}}>{bothDone?"오늘의 학습 · 완료 🎉":"오늘의 학습"}</span>
+                  <span style={{fontSize:11,color:C.muted}}>{"약 15분"}</span>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:11,marginBottom:18}}>
+                  {steps.map(function(st){return(
+                    <div key={st.n} style={{display:"flex",alignItems:"center",gap:12,opacity:st.done?0.55:1}}>
+                      <div style={{width:26,height:26,borderRadius:99,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,background:st.done?C.accent:C.accent+"20",color:st.done?"#08090d":C.accent,border:"1px solid "+C.accent+(st.done?"":"40")}}>{st.done?"✓":st.n}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:700,color:C.text,textDecoration:st.done?"line-through":"none"}}>{st.t}</div>
+                        <div style={{fontSize:11.5,color:C.muted}}>{st.s}</div>
+                      </div>
+                    </div>
+                  );})}
+                </div>
+                <div onClick={props.onStartDaily} role="button" tabIndex={0}
+                     onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onStartDaily();}}
+                     style={{background:bothDone?C.surface:C.accent,color:bothDone?C.accent:"#08090d",border:bothDone?"1px solid "+C.accent+"40":"none",borderRadius:14,padding:"15px 0",textAlign:"center",fontSize:16,fontWeight:800,cursor:"pointer",boxShadow:bothDone?"none":"0 8px 20px -6px "+C.accent+"88"}}>{btn}</div>
               </div>
-              <div style={{fontSize:18,fontWeight:800,lineHeight:1.4,marginBottom:6}}>{"내 하루를 영어로 말해보기"}</div>
-              <div style={{fontSize:13,color:C.muted,marginBottom:14}}>{props.todayMeDone?"오늘 완료! 내일 또 5개가 기다려요":"진짜 상황 5개 · 아는 단어로 직접 말하기"}</div>
-              <div style={{background:C.accent,color:"#08090d",borderRadius:12,padding:"13px 0",textAlign:"center",fontSize:15,fontWeight:800}}>{props.todayMeDone?"한 번 더 하기 →":"시작하기 →"}</div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 내 말 바꾸기 — 우리 차별점, 홈 전면 승격 (v1.7.1) */}
           {onSpeak && (
@@ -1830,32 +1845,7 @@
             </div>
           )}
 
-          {/* ── 메인 CTA — 첫 화면에서 바로 보여야 함 (v1.5.0) ────────── */}
-          {todayDone?(
-            <div style={{background:"linear-gradient(135deg,"+C.accent+"18,"+C.blue+"10)",border:"1px solid "+C.accent+"40",borderRadius:16,padding:20,textAlign:"center",marginBottom:18}}>
-              <div style={{fontSize:28,marginBottom:6}}>{"✅"}</div>
-              <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>오늘 학습 완료!</div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:14}}>더 하고 싶으면 아래에서 이어가세요</div>
-              <div onClick={onStart} style={{background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:10,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer"}}>{"한 번 더 학습하기"}</div>
-            </div>
-          ):(
-            <div onClick={onStart} role="button" tabIndex={0}
-                 onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")onStart();}}
-                 style={{background:C.surface,border:"1px solid "+C.border,borderRadius:20,padding:20,marginBottom:18,cursor:"pointer",boxShadow:"0 8px 20px -12px rgba(0,0,0,0.6)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                <div style={{fontSize:12.5,color:C.text,letterSpacing:1,fontWeight:800}}>{"오늘의 학습"}</div>
-                <div style={{fontSize:11,color:C.muted}}>{"약 10분"}</div>
-              </div>
-              {allVerbTags.length>0&&(
-                <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:14}}>
-                  {allVerbTags.map(function(vt,i){return(
-                    <span key={i} style={{background:C.bg,border:"1px solid "+C.border,color:C.text,padding:"6px 13px",borderRadius:9,fontSize:16,fontWeight:700}}>{vt.verb}</span>
-                  );})}
-                </div>
-              )}
-              <div style={{background:C.accent,color:"#08090d",borderRadius:14,padding:"15px 0",textAlign:"center",fontSize:16,fontWeight:800,boxShadow:"0 6px 18px -6px "+C.accent+"88"}}>{"시작하기 →"}</div>
-            </div>
-          )}
+          {/* 오늘의 학습 시작은 위 통합 흐름 카드가 담당 — 중복 "시작하기" 버튼 제거 (v1.8.x) */}
 
           {/* 지표는 한 줄로 압축 — 시작을 방해하지 않도록 (v1.5.0) */}
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,padding:"10px 14px",background:C.surface,border:"1px solid "+C.border,borderRadius:12,flexWrap:"wrap"}}>
@@ -4587,7 +4577,11 @@
               <div style={{fontSize:11,fontWeight:800,letterSpacing:1.5,color:C.accent,marginBottom:8}}>{"왜 이게 느는가"}</div>
               <div style={{fontSize:14,lineHeight:1.65,color:C.text}}>{"당신은 이미 충분히 알아요. 단어가 부족한 게 아니라, 3초 안에 꺼내는 연습이 없었을 뿐. 매일 5개씩 당신의 진짜 상황을 말하면 — 어느 순간 입이 먼저 나갑니다."}</div>
             </div>
-            <button onClick={props.onHome} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"오늘 완료 · 홈으로"}</button>
+            {props.flow ? (
+              <button onClick={props.onNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"다음: 단어 학습 →"}</button>
+            ) : (
+              <button onClick={props.onHome} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"오늘 완료 · 홈으로"}</button>
+            )}
           </div>
         );
       }
@@ -4695,6 +4689,8 @@
       var _s2=useState("home"); var screen=_s2[0]; var setScreen=_s2[1];
       var _s3=useState(null); var lessons=_s3[0]; var setLessons=_s3[1];
       var _s4=useState(false); var todayDone=_s4[0]; var setTodayDone=_s4[1];
+      // v1.8.x 물흐르듯: 데일리 흐름(오늘의 나 → 단어 학습)이 진행 중인지. 완료 시 홈이 아니라 다음 단계로 밀어준다.
+      var _df=useState(false); var dailyFlow=_df[0]; var setDailyFlow=_df[1];
       var _s5=useState(0); var streak=_s5[0]; var setStreak=_s5[1];
       var _s6=useState(false); var loading=_s6[0]; var setLoading=_s6[1];
       var _s7=useState([]); var speakHistory=_s7[0]; var setSpeakHistory=_s7[1];
@@ -4859,6 +4855,17 @@
         setScreen("learn"); setTab("learn");
       };
 
+      // v1.8.x 물흐르듯: 홈의 단일 "오늘 시작" — 아직 안 한 단계로 바로 데려간다.
+      // 오늘의 나 → 단어 학습 → (둘 다 끝났으면) 복습. 유저가 "뭐부터 하지"를 고를 필요 없음.
+      var startDaily = function() {
+        setDailyFlow(true);
+        var meDone = !!loadLocal("todayme_done_"+todayKey());
+        var learnDone = !!loadLocal("verb_done_"+todayKey());
+        if (!meDone) { setScreen("todayme"); setTab("home"); }
+        else if (!learnDone) { handleStart(); }
+        else { setDailyFlow(false); setScreen("review"); setTab("review"); }
+      };
+
       var handleComplete = function() {
         track("lesson_done");
         var allVerbs = [];
@@ -4907,6 +4914,8 @@
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
           updateLeaderboard(user.uid, user.displayName);
         }
+        // 데일리 흐름의 마지막 단계 — 홈으로 돌아가 "오늘 다 했어요"를 보여준다(막다른 길 아님).
+        if (dailyFlow) setDailyFlow(false);
         setScreen("home"); setTab("home");
       };
 
@@ -5070,8 +5079,8 @@
           </div>
 
           <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:120}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
-            {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} streak={streak} aiAvailable={aiAvailable}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} verbDone={!!loadLocal("verb_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
+            {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} flow={dailyFlow} onNext={function(){ if(!loadLocal("verb_done_"+todayKey())){ handleStart(); } else { setDailyFlow(false); setScreen("home"); setTab("home"); } }} streak={streak} aiAvailable={aiAvailable}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
             {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} onMore={handleMoreLesson} aiAvailable={aiAvailable}/>}
