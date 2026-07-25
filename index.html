@@ -1801,15 +1801,18 @@
 
           {/* ── 오늘의 학습 — 하나의 흐름(물흐르듯): 오늘의 나 → 단어 학습 → 복습 (v1.8.x) ────── */}
           {(function(){
-            var meDone=!!props.todayMeDone, learnDone=!!props.verbDone, bothDone=meDone&&learnDone;
+            var meDone=!!props.todayMeDone, learnDone=!!props.verbDone, applyDone=!!props.applyDone;
+            var bothDone=meDone&&learnDone&&applyDone;
             var steps=[{n:1,done:meDone,t:"오늘의 나 — 내 하루를 영어로 말하기",s:"진짜 상황 5개 · 약 5분"},
-                       {n:2,done:learnDone,t:"단어 학습 — 배우고 롤플레이·문장 쓰기",s:"오늘의 동사 4개 · 약 10분"}];
-            var btn=bothDone?"오늘 다 했어요 ✅ · 복습하기":(meDone?"이어서 계속 →":"오늘 시작 →");
+                       {n:2,done:learnDone,t:"단어 학습 — 배우고 롤플레이·문장 쓰기",s:"오늘의 동사 4개 · 약 10분"},
+                       {n:3,done:applyDone,t:"적용 — 배운 표현을 내 말·유튜브에 써보기",s:"회화·유튜브로 실전 · 약 5분"}];
+            var doneCount=(meDone?1:0)+(learnDone?1:0)+(applyDone?1:0);
+            var btn=bothDone?"오늘 다 했어요 ✅ · 복습하기":(doneCount>0?"이어서 계속 →":"오늘 시작 →");
             return (
               <div style={{background:"linear-gradient(135deg,"+C.accent+"22,"+C.accent+"06)",border:"1px solid "+C.accent+"50",borderRadius:22,padding:22,marginBottom:16,boxShadow:"0 14px 32px -16px "+C.accent+"66"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
                   <span style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:0.5}}>{bothDone?"오늘의 학습 · 완료 🎉":"오늘의 학습"}</span>
-                  <span style={{fontSize:11,color:C.muted}}>{"약 15분"}</span>
+                  <span style={{fontSize:11,color:C.muted}}>{"약 20분"}</span>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:11,marginBottom:18}}>
                   {steps.map(function(st){return(
@@ -2195,6 +2198,11 @@
                   <div style={{fontSize:13,color:C.muted}}>{ex.korean}</div>
                 </div>
               );})}
+              {/* v1.8.x 슬롯 변주: 예문을 '읽기'로 끝내지 않고 '구조를 소유'하게 — 같은 패턴에 내 상황을 넣어 생산 */}
+              <div style={{background:color+"10",border:"1px solid "+color+"30",borderRadius:12,padding:16,marginTop:4}}>
+                <div style={{fontSize:12,fontWeight:800,color:color,marginBottom:6}}>{"🗣 이제 당신 차례"}</div>
+                <div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{"위 문장들처럼 "}<b style={{color:color}}>{"\""+current.verb+"\""}</b>{"를 넣어, 단어만 바꿔 당신의 상황을 영어로 소리 내어 말해보세요. 외우는 게 아니라 '구조'를 갖는 거예요."}</div>
+              </div>
             </div>
           )}
 
@@ -3163,6 +3171,20 @@
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>MY DAILY ENGLISH</div>
           <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>내 대화를 영어로</div>
           <div style={{fontSize:13,color:C.muted,marginBottom:20}}>녹음, 입력, 또는 파일 업로드로 쉬운 동사 변환</div>
+
+          {/* 데일리 흐름의 '적용' 단계로 들어왔을 때 — 목적을 주고 완료로 이어준다 (v1.8.x) */}
+          {props.flow && (
+            <div style={{background:"linear-gradient(135deg,"+C.accent+"22,"+C.accent+"08)",border:"1px solid "+C.accent+"55",borderRadius:16,padding:"16px 18px",marginBottom:18}}>
+              <div style={{fontSize:12.5,fontWeight:800,color:C.accent,letterSpacing:0.5,marginBottom:6}}>{"🎯 오늘의 마지막 단계 · 적용"}</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.text,lineHeight:1.5,marginBottom:props.flowVerbs&&props.flowVerbs.length>0?8:12}}>{"오늘 배운 표현으로, 내가 실제로 한 말이나 본 유튜브를 영어로 바꿔보세요."}</div>
+              {props.flowVerbs&&props.flowVerbs.length>0&&(
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                  {props.flowVerbs.map(function(v,i){return(<span key={i} style={{background:C.accent+"18",color:C.accent,border:"1px solid "+C.accent+"30",padding:"4px 10px",borderRadius:8,fontSize:12,fontWeight:700}}>{v}</span>);})}
+                </div>
+              )}
+              <button onClick={props.onFlowDone} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:13,fontSize:14,fontWeight:800,cursor:"pointer"}}>{"✅ 오늘 학습 마치기"}</button>
+            </div>
+          )}
 
           {!result && (
             <div>
@@ -4875,8 +4897,10 @@
         setDailyFlow(true);
         var meDone = !!loadLocal("todayme_done_"+todayKey());
         var learnDone = !!loadLocal("verb_done_"+todayKey());
+        var applyDone = !!loadLocal("apply_done_"+todayKey());
         if (!meDone) { setScreen("todayme"); setTab("home"); }
         else if (!learnDone) { handleStart(); }
+        else if (!applyDone) { setScreen("speak"); setTab("speak"); }
         else { setDailyFlow(false); setScreen("review"); setTab("review"); }
       };
 
@@ -4928,9 +4952,9 @@
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
           updateLeaderboard(user.uid, user.displayName);
         }
-        // 데일리 흐름의 마지막 단계 — 홈으로 돌아가 "오늘 다 했어요"를 보여준다(막다른 길 아님).
-        if (dailyFlow) setDailyFlow(false);
-        setScreen("home"); setTab("home");
+        // 단어 학습 끝 → 데일리 흐름이면 '적용(회화/유튜브)' 단계로 이어준다. 아니면 홈.
+        if (dailyFlow) { setScreen("speak"); setTab("speak"); }
+        else { setScreen("home"); setTab("home"); }
       };
 
       // "오늘의 나" 루프 완료 → 학습 완료와 동일하게 스트릭·출석 인정.
@@ -5093,14 +5117,14 @@
           </div>
 
           <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:120}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} verbDone={!!loadLocal("verb_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} verbDone={!!loadLocal("verb_done_"+todayKey())} applyDone={!!loadLocal("apply_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
             {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} flow={dailyFlow} onNext={function(){ if(!loadLocal("verb_done_"+todayKey())){ handleStart(); } else { setDailyFlow(false); setScreen("home"); setTab("home"); } }} streak={streak} aiAvailable={aiAvailable}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
             {screen==="practice"&&<PracticeScreen lessons={lessons} onComplete={handleComplete} onMore={handleMoreLesson} aiAvailable={aiAvailable}/>}
             {screen==="review"&&<ReviewScreen lessons={lessons} speakHistory={speakHistory} setSpeakHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}}/>}
             {screen==="history"&&<HistoryScreen history={verbHistory} lbData={lbData} userId={user?user.uid:null}/>}
-            <div style={{display:screen==="speak"?"block":"none"}}><SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/></div>
+            <div style={{display:screen==="speak"?"block":"none"}}><SpeakScreen history={speakHistory} setHistory={function(h){setSpeakHistory(h);saveLocal("speak_history",h);if(user)saveCloud(user.uid,"speak_history",h);}} onHome={function(){setScreen("home");setTab("home");}} flow={dailyFlow} flowVerbs={(lessons||[]).reduce(function(a,l){if(l&&l.basic)a.push(l.basic.verb);if(l&&l.phrasal)a.push(l.phrasal.verb);return a;},[])} onFlowDone={function(){saveLocal("apply_done_"+todayKey(),true);setDailyFlow(false);setScreen("home");setTab("home");}} aiAvailable={aiAvailable}/></div>
             {screen==="chat"&&<ChatScreen onHome={function(){setScreen("home");setTab("home");}}/>}
             {screen==="admin"&&<AdminScreen/>}
             {screen==="settings"&&<SettingsScreen onClose={function(){setScreen("home");setTab("home");}} user={user} onLogout={function(){signOutUser();setIsGuest(false);saveLocal("is_guest",false);setScreen("home");}} isPremium={isPremium} onUpgradeClick={function(){setShowPremium(true);}} onDowngrade={function(){if(confirm("멤버십을 해지하시겠습니까? (다시 무료 모드로 변경됩니다)")){setIsPremium(false);saveLocal("is_premium",false);if(user)saveCloud(user.uid,"is_premium",false);setAiLeft(30);}}}/>}
