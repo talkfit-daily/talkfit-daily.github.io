@@ -3868,10 +3868,17 @@
       var aheadRemaining = srsAheadList.filter(function(v){return !srsRev[v.verb];});
       var srsShow = dueRemaining.length>0 ? dueRemaining : (showAhead ? aheadRemaining : []);
       var hasSrs = srsAll.length > 0;
-      function markReviewed(verb){
+      // 진짜 기억 기반(라이트너식): 기억했으면 간격을 늘리고(count++),
+      // 까먹었으면 처음 상자로 돌려보내 내일 다시 나오게 한다(count=1). 노출 횟수가 아니라 '기억 여부'로 스케줄.
+      function markReviewed(verb, remembered){
         var all = load("my_encountered_verbs")||[];
         var it = all.find(function(v){return v.verb===verb;});
-        if(it){ it.lastSeen = todayK; it.count=(it.count||1)+1; save("my_encountered_verbs", all); }
+        if(it){
+          it.lastSeen = todayK;
+          if(remembered===false){ it.count = 1; }        // 까먹음 → 내일 다시
+          else { it.count = (it.count||1)+1; }            // 기억함 → 간격 늘림
+          save("my_encountered_verbs", all);
+        }
       }
 
       if (!hasContent && !hasSrs) return (
@@ -3886,7 +3893,7 @@
         <div style={{padding:"24px 20px"}}>
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>REVIEW</div>
           <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>오늘의 복습</div>
-          <div style={{fontSize:12,color:C.muted,marginBottom:20}}>카드를 탭하면 답이 보여요</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:20}}>입으로 먼저 말하고, 탭해서 확인하세요</div>
 
           {todayVerbs.length>0&&(
             <div style={{marginBottom:24}}>
@@ -4041,7 +4048,7 @@
                 <div style={{fontSize:11,color:C.blue,letterSpacing:2,fontWeight:700}}>{"🔁 지난 학습 복습"}</div>
                 {dueRemaining.length>0&&<div style={{fontSize:10,color:C.blue,background:C.blue+"18",padding:"3px 9px",borderRadius:8,fontWeight:700}}>{"복습할 때 "+dueRemaining.length+"개"}</div>}
               </div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.55}}>{"까먹기 전에 다시 봐요. 카드를 탭해서 뜻을 먼저 떠올려보세요."}</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.55}}>{"까먹기 전에 다시. 입으로 먼저 말해보고, 탭해서 확인하세요."}</div>
 
               {srsShow.map(function(v){
                 var rKey="rv_"+v.verb;
@@ -4059,17 +4066,24 @@
                     </div>
                   </div>
                   {!isOpen?(
-                    <div style={{marginTop:8,fontSize:12,color:C.muted}}>{"뜻이 뭐였죠? 탭해서 확인"}</div>
+                    <div style={{marginTop:8}}>
+                      <div style={{fontSize:13.5,color:C.text,fontWeight:700,marginBottom:3}}>{"🗣 이 단어로 영어 문장을 소리 내어 말해보세요"}</div>
+                      <div style={{fontSize:11.5,color:C.muted}}>{"입으로 먼저 말하고 · 탭해서 정답 확인"}</div>
+                    </div>
                   ):(
                     <div style={{marginTop:12}}>
                       <div style={{fontSize:15,color:C.text,fontWeight:700,marginBottom:v.example?10:14}}>{v.meaning}</div>
                       {v.example&&(
                         <div style={{background:color+"10",border:"1px solid "+color+"25",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
                           <div style={{fontSize:14,color:C.text,fontWeight:600}}>{stripStars(v.example)}</div>
-                          <button onClick={function(e){e.stopPropagation();speakEnglish(stripStars(v.example),e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣기"}</button>
+                          <button onClick={function(e){e.stopPropagation();speakEnglish(stripStars(v.example),e.currentTarget);}} style={{marginTop:6,background:"none",border:"1px solid "+color+"40",color:color,borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer"}}>{"🔊 듣고 따라 말하기"}</button>
                         </div>
                       )}
-                      <button onClick={function(e){e.stopPropagation();markReviewed(v.verb);setSrsRev(function(s){var n={};for(var k in s)n[k]=s[k];n[v.verb]=true;return n;});}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:10,padding:12,fontSize:13,fontWeight:800,cursor:"pointer"}}>{"✓ 기억했어요"}</button>
+                      <div style={{fontSize:11.5,color:C.muted,marginBottom:8,textAlign:"center"}}>{"방금 입으로 잘 말했나요?"}</div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={function(e){e.stopPropagation();markReviewed(v.verb,false);setSrsRev(function(s){var n={};for(var k in s)n[k]=s[k];n[v.verb]=true;return n;});}} style={{flex:1,background:C.surface,color:C.red,border:"1px solid "+C.red+"50",borderRadius:10,padding:12,fontSize:13,fontWeight:800,cursor:"pointer"}}>{"✗ 까먹었어요"}</button>
+                        <button onClick={function(e){e.stopPropagation();markReviewed(v.verb,true);setSrsRev(function(s){var n={};for(var k in s)n[k]=s[k];n[v.verb]=true;return n;});}} style={{flex:1,background:C.accent,color:"#08090d",border:"none",borderRadius:10,padding:12,fontSize:13,fontWeight:800,cursor:"pointer"}}>{"✓ 말했어요"}</button>
+                      </div>
                     </div>
                   )}
                 </div>
