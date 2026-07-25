@@ -4151,6 +4151,29 @@
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:8}}>HISTORY</div>
           <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>나의 통계</div>
 
+          {/* 말해보카식 성장 가시화 — '말할 수 있는 표현'이 숙달 등급으로 쌓이는 게 보이게 */}
+          {encountered.length>0&&(function(){
+            var m={n0:0,n1:0,n2:0,n3:0};
+            encountered.forEach(function(v){var c=v.count||1; if(c>=6)m.n3++; else if(c>=4)m.n2++; else if(c>=2)m.n1++; else m.n0++;});
+            var tiers=[{k:"n3",label:"숙달 💪",color:C.accent},{k:"n2",label:"익숙해짐",color:C.blue},{k:"n1",label:"익히는 중",color:C.yellow},{k:"n0",label:"갓 배움",color:C.muted}];
+            return (
+              <div style={{background:"linear-gradient(135deg,"+C.accent+"14,"+C.surface+")",border:"1px solid "+C.accent+"40",borderRadius:16,padding:18,marginBottom:20}}>
+                <div style={{fontSize:12,fontWeight:800,color:C.accent,letterSpacing:0.5,marginBottom:3}}>{"내가 말할 수 있는 표현"}</div>
+                <div style={{fontSize:28,fontWeight:900,color:C.text,marginBottom:14}}>{encountered.length}{"개"}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {tiers.map(function(t){var cnt=m[t.k]; var pct=encountered.length?Math.round(cnt/encountered.length*100):0; return (
+                    <div key={t.k} style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{fontSize:12,color:C.muted,width:70,flexShrink:0}}>{t.label}</div>
+                      <div style={{flex:1,height:8,background:C.bg,borderRadius:99,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:t.color,borderRadius:99,transition:"width 0.4s"}}/></div>
+                      <div style={{fontSize:12,fontWeight:800,color:t.color,width:26,textAlign:"right"}}>{cnt}</div>
+                    </div>
+                  );})}
+                </div>
+                <div style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>{"복습에서 맞힐수록 위 단계로 올라가요. 숙달되면 오래 안 까먹어요."}</div>
+              </div>
+            );
+          })()}
+
           {/* 통계 카드 */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
             <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:12,padding:14}}>
