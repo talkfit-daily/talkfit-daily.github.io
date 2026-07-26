@@ -3928,7 +3928,44 @@
         }
       }
 
-      if (!hasContent && !hasSrs) return (
+      // ── 오답 노트: 틀린 문제 다시 풀기 ──────────────────────────────
+      // weak_verbs = 퀴즈에서 틀린 동사(영구 저장). 여기 모아 '다시 풀기' 퀴즈로 낸다.
+      // 맞히면 목록에서 빠지고(removeWeakVerb), 틀리면 남아 다음에 또 나온다.
+      var _wq = useState(null); var wq = _wq[0]; var setWq = _wq[1];   // {items,idx,sel,answered,right,done} | null
+      function resolveVerb(v){
+        for(var i=0;i<LESSON_POOL.length;i++){
+          if(LESSON_POOL[i].basic && LESSON_POOL[i].basic.verb===v) return LESSON_POOL[i].basic;
+          if(LESSON_POOL[i].phrasal && LESSON_POOL[i].phrasal.verb===v) return LESSON_POOL[i].phrasal;
+        }
+        return null;
+      }
+      var weakItems = getWeakVerbs().map(resolveVerb).filter(Boolean);
+      var allMeanings = [];
+      LESSON_POOL.forEach(function(lp){
+        if(lp.basic) allMeanings.push(lp.basic.meaning_ko.split(",")[0].trim());
+        if(lp.phrasal) allMeanings.push(lp.phrasal.meaning_ko.split(",")[0].trim());
+      });
+      function shuf(a){return a.slice().sort(function(){return Math.random()-0.5;});}
+      function startWeakQuiz(){
+        var items = shuf(weakItems).map(function(it){
+          var correct = it.meaning_ko.split(",")[0].trim();
+          var distract = shuf(allMeanings.filter(function(m){return m!==correct;})).slice(0,3);
+          return {verb:it.verb, answer:correct, options:shuf([correct].concat(distract))};
+        });
+        setWq({items:items, idx:0, sel:null, answered:false, right:0, done:false});
+      }
+      function wqSelect(opt){
+        if(!wq || wq.answered) return;
+        var isRight = opt===wq.items[wq.idx].answer;
+        if(isRight) removeWeakVerb(wq.items[wq.idx].verb);   // 맞히면 오답 노트에서 제거
+        setWq(Object.assign({},wq,{sel:opt,answered:true,right:isRight?wq.right+1:wq.right}));
+      }
+      function wqNext(){
+        if(wq.idx < wq.items.length-1) setWq(Object.assign({},wq,{idx:wq.idx+1,sel:null,answered:false}));
+        else setWq(Object.assign({},wq,{done:true}));
+      }
+
+      if (!hasContent && !hasSrs && weakItems.length===0) return (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",color:C.muted,gap:12}}>
           <div style={{fontSize:36}}>{"🔄"}</div>
           <div style={{fontSize:14}}>아직 복습할 내용이 없어요</div>
@@ -3941,6 +3978,52 @@
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:6}}>REVIEW</div>
           <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>오늘의 복습</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:20}}>입으로 먼저 말하고, 탭해서 확인하세요</div>
+
+          {weakItems.length>0 && !wq && (
+            <div style={{background:C.surface,border:"1px solid "+C.orange+"40",borderRadius:16,padding:"18px",marginBottom:20,boxShadow:SH}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:3}}>{"📕 틀린 문제 "+weakItems.length+"개"}</div>
+                  <div style={{fontSize:12.5,color:C.muted,lineHeight:1.5}}>{"전에 틀린 표현만 모아서 다시 풀어요"}</div>
+                </div>
+                <button onClick={startWeakQuiz} style={{flex:"0 0 auto",background:C.orange,color:"#fff",border:"none",borderRadius:12,padding:"12px 18px",fontSize:14,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>{"다시 풀기"}</button>
+              </div>
+            </div>
+          )}
+
+          {wq && !wq.done && (function(){
+            var cur = wq.items[wq.idx];
+            return (
+            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:20,marginBottom:20,boxShadow:SH}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                <div style={{fontSize:11,color:C.orange,fontWeight:800,letterSpacing:1}}>{"📕 오답 다시 풀기"}</div>
+                <div style={{fontSize:12,color:C.muted}}>{(wq.idx+1)+" / "+wq.items.length}</div>
+              </div>
+              <div style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:16}}>{'"'+cur.verb+'" 의 뜻은?'}</div>
+              {cur.options.map(function(opt,oi){
+                var isAns = opt===cur.answer, picked = wq.sel===opt;
+                var bg=C.surface, bd=C.border, tc=C.text;
+                if(wq.answered){
+                  if(isAns){bg=C.accent+"18";bd=C.accent;tc=C.accent;}
+                  else if(picked){bg=C.red+"12";bd=C.red;tc=C.red;}
+                }
+                return <button key={oi} onClick={function(){wqSelect(opt);}} disabled={wq.answered} style={{width:"100%",textAlign:"left",background:bg,border:"1px solid "+bd,color:tc,borderRadius:12,padding:"14px 16px",marginBottom:8,fontSize:15,fontWeight:600,cursor:wq.answered?"default":"pointer"}}>{opt}{wq.answered&&isAns?"   ✓":""}</button>;
+              })}
+              {wq.answered && (
+                <button onClick={wqNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:14,fontSize:15,fontWeight:800,cursor:"pointer",marginTop:6}}>{wq.idx<wq.items.length-1?"다음":"결과 보기"}</button>
+              )}
+            </div>
+            );
+          })()}
+
+          {wq && wq.done && (
+            <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,padding:24,marginBottom:20,boxShadow:SH,textAlign:"center"}}>
+              <div style={{fontSize:32,marginBottom:8}}>{wq.right===wq.items.length?"🎉":"💪"}</div>
+              <div style={{fontSize:17,fontWeight:800,color:C.text,marginBottom:6}}>{wq.items.length+"개 중 "+wq.right+"개 다시 익혔어요!"}</div>
+              <div style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.5}}>{wq.right<wq.items.length?"못 맞힌 건 오답 노트에 그대로 있어요. 또 도전!":"오답 노트를 다 비웠어요 👏"}</div>
+              <button onClick={function(){setWq(null);}} style={{background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:"12px 28px",fontSize:14,fontWeight:800,cursor:"pointer"}}>{"닫기"}</button>
+            </div>
+          )}
 
           {todayVerbs.length>0&&(
             <div style={{marginBottom:24}}>
