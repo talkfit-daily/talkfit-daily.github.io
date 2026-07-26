@@ -5382,6 +5382,7 @@
             var _merged = mergeLearning(_lk, _ll, _lc);
             if (_merged!=null){ saveLocal(_lk, _merged); saveCloud(user.uid, _lk, _merged); }
           }
+          setLessons(getTodayLesson());   // 병합된 진행 기준으로 오늘 레슨 재계산 (새 기기 로그인 시 어긋남 방지)
         })();
       }, [user]);
 
@@ -5619,7 +5620,7 @@
       ];
 
       return (
-        <div data-app-root style={(function(){var fs=load("font_size")||"normal";var z=fs==="large"?1.25:(fs==="small"?1.0:1.12);return {maxWidth:"min(430px, "+(100/z).toFixed(1)+"vw)",margin:"0 auto",minHeight:"100vh",background:C.bg,color:C.text,display:"flex",flexDirection:"column",zoom:z};})()}>
+        <div data-app-root style={(function(){var fs=load("font_size")||"normal";var z=fs==="large"?1.25:(fs==="small"?1.0:1.12);return {maxWidth:"min(430px, "+(100/z).toFixed(1)+"vw)",margin:"0 auto",minHeight:(100/z).toFixed(2)+"dvh",background:C.bg,color:C.text,display:"flex",flexDirection:"column",zoom:z};})()}>
           <div style={{position:(screen==="settings"?"static":"sticky"),top:0,zIndex:10,background:C.bg+"ee",backdropFilter:"blur(12px)",borderBottom:"1px solid "+C.border,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{fontWeight:900,fontSize:16,letterSpacing:-0.5,display:"flex",alignItems:"center",gap:8}}>
               {React.createElement("svg",{width:24,height:24,viewBox:"0 0 512 512"},
