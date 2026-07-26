@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TalkFit 거꾸로 영어 · 홍보 카드</title>
+<style>
+  :root{--bg:#08090d;--ink:#141824;--mint:#7ee8a2;--text:#eef1f5;--muted:#8b95a7;--faint:#5a6478}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1100px 700px at 50% -10%,#10261c 0%,transparent 55%),var(--bg);color:var(--text);
+    font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:34px 16px 90px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:440px;margin:0 auto}
+  .lead{text-align:center;margin-bottom:26px}
+  .lead .k{font-size:12px;letter-spacing:3px;color:var(--mint);font-weight:800;margin-bottom:9px}
+  .lead h1{font-size:24px;font-weight:900;letter-spacing:-.5px;margin-bottom:9px}
+  .lead p{font-size:13px;color:var(--muted);line-height:1.7}
+  .how{margin-top:14px;background:var(--ink);border:1px solid #232a3a;border-radius:12px;padding:12px 15px;font-size:12.5px;text-align:left;line-height:1.7}
+  .how b{color:var(--mint)}
+  .post{margin-bottom:38px}
+  .idx{font-size:12px;font-weight:800;color:var(--faint);letter-spacing:1px;margin-bottom:8px}
+  .post img{width:100%;border-radius:22px;display:block;box-shadow:0 22px 55px -26px #000;border:1px solid #1c2333}
+  .savetip{margin-top:9px;text-align:center;font-size:12.5px;color:var(--mint);font-weight:800}
+  .cap{margin-top:11px;background:var(--ink);border:1px solid #222a3a;border-radius:13px;padding:14px 15px}
+  .cap .h{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--faint);font-weight:800;letter-spacing:1px;margin-bottom:8px}
+  .cap .copy{color:var(--mint);cursor:pointer;border:1px solid #3a5a46;border-radius:7px;padding:4px 11px;font-size:12px;background:none}
+  .cap pre{white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13px;color:#d7dce6;line-height:1.62}
+  .cap .tags{margin-top:8px;font-size:12px;color:var(--mint);opacity:.9;line-height:1.7}
+  .end{text-align:center;color:var(--faint);font-size:12px;margin-top:14px;line-height:1.8}
+</style></head><body>
+<div class="wrap">
+  <div class="lead">
+    <div class="k">TALKFIT · 거꾸로 영어</div>
+    <h1>@krave_korea 홍보 카드 10장</h1>
+    <p>한국인이 “헐 이거네” 하고 저장·공유하는 포맷.</p>
+    <div class="how"><b>저장</b> · 카드 이미지를 <b>손가락으로 꾹 눌러</b> → “사진에 저장”.<br><b>캡션</b> · 아래 <b>복사</b> 눌러서 게시글에 붙여넣기.<br>인스타는 카드 이미지로, 쓰레드는 캡션 텍스트만으로도 좋아요.</div>
+  </div>
+  <div id="posts"></div>
+  <div class="end">하루 1장씩 = 2주치.<br>다 쓰면 감정편·직장편도 만들어드려요.</div>
+</div>
+<script>
+  var CAPS=[
+   "“이거 내가 처리할게”를 영어로? 🤔\n\n❌ I will handle this — 틀린 건 아닌데 딱딱해요\n✅ I got this — 원어민은 이렇게 말해요\n\n어려운 단어 대신 쉬운 동사 하나. 그게 진짜 영어예요.\n내가 하고 싶은 말을 원어민의 쉬운 영어로 → 프로필 링크 🔗",
+   "“회의 좀 미루자”를 영어로?\n\n❌ I’d like to postpone the meeting\n✅ Can we push it back? 👈 원어민 버전\n\npostpone 같은 어려운 단어, 원어민은 잘 안 써요.\n쉬운 표현이 더 자연스러워요. → 프로필 링크 🔗",
+   "“나 지금 너무 바빠”를 영어로?\n\n❌ I’m currently very busy\n✅ I’m swamped right now\n\n똑같은 뜻인데 원어민은 훨씬 생생하게 말해요.\n이런 진짜 표현, 매일 하나씩 → 프로필 링크 🔗",
+   "“천천히 해, 서두르지 마”를 영어로?\n\n❌ Please don’t hurry\n✅ Take your time\n\n원어민은 짧고 쉬운 동사로 끝내요.\ntake 하나로 완성. → 프로필 링크 🔗",
+   "“그 얘기 꺼내기 좀 그래”를 영어로?\n\n❌ It’s hard to mention that\n✅ I don’t want to bring it up\n\nbring up = (화제를) 꺼내다. 원어민 입에 붙은 표현.\n쉬운 동사로 진짜 영어를 → 프로필 링크 🔗",
+   "“나중에 다시 연락할게”를 영어로?\n\n❌ I’ll contact you later\n✅ I’ll get back to you\n\ncontact 대신 get back to. 이메일·회사에서도 이게 자연스러워요.\n매일 한 표현씩 → 프로필 링크 🔗",
+   "“덕분에 살았어, 고마워”를 영어로?\n\n❌ Thank you for your assistance\n✅ You really helped me out\n\nhelp에 out만 붙이면 훨씬 따뜻하고 자연스러워요.\n교과서 말고 진짜 영어를 → 프로필 링크 🔗",
+   "“나 몸이 좀 안 좋아”를 영어로?\n\n❌ My condition isn’t good\n✅ I’m not feeling well\n\n원어민은 condition 안 써요. feel 하나로 끝.\n이런 거 매일 알려드려요 → 프로필 링크 🔗",
+   "“한번 해볼게”를 영어로?\n\n❌ I’ll attempt it\n✅ I’ll give it a shot\n\nattempt 같은 단어 대신, 원어민은 give it a shot.\n쉬운 표현이 진짜 영어예요 → 프로필 링크 🔗",
+   "“그거 별거 아니야”를 영어로?\n\n❌ It’s not a big problem\n✅ It’s no big deal\n\n한 단어만 바꿔도 확 자연스러워져요.\n매일 내 말을 원어민 영어로 → 프로필 링크 🔗"
+  ];
+  var TAGS="#영어회화 #생활영어 #영어공부 #미국영어 #영어표현 #직장인영어 #영어독학 #영어한마디 #TalkFit";
+  var host=document.getElementById("posts");
+  for(var i=0;i<10;i++){
+    var n=String(i+1).padStart(2,"0");
+    var d=document.createElement("div");d.className="post";
+    d.innerHTML='<div class="idx">'+n+' / 10</div>'+
+      '<img src="card-'+n+'.png" alt="거꾸로 영어 '+n+'">'+
+      '<div class="savetip">👆 이미지를 꾹 눌러 “사진에 저장”</div>'+
+      '<div class="cap"><div class="h"><span>📋 캡션</span><button class="copy" data-i="'+i+'">복사</button></div><pre id="c'+i+'">'+CAPS[i]+'</pre><div class="tags">'+TAGS+'</div></div>';
+    host.appendChild(d);
+  }
+  document.addEventListener("click",function(e){
+    var b=e.target.closest(".copy");if(!b)return;var i=b.getAttribute("data-i");
+    var t=document.getElementById("c"+i).textContent+"\n\n"+TAGS;
+    try{navigator.clipboard.writeText(t);var o=b.textContent;b.textContent="복사됨 ✓";setTimeout(function(){b.textContent=o;},1400);}catch(x){}
+  });
+</script>
+</body></html>
