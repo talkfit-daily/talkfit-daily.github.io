@@ -47,6 +47,8 @@
     @keyframes wrongShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
     @keyframes levelUp{0%{transform:scale(0.5);opacity:0}50%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}
     @keyframes xpPop{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-30px);opacity:0}}
+    @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
     ::-webkit-scrollbar{width:0}
     .tf-pressing{transform:scale(0.93)!important;opacity:0.65!important;transition:transform 0.06s ease,opacity 0.06s ease!important}
     button,img,[role="button"]{transition:transform 0.12s ease,opacity 0.12s ease;-webkit-tap-highlight-color:transparent}
@@ -1947,12 +1949,8 @@
       }
 
       return (
-        <div style={{padding:"32px 20px 24px"}}>
-          <div style={{fontSize:12,color:C.muted,letterSpacing:2,marginBottom:6}}>
-            {new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})}
-          </div>
-          <div style={{fontSize:30,fontWeight:800,lineHeight:1.25,marginBottom:5,letterSpacing:-0.5}}>{greeting.t}</div>
-          <div style={{fontSize:14.5,color:C.muted,marginBottom:22}}>{greeting.s}</div>
+        <div style={{padding:"18px 18px 44px"}}>
+          <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:18,letterSpacing:-0.2}}>{greeting.t}<span style={{color:C.muted,fontWeight:600}}>{"  ·  "+greeting.s}</span></div>
 
           {/* ── 학습 경로(길) — 듀오링고식 홈: 열면 내 여정이 보이고 다음 노드를 눌러 오늘 학습 시작 (v2.0 A안) ────── */}
           {(function(){
@@ -1998,61 +1996,82 @@
                   // 활성 유닛만 노드 경로를 펼치고, 나머지는 컴팩트 배너
                   if(!isActive){
                     return (
-                      <div key={ui} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",marginBottom:10,background:C.surface,border:"1px solid "+C.border,borderRadius:14,opacity:isFuture?0.5:1}}>
-                        <span style={{fontSize:18}}>{uComplete?"🏆":(isFuture?"🔒":t.e)}</span>
+                      <div key={ui} style={{display:"flex",alignItems:"center",gap:11,padding:"13px 16px",marginBottom:11,background:uComplete?C.accent+"14":C.surface,border:"1.5px solid "+(uComplete?C.accent+"44":C.border),borderRadius:16,opacity:isFuture?0.55:1,boxShadow:uComplete?"none":SH}}>
+                        <span style={{fontSize:20,filter:isFuture?"grayscale(1)":"none"}}>{uComplete?"🏆":(isFuture?"🔒":t.e)}</span>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>{t.n}</div>
-                          <div style={{fontSize:11,color:C.muted}}>{uComplete?"유닛 완료":isFuture?"곧 열려요":uDone+"/"+idxs.length+" 익힘"}</div>
+                          <div style={{fontSize:14,fontWeight:800,color:C.text}}>{t.n}</div>
+                          <div style={{fontSize:11.5,color:uComplete?C.accent:C.muted,fontWeight:uComplete?700:400}}>{uComplete?"유닛 클리어!":isFuture?"곧 열려요":uDone+" / "+idxs.length+" 익힘"}</div>
                         </div>
-                        <span style={{fontSize:11,fontWeight:800,color:uComplete?C.accent:C.muted}}>{uDone}{"/"}{idxs.length}</span>
+                        <span style={{fontSize:12,fontWeight:800,color:uComplete?C.accent:C.muted}}>{uDone}{"/"}{idxs.length}</span>
                       </div>
                     );
                   }
                   return (
                     <div key={ui} style={{marginBottom:14}}>
-                      {/* 활성 유닛 배너 */}
-                      <div style={{display:"flex",alignItems:"center",gap:9,padding:"11px 15px",marginBottom:4,background:"linear-gradient(135deg,"+C.accent+"20,"+C.surface+")",border:"1px solid "+C.accent+"55",borderRadius:14}}>
-                        <span style={{fontSize:19}}>{t.e}</span>
+                      {/* 활성 유닛 배너 — 솔리드 색 섹션 헤더 */}
+                      <div style={{display:"flex",alignItems:"center",gap:11,padding:"13px 17px",marginBottom:6,background:C.accent,borderRadius:16,boxShadow:"0 6px 0 rgba(0,0,0,0.14), 0 12px 24px -8px "+C.accent}}>
+                        <span style={{fontSize:22,filter:"drop-shadow(0 1px 1px rgba(0,0,0,0.15))"}}>{t.e}</span>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:11,fontWeight:800,color:C.accent,letterSpacing:0.5}}>{"지금 여기"}</div>
-                          <div style={{fontSize:14,fontWeight:800,color:C.text}}>{t.n}</div>
+                          <div style={{fontSize:10.5,fontWeight:900,color:"#08090d",opacity:0.55,letterSpacing:1}}>{"지금 여기"}</div>
+                          <div style={{fontSize:15,fontWeight:900,color:"#08090d"}}>{t.n}</div>
                         </div>
-                        <span style={{fontSize:12,fontWeight:800,color:C.accent}}>{uDone}{"/"}{idxs.length}</span>
+                        <span style={{fontSize:12.5,fontWeight:900,color:"#08090d"}}>{uDone}{"/"}{idxs.length}</span>
                       </div>
-                      {/* 세로 winding 경로 — 현재 노드 중심 윈도우(직전 완료 2 + 현재 + 다음 3)로 현재 노드가 항상 화면 위에 보이게 */}
+                      {/* 세로 winding 경로 — 점선 트레일 + 3D 촉각 노드, 현재 노드 중심 윈도우 */}
                       {(function(){
                         var anchor = (currentIdx===-1) ? end : currentIdx;
                         var winStart=Math.max(start, anchor-2);
                         var winEnd=Math.min(end, anchor+4);
                         var win=[]; for(var w=winStart;w<winEnd;w++) win.push(w);
                         var hiddenDone=winStart-start;
+                        var zig2=[0,34,50,34,0,-34,-50,-34];
                         return (
-                          <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:6}}>
+                          <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",paddingTop:10}}>
+                            {/* 가운데 점선 트레일 */}
+                            <div style={{position:"absolute",left:"50%",top:16,bottom:16,width:0,borderLeft:"3px dashed "+C.border,transform:"translateX(-1.5px)",zIndex:0}}/>
                             {hiddenDone>0 && (
-                              <div style={{fontSize:11,fontWeight:800,color:C.accent,background:C.accent+"18",padding:"4px 13px",borderRadius:99,marginBottom:2}}>{"✓ 여기까지 "+hiddenDone+"개 완료"}</div>
+                              <div style={{position:"relative",zIndex:1,fontSize:11,fontWeight:800,color:C.accent,background:C.accent+"1e",padding:"5px 14px",borderRadius:99,marginBottom:6}}>{"✓ 여기까지 "+hiddenDone+"개 익힘"}</div>
                             )}
                             {win.map(function(i){
                               var done=(i<doneCount), isCur=(i===currentIdx && !todayDoneAll);
-                              var off=zig[(i-start) % zig.length];
+                              var off=isCur?0:zig2[(i-start) % zig2.length];
                               var vb=(pool[i]&&pool[i].basic&&pool[i].basic.verb)||"";
                               if(isCur){
                                 return (
                                   <div key={i} onClick={props.onStartDaily} role="button" tabIndex={0}
                                        onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onStartDaily();}}
-                                       style={{transform:"translateX("+off+"px)",display:"flex",flexDirection:"column",alignItems:"center",margin:"8px 0 12px",cursor:"pointer"}}>
-                                    <div style={{fontSize:12,fontWeight:900,color:"#08090d",background:C.accent,padding:"6px 14px",borderRadius:12,marginBottom:8,boxShadow:"0 6px 16px -4px "+C.accent+"cc",whiteSpace:"nowrap"}}>{stepTag}{" ▶"}</div>
-                                    <div style={{width:74,height:74,borderRadius:"50%",background:C.accent,border:"5px solid "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 26px -6px "+C.accent+"cc",animation:"pulse1 1.8s infinite"}}>
-                                      <span style={{fontSize:30}}>{"▶"}</span>
+                                       style={{position:"relative",zIndex:2,display:"flex",flexDirection:"column",alignItems:"center",margin:"6px 0 18px",cursor:"pointer"}}>
+                                    {/* 말풍선 + 꼬리 (통통) */}
+                                    <div style={{animation:"bob 1.5s ease-in-out infinite",position:"relative",marginBottom:15}}>
+                                      <div style={{background:C.surface,border:"2px solid "+C.accent,color:C.accent,fontWeight:900,fontSize:13,padding:"9px 16px",borderRadius:14,boxShadow:"0 8px 18px -5px "+C.accent+"77",whiteSpace:"nowrap"}}>{stepTag}</div>
+                                      <div style={{position:"absolute",left:"50%",bottom:-6,transform:"translateX(-50%) rotate(45deg)",width:12,height:12,background:C.surface,borderRight:"2px solid "+C.accent,borderBottom:"2px solid "+C.accent}}/>
+                                    </div>
+                                    {/* 별 노드 — 튀어나온 3D + 리플 */}
+                                    <div style={{position:"relative",width:80,height:80,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                      <div style={{position:"absolute",width:80,height:80,borderRadius:"50%",background:C.accent,opacity:0.5,animation:"pulse1 1.9s ease-out infinite"}}/>
+                                      <div style={{position:"relative",width:80,height:80,borderRadius:"50%",background:C.accent,boxShadow:"0 7px 0 rgba(0,0,0,0.18), 0 16px 34px -8px "+C.accent,display:"flex",alignItems:"center",justifyContent:"center",animation:"breathe 2.4s ease-in-out infinite"}}>
+                                        <span style={{fontSize:38,filter:"drop-shadow(0 1px 1px rgba(0,0,0,0.2))"}}>{"⭐"}</span>
+                                      </div>
                                     </div>
                                   </div>
                                 );
                               }
+                              var sz=done?56:48;
                               return (
-                                <div key={i} title={vb} style={{transform:"translateX("+off+"px)",width:done?44:38,height:done?44:38,borderRadius:"50%",background:done?C.accent:C.surface,border:"3px solid "+(done?C.accent+"66":C.border),display:"flex",alignItems:"center",justifyContent:"center",margin:"6px 0",boxShadow:done?"0 4px 10px -4px "+C.accent+"66":"none"}}>
-                                  <span style={{fontSize:done?17:12,fontWeight:800,color:done?"#08090d":C.muted}}>{done?"✓":i+1}</span>
+                                <div key={i} title={vb} style={{position:"relative",zIndex:1,transform:"translateX("+off+"px)",width:sz,height:sz,borderRadius:"50%",background:done?C.accent:C.surface,border:done?"none":"2.5px solid "+C.border,display:"flex",alignItems:"center",justifyContent:"center",margin:"10px 0",boxShadow:done?"0 5px 0 rgba(0,0,0,0.16), 0 8px 16px -6px "+C.accent+"88":"0 4px 0 "+C.border}}>
+                                  <span style={{fontSize:done?24:15,fontWeight:900,color:done?"#08090d":C.muted}}>{done?"✓":i+1}</span>
                                 </div>
                               );
                             })}
+                            {/* 유닛 끝 도달 시 🏆 보상 노드 */}
+                            {winEnd===end && (
+                              <div style={{position:"relative",zIndex:1,marginTop:10,display:"flex",flexDirection:"column",alignItems:"center"}}>
+                                <div style={{width:60,height:60,borderRadius:"50%",background:uComplete?C.yellow:C.surface,border:uComplete?"none":"2.5px dashed "+C.border,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:uComplete?"0 5px 0 rgba(0,0,0,0.16)":"none",filter:uComplete?"none":"grayscale(0.4)",opacity:uComplete?1:0.7}}>
+                                  <span style={{fontSize:28}}>{"🏆"}</span>
+                                </div>
+                                <div style={{fontSize:10.5,color:C.muted,marginTop:5,fontWeight:700}}>{uComplete?"유닛 클리어!":"유닛 완주 보상"}</div>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -2070,124 +2089,7 @@
             );
           })()}
 
-          {/* '쉬운 영어로 바꾸기' 홈 카드 제거 — 하단 '회화' 탭과 중복(대표 피드백). 기능은 회화 탭에 그대로. */}
 
-          {/* 오늘의 학습 시작은 위 통합 흐름 카드가 담당 — 중복 "시작하기" 버튼 제거 (v1.8.x) */}
-
-          {/* 지표는 한 줄로 압축 — 시작을 방해하지 않도록 (v1.5.0) */}
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18,padding:"10px 14px",background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,flexWrap:"wrap"}}>
-            <span style={{fontSize:13,fontWeight:800,color:streak>0?C.accent:C.muted}}>{"🔥 "}{streak}{"일 연속"}</span>
-            <span style={{marginLeft:"auto",display:"flex",gap:4}}>
-              {days.map(function(d,i){return(
-                <div key={i} title={d} style={{width:14,height:14,borderRadius:4,background:weekDone[i]?C.accent:(i===today?C.accentDim:C.border)}}/>
-              );})}
-            </span>
-          </div>
-
-          <div onClick={function(){var el=document.getElementById("idiom-detail");if(el)el.style.display=el.style.display==="none"?"block":"block";el.style.maxHeight=el.style.maxHeight==="0px"?"200px":"0px";}} style={{background:C.surface,border:"1px solid "+C.yellow+"25",borderRadius:12,padding:"10px 14px",marginBottom:16,cursor:"pointer"}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-              <span style={{fontSize:11,color:C.yellow,fontWeight:700,letterSpacing:1}}>{"💡 오늘의 표현"}</span>
-            </div>
-            <div style={{fontSize:15,fontWeight:700,color:C.text}}>
-              <span style={{color:C.yellow}}>{"\""}{todayIdiom.en}{"\""}</span>
-              <span style={{fontSize:13,color:C.muted,fontWeight:400}}>{" = "}{todayIdiom.ko}</span>
-            </div>
-            <div id="idiom-detail" style={{maxHeight:0,overflow:"hidden",transition:"max-height 0.3s ease"}}>
-              <div style={{marginTop:8,padding:"8px 10px",background:C.bg,borderRadius:8}}>
-                <div style={{fontSize:13,color:C.text,fontStyle:"italic",marginBottom:4}}>{"\""}{todayIdiom.ex}{"\""}</div>
-                <div style={{fontSize:12,color:C.muted}}>{todayIdiom.exKo}</div>
-              </div>
-            </div>
-            <div style={{fontSize:10,color:C.muted,marginTop:4,textAlign:"right"}}>탭하면 예문 보기</div>
-          </div>
-
-          {/* 다른 방법으로 배우기 — 메인 CTA를 방해하지 않도록 아래로 (v1.5.0) */}
-          <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10}}>{"다른 방법으로 배우기"}</div>
-          <div onClick={onChat} role="button" tabIndex={0}
-               onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")onChat();}}
-               style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-            <div style={{fontSize:20,flexShrink:0}}>{"\uD83D\uDCAC"}</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:700,color:C.text}}>{"AI\uC640 \uB300\uD654"}</div>
-              <div style={{fontSize:11,color:C.muted}}>{"\uC790\uC720\uB85C\uC6B4 \uC601\uC5B4 \uB300\uD654 \uC5F0\uC2B5"}</div>
-            </div>
-            <div style={{fontSize:16,color:C.muted,flexShrink:0}}>{"\u2192"}</div>
-          </div>
-
-          {/* \uc571 \ucc28\ubcc4\uc810 \u2014 \ud648 \uc2ec\ud50c\ud654: \ucef4\ud329\ud2b8 \ubc84\uc804(\uacf5\uc720\ub9cc) */}
-          <div style={{background:"linear-gradient(145deg,"+C.accent+"14,"+C.surface+")",border:"1px solid "+C.accent+"30",borderRadius:16,padding:"16px 18px",marginBottom:16}}>
-            <div style={{fontSize:14.5,fontWeight:700,color:C.text,marginBottom:3,lineHeight:1.4}}>{"\ud83d\udcf2 \ub9e4\uc77c \ub098\ub97c \ub9d0\ud558\uac8c, "}<span style={{color:C.accent}}>{"\uc571\uc774 \ub54c\ub9de\ucdb0 \uc54c\ub9bc"}</span></div>
-            <div style={{fontSize:12,color:C.muted,marginBottom:13}}>{"\uc5f0\uc18d \ub04a\uae30\uae30 \uc804\uc5d0 \u00b7 \uae4c\uba39\uc744 \ub54c\ucbe4 \ubcf5\uc2b5 \u00b7 \uc571 \uace7 \ucd9c\uc2dc"}</div>
-            <button onClick={function(){var url="https://talkfit-daily-github-io.vercel.app",text="\ub0b4\uac00 \ud558\uace0 \uc2f6\uc740 \ub9d0\uc744 30\ucd08\uc5d0 \ubbf8\uad6d\uc2dd \uc601\uc5b4\ub85c \u2014 \ub179\uc74c\u00b7\uce74\ud1a1\u00b7\uc720\ud29c\ube0c\ub97c \uc26c\uc6b4 \uc601\uc5b4\ub85c, \uac00\uc785 \uc5c6\uc774.";try{if(navigator.share){navigator.share({title:"TalkFit",text:text,url:url});}else{navigator.clipboard.writeText(text+"\n"+url);var b=event.currentTarget;var o=b.textContent;b.textContent="\ub9c1\ud06c \ubcf5\uc0ac\ub410\uc5b4\uc694 \u2713";setTimeout(function(){b.textContent=o;},1700);}}catch(e){}}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:12,padding:13,fontSize:14,fontWeight:800,cursor:"pointer"}}>{"\uce5c\uad6c\uc5d0\uac8c TalkFit \uacf5\uc720\ud558\uae30"}</button>
-          </div>
-
-          {/* 레벨/XP 카드는 '나' 탭(프로필)으로 이동 — 홈 심플화 + 유저 탭 신설(대표 피드백) */}
-
-          {/* 일일 미션 */}
-          {(function(){
-            var todayK=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-            var missions={verbDone:false,speakDone:false,combo3:false};
-            // 매번 재계산
-            if(loadLocal("verb_done_"+todayK))missions.verbDone=true;
-            if(loadLocal("speak_done_"+todayK))missions.speakDone=true;
-            var st=load("xp_state")||{};
-            var comboToday = st.lastCorrectTime && (st.combo||0)>=3 && new Date(st.lastCorrectTime).toISOString().slice(0,10) === todayK;
-            if(comboToday)missions.combo3=true;
-            save("daily_missions_"+todayK,missions);
-            var done=(missions.verbDone?1:0)+(missions.speakDone?1:0)+(missions.combo3?1:0);
-            // v1.5.0: "0/3 미달성" 대신 "해낸 것"을 먼저 보여준다.
-            // 듀오링고가 2025년 벌점(하트)→보상(에너지)으로 뒤집은 것과 같은 방향.
-            var items=[
-              {k:"verbDone",label:"\uB3D9\uC0AC \uB808\uC2A8",reward:"+10 XP"},
-              {k:"speakDone",label:"\uB0B4 \uB9D0 \uBC14\uAFB8\uAE30",reward:"+15 XP"},
-              {k:"combo3",label:"3\uC5F0\uC18D \uC815\uB2F5",reward:"+5 XP"}
-            ];
-            var doneItems=items.filter(function(m){return missions[m.k];});
-            var todoItems=items.filter(function(m){return !missions[m.k];});
-            return(
-              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:14,marginBottom:16}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:11,color:C.muted,letterSpacing:2,fontWeight:700}}>{"\uC624\uB298 \uD574\uB0B8 \uAC83"}</div>
-                  {done>0&&<div style={{fontSize:11,color:C.accent,fontWeight:700}}>{"+"}{done}{"\uAC1C \uB2EC\uC131"}</div>}
-                </div>
-                {done===0&&(
-                  <div style={{fontSize:12,color:C.muted,lineHeight:1.7,paddingBottom:4}}>
-                    {"\uC544\uBB34\uAC70\uB098 \uD558\uB098\uB9CC \uD574\uB3C4 \uC624\uB298\uC740 \uC131\uACF5\uC774\uC5D0\uC694."}
-                  </div>
-                )}
-                {doneItems.map(function(m,i){return(
-                  <div key={"d"+i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0"}}>
-                    <span style={{fontSize:14}}>{"\u2705"}</span>
-                    <span style={{flex:1,fontSize:13,color:C.text,fontWeight:600}}>{m.label}</span>
-                    <span style={{fontSize:11,color:C.accent,fontWeight:700}}>{m.reward}</span>
-                  </div>
-                );})}
-                {todoItems.map(function(m,i){return(
-                  <div key={"t"+i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",opacity:0.55}}>
-                    <span style={{fontSize:14,color:C.muted}}>{"\u00B7"}</span>
-                    <span style={{flex:1,fontSize:13,color:C.muted}}>{m.label}</span>
-                    <span style={{fontSize:11,color:C.muted}}>{m.reward}</span>
-                  </div>
-                );})}
-              </div>
-            );
-          })()}
-
-
-          <div style={{display:"flex",gap:10,marginTop:4}}>
-            {[{label:"학습한 날",value:streak+"일"},{label:"AI 남은 횟수",value:isPremiumUser()?"무제한":aiRemaining+"회"}].map(function(s,i){return(
-              <div key={i} style={{flex:1,background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:"12px 14px"}}>
-                <div style={{fontSize:18,fontWeight:800}}>{s.value}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
-              </div>
-            );})}
-          </div>
-
-          <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid "+C.border,textAlign:"center"}}>
-            <div style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:2,marginBottom:4}}>{"TALKFIT"}</div>
-            <div style={{fontSize:10,color:C.muted,opacity:0.6}}>{"© 2026 TalkFit. All rights reserved."}</div>
-            <div style={{fontSize:10,color:C.muted,opacity:0.4,marginTop:2}}>{"Master English with your own words."}</div>
-          </div>
         </div>
       );
     }
