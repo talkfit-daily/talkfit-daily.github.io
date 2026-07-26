@@ -1582,8 +1582,11 @@
     function _learnedSetCount() {
       var ld = load("learned_lesson_dates") || {};
       var tk = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-      var _dl=(load("attendance")||{}).daysLog||[]; var _todayDone=_dl.indexOf(tk)!==-1;
-      var seen={}; Object.keys(ld).forEach(function(d){ if(d!==tk || _todayDone) (ld[d]||[]).forEach(function(i){ seen[i]=1; }); });
+      // 완료 판정: 그 날이 실제로 '학습을 끝낸 날'(attendance.daysLog)일 때만 그 날의 세트를 완료로 센다.
+      // (getTodayLesson이 앱을 열 때마다 오늘 세트를 ld에 써 넣기 때문에, 날짜만 세면 '열어보기만 해도'
+      //  진행이 부풀려진다 — 신규 설치에 9/40이 뜨던 근본 원인.)
+      var _dl=(load("attendance")||{}).daysLog||[];
+      var seen={}; Object.keys(ld).forEach(function(d){ if(_dl.indexOf(d)!==-1) (ld[d]||[]).forEach(function(i){ seen[i]=1; }); });
       return Object.keys(seen).length;
     }
 
@@ -1992,11 +1995,10 @@
             var baseN = base.length;
             var ld = load("learned_lesson_dates")||{};
             var tKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-            // 완료 = 실제로 학습한 세트 인덱스 수. 오늘 세트는 '완료(출석 daysLog에 오늘)'일 때만 포함.
-            // getTodayLesson이 순차로 주므로 seen은 {0,1,...} 형태 → 홈·기록·진행바가 완전히 일치한다.
+            // 완료 = '학습을 끝낸 날'(attendance.daysLog)의 세트만 센다. getTodayLesson이 앱 열 때마다
+            // 오늘 세트를 ld에 써 넣으므로, 날짜만 세면 열어보기만 해도 진행이 부풀려진다(신규 9/40 원인).
             var _dl=(load("attendance")||{}).daysLog||[];
-            var _todayDone=_dl.indexOf(tKey)!==-1;
-            var seen={}; Object.keys(ld).forEach(function(d){ if(d!==tKey || _todayDone) (ld[d]||[]).forEach(function(i){ if(i<total) seen[i]=1; }); });
+            var seen={}; Object.keys(ld).forEach(function(d){ if(_dl.indexOf(d)!==-1) (ld[d]||[]).forEach(function(i){ if(i<total) seen[i]=1; }); });
             var meDone=!!props.todayMeDone, learnDone=!!props.verbDone, applyDone=!!props.applyDone;
             var stepDone=(meDone?1:0)+(learnDone?1:0)+(applyDone?1:0);
             var todayDoneAll=meDone&&learnDone&&applyDone;
@@ -4414,10 +4416,10 @@
             var pool = _base.concat(load("my_lesson_pool")||[]);   // 내가 만든 표현(커스텀 세트)도 여정에 포함(홈과 통일)
             var total = pool.length; if(!total) return null;
             var ld = load("learned_lesson_dates")||{};
-            // 오늘은 시작만 하면 learned_lesson_dates에 세트가 잡히므로, '완료(daysLog에 오늘)'일 때만 여정에 반영.
-            var _tk=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-            var _todayDone=(att.daysLog||[]).indexOf(_tk)!==-1;
-            var studied = {}; Object.keys(ld).forEach(function(d){ if(d!==_tk || _todayDone) (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
+            // getTodayLesson이 앱 열 때마다 오늘 세트를 ld에 써 넣으므로, 날짜만 세면 열어보기만 해도 부풀려진다.
+            // → '학습을 끝낸 날'(attendance.daysLog)의 세트만 여정에 반영(홈 진행바와 동일 규칙).
+            var _dl=(att.daysLog||[]);
+            var studied = {}; Object.keys(ld).forEach(function(d){ if(_dl.indexOf(d)!==-1) (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
             var doneCount = Object.keys(studied).length;
             var nextIdx = -1; for(var i=0;i<total;i++){ if(!studied[i]){ nextIdx=i; break; } }
             var USZ=4;
@@ -5368,6 +5370,8 @@
         var authTimer = setTimeout(function(){ setAuthLoading(false); }, 6000);
         var unsub = fbAuth.onAuthStateChanged(function(u) {
           clearTimeout(authTimer);
+          // 로그인되면 게스트 플래그 해제 — 안 그러면 로그인 유저인데도 게스트 게이트가 뜰 수 있다.
+          if (u) { setIsGuest(false); saveLocal("is_guest", false); }
           setUser(u);
           setAuthLoading(false);
         }, function(){ clearTimeout(authTimer); setAuthLoading(false); });
@@ -5615,7 +5619,8 @@
       };
 
       // 온보딩 — hooks는 모든 조건부 return 전에 선언
-      var _onboard = useState(true); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
+      // 온보딩은 한 번 보면 끝 — 게스트도 저장(안 그러면 열 때마다 다시 보인다). ?reset이면 플래그가 지워져 다시 보인다.
+      var _onboard = useState(function(){return loadLocal("onboarding_done")!=="v2";}); var showOnboarding = _onboard[0]; var setShowOnboarding = _onboard[1];
       // 로그인 유저가 이미 봤으면 자동 닫기
       useEffect(function(){
         if (user && loadLocal("onboarding_done")==="v2") setShowOnboarding(false);
@@ -5657,10 +5662,10 @@
             {onboardStep < steps.length - 1 ? (
               <button onClick={function(){setOnboardStep(onboardStep+1);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"다음 →"}</button>
             ) : (
-              <button onClick={function(){setShowOnboarding(false);if(user)saveLocal("onboarding_done","v2");}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"시작하기 🚀"}</button>
+              <button onClick={function(){setShowOnboarding(false);saveLocal("onboarding_done","v2");}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10}}>{"시작하기 🚀"}</button>
             )}
             {onboardStep < steps.length - 1 && (
-              <button onClick={function(){setShowOnboarding(false);if(user)saveLocal("onboarding_done","v2");}} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer"}}>{"건너뛰기"}</button>
+              <button onClick={function(){setShowOnboarding(false);saveLocal("onboarding_done","v2");}} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer"}}>{"건너뛰기"}</button>
             )}
           </div>
         );
