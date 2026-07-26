@@ -1961,15 +1961,15 @@
             var ld = load("learned_lesson_dates")||{};
             var tKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
             // '완료(done)'는 오늘 이전에 학습한 세트만 — 오늘 세트는 완료 여부로 따로 판단
-            var studied = {}; Object.keys(ld).forEach(function(d){ if(d!==tKey) (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
-            var todayIdxs = (ld[tKey]||[]).filter(function(i){return i<total;});
+            // 경로는 '순차 진행' 모델 — 콘텐츠 회전(getTodayLesson)과 무관하게, 지금까지 익힌 세트 수만큼
+            // 앞 노드가 채워지고 그다음 노드가 '현재'가 된다. 항상 단조 증가 → 듀오링고식 길과 일치.
+            var seen={}; Object.keys(ld).forEach(function(d){ if(d!==tKey) (ld[d]||[]).forEach(function(i){ if(i<total) seen[i]=1; }); });
             var meDone=!!props.todayMeDone, learnDone=!!props.verbDone, applyDone=!!props.applyDone;
             var stepDone=(meDone?1:0)+(learnDone?1:0)+(applyDone?1:0);
             var todayDoneAll=meDone&&learnDone&&applyDone;
-            // 오늘 세트를 다 끝냈으면 완료로 포함
-            if(todayDoneAll) todayIdxs.forEach(function(i){studied[i]=true;});
-            var currentIdx = todayIdxs.length ? todayIdxs[0] : (function(){for(var i=0;i<total;i++){if(!studied[i])return i;}return -1;})();
-            var doneCount = Object.keys(studied).length;
+            var doneCount = Object.keys(seen).length + (todayDoneAll?1:0);
+            if(doneCount>total) doneCount=total;
+            var currentIdx = doneCount<total ? doneCount : -1;
             var pct = Math.round(doneCount/total*100);
             var THEMES=[{e:"☕",n:"일상 표현"},{e:"💬",n:"감정·관계"},{e:"💼",n:"일·성장"},{e:"✈️",n:"여행·경험"}];
             var per=Math.ceil(total/THEMES.length);
@@ -1991,7 +1991,7 @@
                 {THEMES.map(function(t,ui){
                   var start=ui*per, end=Math.min(total,start+per); if(start>=total) return null;
                   var idxs=[]; for(var k=start;k<end;k++) idxs.push(k);
-                  var uDone=idxs.filter(function(i){return studied[i];}).length;
+                  var uDone=Math.max(0,Math.min(idxs.length, doneCount-start));
                   var uComplete=uDone===idxs.length;
                   var isActive=(ui===activeUnit);
                   var isFuture=(start>currentIdx && currentIdx!==-1 && !isActive);
@@ -2019,31 +2019,43 @@
                         </div>
                         <span style={{fontSize:12,fontWeight:800,color:C.accent}}>{uDone}{"/"}{idxs.length}</span>
                       </div>
-                      {/* 세로 winding 경로 */}
-                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:6}}>
-                        {idxs.map(function(i,ni){
-                          var done=studied[i], isCur=(i===currentIdx && !todayDoneAll);
-                          var off=zig[ni % zig.length];
-                          var vb=(pool[i]&&pool[i].basic&&pool[i].basic.verb)||"";
-                          if(isCur){
-                            return (
-                              <div key={i} onClick={props.onStartDaily} role="button" tabIndex={0}
-                                   onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onStartDaily();}}
-                                   style={{transform:"translateX("+off+"px)",display:"flex",flexDirection:"column",alignItems:"center",margin:"8px 0 12px",cursor:"pointer"}}>
-                                <div style={{fontSize:12,fontWeight:900,color:"#08090d",background:C.accent,padding:"6px 14px",borderRadius:12,marginBottom:8,boxShadow:"0 6px 16px -4px "+C.accent+"cc",whiteSpace:"nowrap"}}>{stepTag}{" ▶"}</div>
-                                <div style={{width:74,height:74,borderRadius:"50%",background:C.accent,border:"5px solid "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 26px -6px "+C.accent+"cc",animation:"pulse1 1.8s infinite"}}>
-                                  <span style={{fontSize:30}}>{"▶"}</span>
+                      {/* 세로 winding 경로 — 현재 노드 중심 윈도우(직전 완료 2 + 현재 + 다음 3)로 현재 노드가 항상 화면 위에 보이게 */}
+                      {(function(){
+                        var anchor = (currentIdx===-1) ? end : currentIdx;
+                        var winStart=Math.max(start, anchor-2);
+                        var winEnd=Math.min(end, anchor+4);
+                        var win=[]; for(var w=winStart;w<winEnd;w++) win.push(w);
+                        var hiddenDone=winStart-start;
+                        return (
+                          <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:6}}>
+                            {hiddenDone>0 && (
+                              <div style={{fontSize:11,fontWeight:800,color:C.accent,background:C.accent+"18",padding:"4px 13px",borderRadius:99,marginBottom:2}}>{"✓ 여기까지 "+hiddenDone+"개 완료"}</div>
+                            )}
+                            {win.map(function(i){
+                              var done=(i<doneCount), isCur=(i===currentIdx && !todayDoneAll);
+                              var off=zig[(i-start) % zig.length];
+                              var vb=(pool[i]&&pool[i].basic&&pool[i].basic.verb)||"";
+                              if(isCur){
+                                return (
+                                  <div key={i} onClick={props.onStartDaily} role="button" tabIndex={0}
+                                       onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onStartDaily();}}
+                                       style={{transform:"translateX("+off+"px)",display:"flex",flexDirection:"column",alignItems:"center",margin:"8px 0 12px",cursor:"pointer"}}>
+                                    <div style={{fontSize:12,fontWeight:900,color:"#08090d",background:C.accent,padding:"6px 14px",borderRadius:12,marginBottom:8,boxShadow:"0 6px 16px -4px "+C.accent+"cc",whiteSpace:"nowrap"}}>{stepTag}{" ▶"}</div>
+                                    <div style={{width:74,height:74,borderRadius:"50%",background:C.accent,border:"5px solid "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 26px -6px "+C.accent+"cc",animation:"pulse1 1.8s infinite"}}>
+                                      <span style={{fontSize:30}}>{"▶"}</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div key={i} title={vb} style={{transform:"translateX("+off+"px)",width:done?44:38,height:done?44:38,borderRadius:"50%",background:done?C.accent:C.surface,border:"3px solid "+(done?C.accent+"66":C.border),display:"flex",alignItems:"center",justifyContent:"center",margin:"6px 0",boxShadow:done?"0 4px 10px -4px "+C.accent+"66":"none"}}>
+                                  <span style={{fontSize:done?17:12,fontWeight:800,color:done?"#08090d":C.muted}}>{done?"✓":i+1}</span>
                                 </div>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div key={i} title={vb} style={{transform:"translateX("+off+"px)",width:done?44:38,height:done?44:38,borderRadius:"50%",background:done?C.accent:C.surface,border:"3px solid "+(done?C.accent+"66":C.border),display:"flex",alignItems:"center",justifyContent:"center",margin:"6px 0",boxShadow:done?"0 4px 10px -4px "+C.accent+"66":"none"}}>
-                              <span style={{fontSize:done?17:12,fontWeight:800,color:done?"#08090d":C.muted}}>{done?"✓":i+1}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
