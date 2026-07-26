@@ -277,8 +277,9 @@
       try { return JSON.parse(localStorage.getItem("tf_is_guest")); } catch { return false; }
     }
     function _storage(key) {
-      if (PERSIST_KEYS.indexOf(key) !== -1) return localStorage;
-      return _isGuest() ? sessionStorage : localStorage;
+      // 게스트도 localStorage에 저장 — 앱을 닫아도 진행이 유지되고(체험 이탈 방지),
+      // 나중에 로그인하면 그 진행이 클라우드로 병합된다. (예전엔 sessionStorage라 닫으면 소실)
+      return localStorage;
     }
     function loadLocal(key) {
       try { var v = _storage(key).getItem("tf_"+key); return v ? JSON.parse(v) : null; } catch { return null; }
