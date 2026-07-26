@@ -1600,47 +1600,33 @@
         else if (lp.phrasal && encounteredVerbs.indexOf(lp.phrasal.verb.toLowerCase()) !== -1) matchedIndices.push(i);
       });
 
+      // 순차 진행 — 아직 안 배운 '첫' 세트부터 준다. 이래야 학습 경로가 일관되게 앞으로 나아가고,
+      // 홈 경로·기록 여정맵·진행바가 전부 같은 그림을 보인다(회전식이면 40·41을 배웠는데 홈은 0번을 ✓로 표시하던 버그).
       var dayIndex = Math.floor(Date.now() / 86400000);
-      var idx1, idx2;
+      var learnedIdx = {};
+      Object.keys(learnedDates).forEach(function(d){ if(d!==todayKey) (learnedDates[d]||[]).forEach(function(i){ learnedIdx[i]=true; }); });
+      var chosen = [];
+      for (var si = 0; si < POOL.length && chosen.length < N_SETS; si++) { if (!learnedIdx[si]) chosen.push(si); }
 
-      if (matchedIndices.length >= 1) {
-        idx1 = matchedIndices[dayIndex % matchedIndices.length];
-        idx2 = ((dayIndex + 1) * 2) % POOL.length;
-        if (idx2 === idx1) idx2 = (idx2 + 1) % POOL.length;
-      } else {
-        idx1 = (dayIndex * 2) % POOL.length;
-        idx2 = (dayIndex * 2 + 1) % POOL.length;
-      }
-
-      // 모든 풀 다 학습했는지 체크
-      var allLearnedIndices = {};
-      Object.values(learnedDates).forEach(function(arr){arr.forEach(function(i){allLearnedIndices[i]=true;});});
-      var totalLearned = Object.keys(allLearnedIndices).length;
-
-      if (totalLearned >= POOL.length) {
+      // 모든 세트를 다 배웠으면 → 약한 동사 복습으로 채운다
+      if (chosen.length < N_SETS) {
         var weakIndices = [];
-        encountered.sort(function(a,b){return (b.count||1)-(a.count||1);}).forEach(function(e){
+        encountered.slice().sort(function(a,b){return (b.count||1)-(a.count||1);}).forEach(function(e){
           POOL.forEach(function(lp,i){
             if (lp.basic && lp.basic.verb === e.verb.toLowerCase()) weakIndices.push(i);
             if (lp.phrasal && lp.phrasal.verb === e.verb.toLowerCase()) weakIndices.push(i);
           });
         });
-        if (weakIndices.length >= 2) {
-          idx1 = weakIndices[dayIndex % weakIndices.length];
-          idx2 = weakIndices[(dayIndex+1) % weakIndices.length];
-          if (idx1 === idx2) idx2 = (idx2+1) % POOL.length;
+        for (var wi = 0; wi < weakIndices.length && chosen.length < N_SETS; wi++) {
+          var widx = weakIndices[(dayIndex + wi) % weakIndices.length];
+          if (chosen.indexOf(widx) === -1) chosen.push(widx);
         }
-      }
-
-      // 겹치지 않는 N_SETS개 세트 선택 (idx1·idx2 우선, 나머지는 날짜 기준 회전으로 채움)
-      var chosen = [];
-      function pushUniq(i){ if (POOL[i] && chosen.indexOf(i) === -1) chosen.push(i); }
-      pushUniq(idx1);
-      if (POOL.length > 1) pushUniq(idx2);
-      var guard = 0;
-      while (chosen.length < N_SETS && chosen.length < POOL.length && guard < POOL.length * 2) {
-        pushUniq((dayIndex * N_SETS + chosen.length + guard) % POOL.length);
-        guard++;
+        var guard = 0;
+        while (chosen.length < N_SETS && chosen.length < POOL.length && guard < POOL.length * 2) {
+          var fidx = (dayIndex * N_SETS + chosen.length + guard) % POOL.length;
+          if (chosen.indexOf(fidx) === -1) chosen.push(fidx);
+          guard++;
+        }
       }
 
       learnedDates[todayKey] = chosen;
@@ -1989,14 +1975,15 @@
             var baseN = base.length;
             var ld = load("learned_lesson_dates")||{};
             var tKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-            // '완료(done)'는 오늘 이전에 학습한 세트만 — 오늘 세트는 완료 여부로 따로 판단
-            // 경로는 '순차 진행' 모델 — 콘텐츠 회전(getTodayLesson)과 무관하게, 지금까지 익힌 세트 수만큼
-            // 앞 노드가 채워지고 그다음 노드가 '현재'가 된다. 항상 단조 증가 → 듀오링고식 길과 일치.
-            var seen={}; Object.keys(ld).forEach(function(d){ if(d!==tKey) (ld[d]||[]).forEach(function(i){ if(i<total) seen[i]=1; }); });
+            // 완료 = 실제로 학습한 세트 인덱스 수. 오늘 세트는 '완료(출석 daysLog에 오늘)'일 때만 포함.
+            // getTodayLesson이 순차로 주므로 seen은 {0,1,...} 형태 → 홈·기록·진행바가 완전히 일치한다.
+            var _dl=(load("attendance")||{}).daysLog||[];
+            var _todayDone=_dl.indexOf(tKey)!==-1;
+            var seen={}; Object.keys(ld).forEach(function(d){ if(d!==tKey || _todayDone) (ld[d]||[]).forEach(function(i){ if(i<total) seen[i]=1; }); });
             var meDone=!!props.todayMeDone, learnDone=!!props.verbDone, applyDone=!!props.applyDone;
             var stepDone=(meDone?1:0)+(learnDone?1:0)+(applyDone?1:0);
             var todayDoneAll=meDone&&learnDone&&applyDone;
-            var doneCount = Object.keys(seen).length + (todayDoneAll?1:0);
+            var doneCount = Object.keys(seen).length;
             if(doneCount>total) doneCount=total;
             var currentIdx = doneCount<total ? doneCount : -1;
             var pct = Math.round(doneCount/total*100);
@@ -4394,10 +4381,14 @@
 
           {/* 학습 여정 — 코스 진행 맵 (경쟁앱 벤치마크: 듀오링고식 '어디까지 왔나/뭐가 다음') */}
           {(function(){
-            var pool = (typeof LESSON_POOL!=="undefined") ? LESSON_POOL : (window.LESSON_POOL_REF||[]);
+            var _base = (typeof LESSON_POOL!=="undefined") ? LESSON_POOL : (window.LESSON_POOL_REF||[]);
+            var pool = _base.concat(load("my_lesson_pool")||[]);   // 내가 만든 표현(커스텀 세트)도 여정에 포함(홈과 통일)
             var total = pool.length; if(!total) return null;
             var ld = load("learned_lesson_dates")||{};
-            var studied = {}; Object.keys(ld).forEach(function(d){ (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
+            // 오늘은 시작만 하면 learned_lesson_dates에 세트가 잡히므로, '완료(daysLog에 오늘)'일 때만 여정에 반영.
+            var _tk=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+            var _todayDone=(att.daysLog||[]).indexOf(_tk)!==-1;
+            var studied = {}; Object.keys(ld).forEach(function(d){ if(d!==_tk || _todayDone) (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
             var doneCount = Object.keys(studied).length;
             var nextIdx = -1; for(var i=0;i<total;i++){ if(!studied[i]){ nextIdx=i; break; } }
             var USZ=4;
@@ -4895,7 +4886,9 @@
       var dayIndex = Math.floor(Date.now() / 86400000);
       var todays = [];
       for (var i = 0; i < 5 && SITU.length > 0; i++) todays.push(SITU[(dayIndex * 5 + i) % SITU.length]);
-      var _a = useState(0), idx = _a[0], setIdx = _a[1];
+      var _tmk=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+      var _a = useState(function(){ var v=loadLocal("todayme_idx_"+_tmk); return (typeof v==="number"&&v>=0&&v<todays.length)?v:0; }), idx = _a[0], _setIdxRaw = _a[1];
+      var setIdx = function(v){ _setIdxRaw(v); try{ saveLocal("todayme_idx_"+_tmk, v); }catch(e){} };
       var _b = useState("prompt"), phase = _b[0], setPhase = _b[1];
       var _c = useState(null), finalStreak = _c[0], setFinalStreak = _c[1];
       var _d = useState(""), interim = _d[0], setInterim = _d[1];
