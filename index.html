@@ -4582,7 +4582,7 @@
 
           {/* 모드 토글 */}
           <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10}}>{"학습 모드"}</div>
-          {toRow("🚇 지하철 모드","말·듣기 없이 탭으로만 풀어요. 지하철·회의·도서관에서.",subway,function(){var n=!subway;setSubway(n);save("subway_mode",n);})}
+          {toRow("🔇 매너 모드","소리 없이 — 말·듣기 문제 빼고 탭으로만. 지하철·회의·도서관에서.",subway,function(){var n=!subway;setSubway(n);save("subway_mode",n);})}
           {toRow(sfxMuted?"🔇 효과음":"🔊 효과음","정답·레벨업 소리로 더 신나게",!sfxMuted,function(){var n=!sfxMuted;setSfxMuted(n);save("sfx_muted",n);if(n===false)SFX.correct();})}
 
           {/* 계정 · 설정 */}

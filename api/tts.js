@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     );
     const data = await r.json();
     const audioPart = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (!audioPart || !audioPart.data) return res.status(502).json({ error: "TTS 생성 실패" });
+    if (!audioPart || !audioPart.data) return res.status(502).json({ error: "TTS 생성 실패", upstreamStatus: r.status, upstreamError: (data && data.error) ? { code: data.error.code, status: data.error.status, message: (data.error.message||"").slice(0,300) } : null });
 
     // PCM L16 24kHz → WAV로 변환
     const pcmBuffer = Buffer.from(audioPart.data, "base64");
