@@ -292,7 +292,12 @@
     // 브라우저는 사용자 제스처 전엔 오디오를 막으므로 첫 탭에서 unlock한다.
     var SFX = (function(){
       var ctx = null;
-      function ac(){ if(!ctx){ try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ctx=null; } } return ctx; }
+      function ac(){
+        if(!ctx){ try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ctx=null; } }
+        // 매 재생 직전 resume — 제스처 안에서 호출되므로 확실히 잠금 해제된다(iOS/Safari 대응).
+        if(ctx && ctx.state === "suspended"){ try{ ctx.resume(); }catch(e){} }
+        return ctx;
+      }
       function muted(){ return load("sfx_muted") === true; }
       function tone(freq, start, dur, type, gain){
         var c = ac(); if(!c) return;
@@ -319,11 +324,17 @@
         complete: function(){ if(muted())return; [659.25,783.99,1046.5,1318.51].forEach(function(f,i){ tone(f,i*0.1,0.26,"triangle",0.16); }); }
       };
     })();
-    // 첫 사용자 제스처에서 오디오 잠금 해제 (한 번만)
+    // 첫 제스처에서 오디오 잠금 해제 + 버튼/탭 요소를 누를 때마다 미세한 탭 소리(듀오링고식 '살아있는' 느낌).
     (function(){
-      function unlock(){ SFX.unlock(); document.removeEventListener("pointerdown", unlock); document.removeEventListener("touchstart", unlock); }
-      document.addEventListener("pointerdown", unlock, {passive:true});
-      document.addEventListener("touchstart", unlock, {passive:true});
+      var unlocked = false;
+      document.addEventListener("pointerdown", function(e){
+        if(!unlocked){ SFX.unlock(); unlocked = true; }
+        var el = e.target;
+        for(var i=0;i<4 && el;i++){
+          if(el.tagName==="BUTTON" || (el.classList && el.classList.contains("tf-press")) || (el.getAttribute && el.getAttribute("role")==="button")){ SFX.tap(); break; }
+          el = el.parentElement;
+        }
+      }, {passive:true});
     })();
 
     // 테스트용: ?reset / ?fresh → 저장된 학습기록 비우고 '처음 시작하는 앱'처럼.
@@ -729,6 +740,37 @@
       u.lang = "en-US";
       u.rate = 0.9;
       window.speechSynthesis.speak(u);
+    }
+
+    // ── TTS 프리페치 ───────────────────────────────────────────────
+    // 와이프 피드백: 🔊 누를 때 API 호출하면 느림 → 화면 뜰 때 미리 받아 ttsCache에 넣어두면
+    // 탭 즉시 재생. 동시 3개로 제한해 클라우드함수·데이터 부담 최소화.
+    var ttsPending = {}, ttsQueue = [], ttsActive = 0;
+    var TTS_MAX = 3;
+    function pumpTTS() {
+      while (ttsActive < TTS_MAX && ttsQueue.length) {
+        var clean = ttsQueue.shift();
+        if (ttsCache[clean] || ttsPending[clean]) continue;
+        ttsPending[clean] = true; ttsActive++;
+        (function(c){
+          fetch(API_BASE+"/api/tts", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({text:c}) })
+            .then(function(r){return r.json();})
+            .then(function(d){ if (d && d.audio) ttsCache[c] = d.audio; })
+            .catch(function(){})
+            .then(function(){ delete ttsPending[c]; ttsActive--; pumpTTS(); });
+        })(clean);
+      }
+    }
+    // texts: 문자열 또는 문자열 배열 — 재생하지 않고 캐시만 미리 채운다.
+    function prefetchTTS(texts) {
+      if (!texts) return;
+      (Array.isArray(texts) ? texts : [texts]).forEach(function(t){
+        if (!t) return;
+        var clean = String(t).replace(/\*\*/g, "").trim();
+        if (!clean || clean.length > 240 || ttsCache[clean] || ttsPending[clean]) return;
+        if (ttsQueue.indexOf(clean) === -1) ttsQueue.push(clean);
+      });
+      pumpTTS();
     }
 
     // ── WEAK VERBS ─────────────────────────────────────────────────
@@ -4931,6 +4973,20 @@
       var _s1=useState("home"); var tab=_s1[0]; var setTab=_s1[1];
       var _s2=useState("home"); var screen=_s2[0]; var setScreen=_s2[1];
       var _s3=useState(null); var lessons=_s3[0]; var setLessons=_s3[1];
+      // 레슨이 로드되면 그 안의 영어(동사·예문·혼동어)를 미리 TTS 캐시에 받아둔다 → 🔊 탭 즉시 재생(와이프 피드백).
+      useEffect(function(){
+        if (!lessons) return;
+        var texts = [];
+        lessons.forEach(function(l){
+          [l && l.basic, l && l.phrasal].forEach(function(it){
+            if (!it) return;
+            if (it.verb) texts.push(it.verb);
+            (it.examples||[]).forEach(function(ex){ if (ex && ex.english) texts.push(ex.english); });
+            if (it.confuse_with){ if(it.confuse_with.example_this) texts.push(it.confuse_with.example_this); if(it.confuse_with.example_other) texts.push(it.confuse_with.example_other); }
+          });
+        });
+        prefetchTTS(texts);
+      }, [lessons]);
       var _s4=useState(false); var todayDone=_s4[0]; var setTodayDone=_s4[1];
       // v1.8.x 물흐르듯: 데일리 흐름(오늘의 나 → 단어 학습)이 진행 중인지. 완료 시 홈이 아니라 다음 단계로 밀어준다.
       var _df=useState(false); var dailyFlow=_df[0]; var setDailyFlow=_df[1];
