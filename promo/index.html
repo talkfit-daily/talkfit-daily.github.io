@@ -55,7 +55,7 @@
     var n=String(i+1).padStart(2,"0");
     var d=document.createElement("div");d.className="post";
     d.innerHTML='<div class="idx">'+n+' / 10</div>'+
-      '<img src="card-'+n+'.png" alt="거꾸로 영어 '+n+'">'+
+      '<img src="card-'+n+'.png?v=3" alt="거꾸로 영어 '+n+'">'+
       '<div class="savetip">👆 이미지를 꾹 눌러 “사진에 저장”</div>'+
       '<div class="cap"><div class="h"><span>📋 캡션</span><button class="copy" data-i="'+i+'">복사</button></div><pre id="c'+i+'">'+CAPS[i]+'</pre><div class="tags">'+TAGS+'</div></div>';
     host.appendChild(d);
