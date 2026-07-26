@@ -1575,6 +1575,18 @@
     // v1.6.0: 하루 1세트(2동사) → 2세트(4동사)로 복원.
     //   v1.1.0에서 4동사→2동사로 줄였는데, "하루 15분" 문구 대비 실제 5~7분밖에 안 돼
     //   유저가 "이게 다야?" 하고 이탈하는 원인이 됐다.
+    // 게스트(로그인 안 함)는 맛보기로 앞 6세트(≈3일치)만. 그 뒤엔 회원가입 유도 →
+    //   가입하면 40세트 전체 + 클라우드 저장 + 40세트 이후 맞춤 학습(내가 쓴 말·약한 동사)이 열린다.
+    var GUEST_SET_LIMIT = 6;
+    // 이미 완료한(오늘 제외) 세트 수 — 게스트 한도 판정에 쓴다.
+    function _learnedSetCount() {
+      var ld = load("learned_lesson_dates") || {};
+      var tk = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+      var _dl=(load("attendance")||{}).daysLog||[]; var _todayDone=_dl.indexOf(tk)!==-1;
+      var seen={}; Object.keys(ld).forEach(function(d){ if(d!==tk || _todayDone) (ld[d]||[]).forEach(function(i){ seen[i]=1; }); });
+      return Object.keys(seen).length;
+    }
+
     // v1.6.0: 개인 AI 레슨 풀을 게스트에게도 개방.
     //   기존엔 로그인해야만 my_lesson_pool 을 읽어서, 대부분의 유저에게는
     //   고정 21세트가 전부였다. 무한 콘텐츠 장치를 만들어놓고 잠가둔 셈.
@@ -1635,9 +1647,13 @@
       return chosen.map(function(i){ return POOL[i]; }).filter(Boolean);
     }
 
-    async function generateNewLesson(completedVerbs) {
+    async function generateNewLesson(completedVerbs, focusVerbs) {
       var system = 'You help Korean students learn American English. Generate a lesson with a basic verb AND a phrasal verb that shares the same root (e.g., get -> get over). NEVER use these already-learned verbs: ' + completedVerbs.join(", ") + '. Return ONLY valid JSON: {"basic":{"verb":"...","meaning_ko":"...","meaning_en":"...","meanings":[{"meaning":"","example":""}],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","bad_reason":"왜 어색한지 한국어 1문장","good_example":"","practice_hint":""},"phrasal":{"verb":"... (must share same root as basic verb)","meaning_ko":"...","meaning_en":"...","meanings":[],"examples":[{"situation":"","english":"","korean":""}],"bad_example":"","bad_reason":"왜 어색한지 한국어 1문장","good_example":"","practice_hint":""}}';
-      var raw = await callClaude(system, "Generate today's lesson. Pick a common English verb not yet learned. The phrasal verb MUST share the same root verb. Focus on daily American English usage.");
+      // 개인화: 유저가 실제로 자주 쓰거나 틀린 동사를 중심으로 (없으면 흔한 일상 동사)
+      var userMsg = (focusVerbs && focusVerbs.length)
+        ? 'Build the lesson around this verb the learner actually uses often but struggles with: "' + focusVerbs[0] + '". If it is unsuitable, pick a closely related everyday verb. The phrasal verb MUST share the same root. Focus on daily American English.'
+        : "Generate today's lesson. Pick a common English verb not yet learned. The phrasal verb MUST share the same root verb. Focus on daily American English usage.";
+      var raw = await callClaude(system, userMsg);
       return JSON.parse(raw.replace(/```json|```/g,"").trim());
     }
 
@@ -1997,7 +2013,8 @@
             var activeUnit=THEMES.length-1;
             if(currentIdx!==-1) for(var u=0;u<THEMES.length;u++){ if(currentIdx>=THEMES[u].s && currentIdx<THEMES[u].en){activeUnit=u;break;} }
             var zig=[0,46,66,46,0,-46,-66,-46];
-            var stepTag=todayDoneAll?"오늘 다 했어요 🎉":(stepDone===0?"오늘 학습 시작":"이어서 "+stepDone+"/3단계");
+            var guestLocked = !!props.isGuest && doneCount >= GUEST_SET_LIMIT;
+            var stepTag=guestLocked?"🔒 가입하고 계속":(todayDoneAll?"오늘 다 했어요 🎉":(stepDone===0?"오늘 학습 시작":"이어서 "+stepDone+"/3단계"));
             return (
               <div style={{marginBottom:20}}>
                 {/* 전체 진행 바 */}
@@ -2008,6 +2025,17 @@
                 <div style={{height:8,background:C.surface,border:"1px solid "+C.border,borderRadius:99,overflow:"hidden",marginBottom:18}}>
                   <div style={{width:pct+"%",height:"100%",background:C.accent,borderRadius:99,transition:"width 0.5s"}}/>
                 </div>
+
+                {/* 게스트 맛보기 한도 도달 → 회원가입 유도 (가입하면 40세트 전체 + 클라우드 저장 + 40세트 이후 맞춤 학습) */}
+                {guestLocked&&(
+                  <div onClick={props.onSignup} role="button" tabIndex={0}
+                       onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onSignup&&props.onSignup();}}
+                       style={{marginBottom:18,padding:"18px 18px",background:"linear-gradient(135deg,"+C.accent+","+C.accent+"cc)",borderRadius:18,boxShadow:"0 8px 22px -6px "+C.accent+"88",cursor:"pointer",color:"#fff"}}>
+                    <div style={{fontSize:15,fontWeight:900,marginBottom:5}}>{"🎉 맛보기 "+GUEST_SET_LIMIT+"세트 완료!"}</div>
+                    <div style={{fontSize:12.5,lineHeight:1.55,opacity:0.95,marginBottom:12}}>{"무료 회원가입하면 전체 40세트가 열리고, 진행이 안전하게 저장돼요. 다 끝내면 내가 쓴 말로 만든 나만의 맞춤 학습까지."}</div>
+                    <div style={{background:"#fff",color:C.accent,fontWeight:900,fontSize:14,textAlign:"center",padding:"12px 0",borderRadius:12}}>{"무료로 회원가입하고 계속 →"}</div>
+                  </div>
+                )}
 
                 {THEMES.map(function(t,ui){
                   var start=t.s, end=t.en; if(start>=end) return null;
@@ -5387,6 +5415,33 @@
         })();
       }, [user]);
 
+      // 40세트 이후 맞춤 학습(로그인 유저 전용 혜택) — 기본 40세트를 다 끝내고 개인 레슨 풀도
+      //   거의 소진하면, 유저가 실제로 자주 쓴/틀린 동사로 나만의 레슨을 하루 1개 자동 생성해
+      //   "⭐ 내가 만든 표현" 여정이 무한히 이어지게. 하루 1개로 제한해 AI 할당량을 아낀다.
+      useEffect(function(){
+        if (!user) return;                              // 로그인 유저만
+        if (typeof callClaude!=="function") return;
+        var base = LESSON_POOL.length;
+        if (_learnedSetCount() < base) return;          // 아직 기본 40세트 진행 중
+        var tk = todayKey();
+        if (loadLocal("autolesson_"+tk)) return;        // 하루 1개
+        var ld = load("learned_lesson_dates")||{}; var seen={};
+        Object.keys(ld).forEach(function(d){(ld[d]||[]).forEach(function(i){seen[i]=1;});});
+        var myPool = load("my_lesson_pool")||[];
+        var remaining=0; for(var i=base;i<base+myPool.length;i++){ if(!seen[i]) remaining++; }
+        if (remaining >= 2) return;                     // 개인 레슨 풀에 아직 여유
+        saveLocal("autolesson_"+tk, true);
+        var learnedVerbs=[]; LESSON_POOL.concat(myPool).forEach(function(l){ if(l&&l.basic)learnedVerbs.push(l.basic.verb); if(l&&l.phrasal)learnedVerbs.push(l.phrasal.verb); });
+        var enc=(load("my_encountered_verbs")||[]).slice().sort(function(a,b){return (b.count||1)-(a.count||1);});
+        var focus=enc.filter(function(e){return learnedVerbs.indexOf((e.verb||"").toLowerCase())===-1;}).map(function(e){return e.verb;});
+        generateNewLesson(learnedVerbs, focus).then(function(nl){
+          if(!nl||!nl.basic||!nl.phrasal) return;
+          var p=load("my_lesson_pool")||[]; p.push(nl); save("my_lesson_pool",p);
+          if(user) saveCloud(user.uid,"my_lesson_pool",p);
+          setLessons(getTodayLesson());
+        }).catch(function(){});
+      }, [user, todayDone]);
+
       useEffect(function(){
         track("visit");
         // 출석 보너스는 훈련 완료 시에만 (handleComplete 또는 회화 완료 시)
@@ -5435,6 +5490,10 @@
       // v1.8.x 물흐르듯: 홈의 단일 "오늘 시작" — 아직 안 한 단계로 바로 데려간다.
       // 오늘의 나 → 단어 학습 → (둘 다 끝났으면) 복습. 유저가 "뭐부터 하지"를 고를 필요 없음.
       var startDaily = function() {
+        // 게스트가 맛보기 한도를 다 쓰면 → 학습을 시작하는 대신 회원가입 화면으로 유도.
+        if (isGuest && _learnedSetCount() >= GUEST_SET_LIMIT) {
+          setIsGuest(false); saveLocal("is_guest", false); return;
+        }
         setDailyFlow(true);
         var meDone = !!loadLocal("todayme_done_"+todayKey());
         var learnDone = !!loadLocal("verb_done_"+todayKey());
@@ -5666,7 +5725,7 @@
           </div>
 
           <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:120}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} verbDone={!!loadLocal("verb_done_"+todayKey())} applyDone={!!loadLocal("apply_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} onReverse={function(){setScreen("reverse");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} isGuest={isGuest} onSignup={function(){setIsGuest(false);saveLocal("is_guest",false);}} verbDone={!!loadLocal("verb_done_"+todayKey())} applyDone={!!loadLocal("apply_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} onReverse={function(){setScreen("reverse");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
             {screen==="reverse"&&<ReverseScreen/>}
             {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} flow={dailyFlow} onNext={function(){ if(!loadLocal("verb_done_"+todayKey())){ handleStart(); } else { setDailyFlow(false); setScreen("home"); setTab("home"); } }} streak={streak} aiAvailable={aiAvailable}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
