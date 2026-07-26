@@ -4368,8 +4368,9 @@
       );
       return (
         <div style={{padding:"24px 20px"}}>
-          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:8}}>HISTORY</div>
-          <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>나의 통계</div>
+          <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:8}}>LEARNING</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>학습 기록</div>
+          <div style={{fontSize:12.5,color:C.muted,marginBottom:20}}>{"내가 어디까지 왔고 뭘 익혔는지 (레벨·연속은 '나' 탭에)"}</div>
 
           {/* 학습 여정 — 코스 진행 맵 (경쟁앱 벤치마크: 듀오링고식 '어디까지 왔나/뭐가 다음') */}
           {(function(){
@@ -4450,24 +4451,7 @@
           })()}
 
           {/* 통계 카드 */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
-            <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:12,padding:14}}>
-              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"누적 학습일"}</div>
-              <div style={{fontSize:22,fontWeight:900,color:C.accent}}>{att.totalDays||0}{"일"}</div>
-            </div>
-            <div style={{background:C.surface,border:"1px solid "+C.orange+"30",borderRadius:12,padding:14}}>
-              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"최장 연속"}</div>
-              <div style={{fontSize:22,fontWeight:900,color:C.orange}}>{att.longestStreak||0}{"일"}</div>
-            </div>
-            <div style={{background:C.surface,border:"1px solid "+C.yellow+"30",borderRadius:12,padding:14}}>
-              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"총 획득 XP"}</div>
-              <div style={{fontSize:22,fontWeight:900,color:C.yellow}}>{(st.totalEarned||st.xp||0).toLocaleString()}</div>
-            </div>
-            <div style={{background:C.surface,border:"1px solid "+C.blue+"30",borderRadius:12,padding:14}}>
-              <div style={{fontSize:10,color:C.muted,marginBottom:4}}>{"학습한 동사"}</div>
-              <div style={{fontSize:22,fontWeight:900,color:C.blue}}>{encountered.length}{"개"}</div>
-            </div>
-          </div>
+          {/* 통계 숫자(누적·연속·XP)는 '나' 탭으로 이동 — 기록은 '뭘 배웠나(여정·표현)'에 집중(대표: 나/기록 차이 명확히) */}
 
 
           {/* 순위 */}
