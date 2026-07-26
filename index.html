@@ -1970,8 +1970,11 @@
 
           {/* ── 학습 경로(길) — 듀오링고식 홈: 열면 내 여정이 보이고 다음 노드를 눌러 오늘 학습 시작 (v2.0 A안) ────── */}
           {(function(){
-            var pool = (typeof LESSON_POOL!=="undefined") ? LESSON_POOL : (window.LESSON_POOL_REF||[]);
+            var base = (typeof LESSON_POOL!=="undefined") ? LESSON_POOL : (window.LESSON_POOL_REF||[]);
+            var myPool = load("my_lesson_pool") || [];
+            var pool = base.concat(myPool);          // 40세트가 끝이 아니다 — 내가 쓴 말이 AI 레슨이 되어 여정이 계속 늘어난다
             var total = pool.length; if(!total) return null;
+            var baseN = base.length;
             var ld = load("learned_lesson_dates")||{};
             var tKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
             // '완료(done)'는 오늘 이전에 학습한 세트만 — 오늘 세트는 완료 여부로 따로 판단
@@ -1985,10 +1988,16 @@
             if(doneCount>total) doneCount=total;
             var currentIdx = doneCount<total ? doneCount : -1;
             var pct = Math.round(doneCount/total*100);
-            var THEMES=[{e:"☕",n:"일상 표현"},{e:"💬",n:"감정·관계"},{e:"💼",n:"일·성장"},{e:"✈️",n:"여행·경험"}];
-            var per=Math.ceil(total/THEMES.length);
+            var q=Math.ceil(baseN/4);
+            var THEMES=[
+              {e:"☕",n:"일상 표현",s:0,en:Math.min(baseN,q)},
+              {e:"💬",n:"감정·관계",s:Math.min(baseN,q),en:Math.min(baseN,q*2)},
+              {e:"💼",n:"일·성장",s:Math.min(baseN,q*2),en:Math.min(baseN,q*3)},
+              {e:"✈️",n:"여행·경험",s:Math.min(baseN,q*3),en:baseN}
+            ];
+            if(myPool.length) THEMES.push({e:"⭐",n:"내가 만든 표현",s:baseN,en:total});
             var activeUnit=THEMES.length-1;
-            if(currentIdx!==-1) for(var u=0;u<THEMES.length;u++){ if(currentIdx>=u*per && currentIdx<Math.min(total,u*per+per)){activeUnit=u;break;} }
+            if(currentIdx!==-1) for(var u=0;u<THEMES.length;u++){ if(currentIdx>=THEMES[u].s && currentIdx<THEMES[u].en){activeUnit=u;break;} }
             var zig=[0,46,66,46,0,-46,-66,-46];
             var stepTag=todayDoneAll?"오늘 완료 🎉":(stepDone===0?"오늘의 학습 · 약 20분":"이어서 · "+stepDone+"/3 단계");
             return (
@@ -2003,7 +2012,7 @@
                 </div>
 
                 {THEMES.map(function(t,ui){
-                  var start=ui*per, end=Math.min(total,start+per); if(start>=total) return null;
+                  var start=t.s, end=t.en; if(start>=end) return null;
                   var idxs=[]; for(var k=start;k<end;k++) idxs.push(k);
                   var uDone=Math.max(0,Math.min(idxs.length, doneCount-start));
                   var uComplete=uDone===idxs.length;
