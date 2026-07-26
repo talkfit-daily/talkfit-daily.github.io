@@ -1988,13 +1988,11 @@
             if(doneCount>total) doneCount=total;
             var currentIdx = doneCount<total ? doneCount : -1;
             var pct = Math.round(doneCount/total*100);
-            var q=Math.ceil(baseN/4);
-            var THEMES=[
-              {e:"☕",n:"일상 표현",s:0,en:Math.min(baseN,q)},
-              {e:"💬",n:"감정·관계",s:Math.min(baseN,q),en:Math.min(baseN,q*2)},
-              {e:"💼",n:"일·성장",s:Math.min(baseN,q*2),en:Math.min(baseN,q*3)},
-              {e:"✈️",n:"여행·경험",s:Math.min(baseN,q*3),en:baseN}
-            ];
+            // 4개로 뭉치면 '짜바리'처럼 보인다는 피드백 → 4세트씩 잘게 나눠 10단계 코스처럼 (자주 나오는 🏆 성취감)
+            var UNIT_SIZE=4;
+            var UNAMES=[{e:"☕",n:"첫 마디"},{e:"💬",n:"일상 대화"},{e:"🙂",n:"감정 표현"},{e:"🤝",n:"사람·관계"},{e:"💼",n:"일·직장"},{e:"🛒",n:"생활·쇼핑"},{e:"✈️",n:"여행"},{e:"🎬",n:"취미·문화"},{e:"🔥",n:"자연스럽게"},{e:"🏅",n:"고급 표현"}];
+            var THEMES=[];
+            for(var ti=0; ti*UNIT_SIZE<baseN; ti++){ var nm=UNAMES[ti % UNAMES.length]; THEMES.push({e:nm.e,n:nm.n,s:ti*UNIT_SIZE,en:Math.min(baseN,(ti+1)*UNIT_SIZE)}); }
             if(myPool.length) THEMES.push({e:"⭐",n:"내가 만든 표현",s:baseN,en:total});
             var activeUnit=THEMES.length-1;
             if(currentIdx!==-1) for(var u=0;u<THEMES.length;u++){ if(currentIdx>=THEMES[u].s && currentIdx<THEMES[u].en){activeUnit=u;break;} }
@@ -5040,7 +5038,13 @@
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:20,padding:22,boxShadow:"0 10px 26px -16px rgba(0,0,0,0.7)"}}>
                 <span style={{display:"inline-block",fontSize:11,fontWeight:800,color:C.accent,background:C.accentDim,padding:"4px 11px",borderRadius:99,marginBottom:14}}>{it.tag}</span>
                 <div style={{fontSize:21,fontWeight:800,lineHeight:1.45}}>{it.ko}</div>
-                <div style={{marginTop:20,textAlign:"center",fontSize:13.5,color:C.muted,fontWeight:600}}>{canRecognize?"🎤 영어로 말하면 ":"🎤 먼저 "}<b style={{color:C.text}}>{canRecognize?"채점해드려요":"영어로 직접"}</b>{canRecognize?"":" 말해보세요"}</div>
+                {it.key ? (
+                  <div style={{marginTop:16,display:"flex",alignItems:"center",gap:9,background:C.accentDim,border:"1px solid "+C.accent+"40",borderRadius:13,padding:"10px 14px"}}>
+                    <span style={{fontSize:12,color:C.muted,fontWeight:700,flexShrink:0}}>{"이 동사로 👉"}</span>
+                    <span style={{fontSize:16,fontWeight:900,color:C.accent}}>{it.key}</span>
+                  </div>
+                ) : null}
+                <div style={{marginTop:18,textAlign:"center",fontSize:13.5,color:C.muted,fontWeight:600}}>{canRecognize?"🎤 영어로 말하면 ":"🎤 먼저 "}<b style={{color:C.text}}>{canRecognize?"채점해드려요":"영어로 직접"}</b>{canRecognize?"":" 말해보세요"}</div>
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12,marginTop:22}}>
                 <button onClick={function(){ if(canRecognize){ startListening(it); } else { setPhase("reveal"); speakEnglish(it.en); } }} style={{width:96,height:96,borderRadius:"50%",border:"none",background:C.accent,color:"#08090d",fontSize:32,cursor:"pointer",boxShadow:"0 10px 34px -6px "+C.accent+"99"}}>{"🎤"}</button>
