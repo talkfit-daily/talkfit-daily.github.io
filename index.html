@@ -5363,11 +5363,15 @@
 
       useEffect(function() {
         fbAuth.getRedirectResult().catch(function(e){ console.error("Redirect error:", e); });
+        // Firebase가 (네트워크 차단·인증 저장소 문제 등으로) onAuthStateChanged를 못 보내면
+        // 앱이 "로딩 중..."에 영원히 걸린다. 6초 안에 응답이 없으면 비로그인으로 간주하고 진행.
+        var authTimer = setTimeout(function(){ setAuthLoading(false); }, 6000);
         var unsub = fbAuth.onAuthStateChanged(function(u) {
+          clearTimeout(authTimer);
           setUser(u);
           setAuthLoading(false);
-        });
-        return unsub;
+        }, function(){ clearTimeout(authTimer); setAuthLoading(false); });
+        return function(){ clearTimeout(authTimer); if(unsub) unsub(); };
       }, []);
 
       useEffect(function(){
