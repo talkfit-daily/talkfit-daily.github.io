@@ -4399,8 +4399,9 @@
             var studied = {}; Object.keys(ld).forEach(function(d){ (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
             var doneCount = Object.keys(studied).length;
             var nextIdx = -1; for(var i=0;i<total;i++){ if(!studied[i]){ nextIdx=i; break; } }
-            var THEMES=[{e:"☕",n:"일상 표현"},{e:"💬",n:"감정·관계"},{e:"💼",n:"일·성장"},{e:"✈️",n:"여행·경험"}];
-            var per=Math.ceil(total/THEMES.length);
+            var USZ=4;
+            var UNM=[{e:"☕",n:"첫 마디"},{e:"💬",n:"일상 대화"},{e:"🙂",n:"감정 표현"},{e:"🤝",n:"사람·관계"},{e:"💼",n:"일·직장"},{e:"🛒",n:"생활·쇼핑"},{e:"✈️",n:"여행"},{e:"🎬",n:"취미·문화"},{e:"🔥",n:"자연스럽게"},{e:"🏅",n:"고급 표현"}];
+            var THEMES=[]; for(var ui2=0; ui2*USZ<total; ui2++){ var nm2=UNM[ui2%UNM.length]; THEMES.push({e:nm2.e,n:nm2.n,s:ui2*USZ,en:Math.min(total,(ui2+1)*USZ)}); }
             var pct=Math.round(doneCount/total*100);
             return (
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:18,marginBottom:20}}>
@@ -4413,12 +4414,12 @@
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
                   {THEMES.map(function(t,ui){
-                    var start=ui*per, end=Math.min(total,start+per); if(start>=total) return null;
+                    var start=t.s, end=t.en; if(start>=end) return null;
                     var idxs=[]; for(var k=start;k<end;k++) idxs.push(k);
                     var uDone=idxs.filter(function(i){return studied[i];}).length;
                     var uComplete=uDone===idxs.length;
                     return (
-                      <div key={ui} style={{opacity:(start<=(nextIdx===-1?total:nextIdx+per)?1:0.55)}}>
+                      <div key={ui} style={{opacity:((nextIdx===-1||start<=nextIdx+4)?1:0.55)}}>
                         <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
                           <span style={{fontSize:15}}>{uComplete?"🏆":t.e}</span>
                           <span style={{fontSize:13,fontWeight:700,color:C.text}}>{t.n}</span>
@@ -4431,8 +4432,8 @@
                             var bd=done?C.accent:(isNext?C.accent:C.border);
                             var vb=(pool[i]&&pool[i].basic&&pool[i].basic.verb)||"";
                             return (
-                              <div key={i} title={vb} style={{width:30,height:30,borderRadius:"50%",background:bg,border:"2px solid "+bd,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,animation:isNext?"pulse1 1.6s infinite":"none",position:"relative"}}>
-                                <span style={{fontSize:11,fontWeight:800,color:done?"#08090d":(isNext?C.accent:C.muted)}}>{done?"✓":(isNext?"▶":i+1)}</span>
+                              <div key={i} title={vb} style={{width:30,height:30,borderRadius:"50%",background:bg,border:"2px solid "+bd,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,position:"relative"}}>
+                                <span style={{fontSize:isNext?13:11,fontWeight:800,color:done?"#08090d":(isNext?C.accent:C.muted)}}>{done?"✓":(isNext?"📍":i+1)}</span>
                               </div>
                             );
                           })}
@@ -4441,7 +4442,7 @@
                     );
                   })}
                 </div>
-                <div style={{fontSize:11,color:C.muted,marginTop:13,lineHeight:1.5}}>{nextIdx===-1?"모든 세트를 익혔어요! 복습으로 굳혀요 💪":"매일 학습하면 ▶ 다음 세트로 나아가요. 유닛을 다 채우면 🏆"}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:13,lineHeight:1.5}}>{nextIdx===-1?"모든 세트를 익혔어요! 복습으로 굳혀요 💪":"📍 지금 여기까지 왔어요. 매일 학습하면 다음으로 나아가요. 유닛을 다 채우면 🏆"}</div>
               </div>
             );
           })()}
