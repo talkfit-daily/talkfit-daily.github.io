@@ -1966,7 +1966,7 @@
 
       return (
         <div style={{padding:"18px 18px 44px"}}>
-          <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:18,letterSpacing:-0.2}}>{greeting.t}<span style={{color:C.muted,fontWeight:600}}>{"  ·  "+greeting.s}</span></div>
+          <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:18,letterSpacing:-0.2}}>{greeting.t}<span style={{color:C.muted,fontWeight:600}}>{"  "+greeting.s}</span></div>
 
           {/* ── 학습 경로(길) — 듀오링고식 홈: 열면 내 여정이 보이고 다음 노드를 눌러 오늘 학습 시작 (v2.0 A안) ────── */}
           {(function(){
@@ -1999,7 +1999,7 @@
             var activeUnit=THEMES.length-1;
             if(currentIdx!==-1) for(var u=0;u<THEMES.length;u++){ if(currentIdx>=THEMES[u].s && currentIdx<THEMES[u].en){activeUnit=u;break;} }
             var zig=[0,46,66,46,0,-46,-66,-46];
-            var stepTag=todayDoneAll?"오늘 완료 🎉":(stepDone===0?"오늘의 학습 · 약 20분":"이어서 · "+stepDone+"/3 단계");
+            var stepTag=todayDoneAll?"오늘 다 했어요 🎉":(stepDone===0?"오늘 학습 시작":"이어서 "+stepDone+"/3단계");
             return (
               <div style={{marginBottom:20}}>
                 {/* 전체 진행 바 */}
@@ -2108,7 +2108,7 @@
                 {currentIdx===-1 ? (
                   <div onClick={props.onStartDaily} role="button" tabIndex={0} style={{marginTop:6,padding:"15px 0",textAlign:"center",background:C.surface,border:"1px solid "+C.accent+"55",borderRadius:14,fontSize:14,fontWeight:800,color:C.accent,cursor:"pointer"}}>{"모든 세트 완주! 🏆 복습으로 굳히기 →"}</div>
                 ) : todayDoneAll ? (
-                  <div onClick={props.onSpeak} role="button" tabIndex={0} style={{marginTop:2,padding:"14px 0",textAlign:"center",background:C.surface,border:"1px solid "+C.accent+"55",borderRadius:14,fontSize:13.5,fontWeight:800,color:C.accent,cursor:"pointer"}}>{"오늘 학습 완료 🎉 · 회화로 더 연습 →"}</div>
+                  <div onClick={props.onSpeak} role="button" tabIndex={0} style={{marginTop:2,padding:"14px 0",textAlign:"center",background:C.surface,border:"1px solid "+C.accent+"55",borderRadius:14,fontSize:13.5,fontWeight:800,color:C.accent,cursor:"pointer"}}>{"오늘 학습 끝났어요 🎉 회화로 더 연습해요 →"}</div>
                 ) : null}
               </div>
             );
@@ -2542,7 +2542,7 @@
                   {learnedVerbs.map(function(v,i){return <span key={i} style={{background:C.accentDim,border:"1px solid "+C.accent+"40",color:C.accent,padding:"7px 13px",borderRadius:99,fontSize:14,fontWeight:800}}>{"✓ "+v}</span>;})}
                 </div>
               )}
-              <div style={{fontSize:12,color:C.muted,marginBottom:22}}>{(perfect?"퍼펙트 +30 XP · ":"정답 "+correctCount+"/"+quizzes.length+" · ")+"Lv."+getLevel(getXP()).level+" "+getLevel(getXP()).name}</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:22}}>{(perfect?"퍼펙트! +30 XP, ":"정답 "+correctCount+"/"+quizzes.length+", ")+"Lv."+getLevel(getXP()).level+" "+getLevel(getXP()).name}</div>
               <button onClick={onNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>
                 {aiAvailable?"롤플레이 하러 가기 →":"오늘 학습 완료"}
               </button>
@@ -2805,7 +2805,7 @@
 
           {/* 백지 대신 예시 앵커 — 이 문장처럼 단어만 바꿔 생산(슬롯 변주) */}
           <div style={{background:C.accentDim,border:"1px solid "+color+"30",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
-            <div style={{fontSize:11,color:color,fontWeight:800,marginBottom:4}}>{"💡 이 문장처럼 · 단어만 바꿔서"}</div>
+            <div style={{fontSize:11,color:color,fontWeight:800,marginBottom:4}}>{"💡 이 문장에서 단어만 바꿔보세요"}</div>
             <div style={{fontSize:13.5,color:C.text,fontWeight:600,lineHeight:1.5}}>{current.good_example||(current.examples&&current.examples[0]&&(current.examples[0].english||current.examples[0].en))||("\""+current.verb+"\"를 넣어 한 문장")}</div>
           </div>
 
@@ -3325,7 +3325,7 @@
           {/* 데일리 흐름의 '적용' 단계로 들어왔을 때 — 목적을 주고 완료로 이어준다 (v1.8.x) */}
           {props.flow && (
             <div style={{background:"linear-gradient(135deg,"+C.accent+"22,"+C.accent+"08)",border:"1px solid "+C.accent+"55",borderRadius:16,padding:"16px 18px",marginBottom:18}}>
-              <div style={{fontSize:12.5,fontWeight:800,color:C.accent,letterSpacing:0.5,marginBottom:6}}>{"🎯 오늘의 마지막 단계 · 적용"}</div>
+              <div style={{fontSize:12.5,fontWeight:800,color:C.accent,letterSpacing:0.5,marginBottom:6}}>{"🎯 이제 마지막, 배운 걸 써볼 차례예요"}</div>
               <div style={{fontSize:14,fontWeight:700,color:C.text,lineHeight:1.5,marginBottom:props.flowVerbs&&props.flowVerbs.length>0?8:12}}>{"오늘 배운 표현으로, 내가 실제로 한 말이나 본 유튜브를 영어로 바꿔보세요."}</div>
               {props.flowVerbs&&props.flowVerbs.length>0&&(
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
@@ -3417,7 +3417,7 @@
                   )}
                   <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:16,marginBottom:12}}>
                     <input type="file" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.aac" onChange={handleFileUpload} style={{fontSize:13,color:C.text,marginBottom:8,width:"100%"}}/>
-                    <div style={{fontSize:10,color:C.muted,marginTop:4}}>mp3, m4a, wav, webm 지원 · 최대 4MB</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:4}}>mp3, m4a, wav, webm 지원 (최대 4MB)</div>
                     {audioUrl && (
                       <div style={{marginTop:10}}>
                         <audio controls src={audioUrl} style={{width:"100%",height:40,borderRadius:8}}/>
@@ -3605,7 +3605,7 @@
                               <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                               <div style={{flex:1}}>
                                 <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{rv.title.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{rv.date?" · "+rv.date:""}</div>
+                                <div style={{fontSize:10,color:C.muted}}>{rv.channel}{rv.duration?(rv.duration<60?", "+rv.duration+"초":", "+Math.floor(rv.duration/60)+"분"):""}{rv.date?", "+rv.date:""}</div>
                               </div>
                             </div>
                           );})}
@@ -3631,7 +3631,7 @@
                                   <img src={rv.thumbnail} style={{width:80,height:45,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
                                   <div style={{flex:1}}>
                                     <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.4,marginBottom:4}}>{(rv.title||"").replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"')}</div>
-                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?(rv.duration<60?" · "+rv.duration+"초":" · "+Math.floor(rv.duration/60)+"분"):""}{bbcTranscripts[rv.id]?" · ⚡ 바로 시작":""}</div>
+                                    <div style={{fontSize:10,color:C.accent}}>{rv.channel}{rv.duration?(rv.duration<60?", "+rv.duration+"초":", "+Math.floor(rv.duration/60)+"분"):""}{bbcTranscripts[rv.id]?" ⚡ 바로 시작":""}</div>
                                   </div>
                                 </div>
                               );})}
@@ -3705,7 +3705,7 @@
 
               {result.turns?.length>0&&!expanded.turns&&(
                 <div className="tf-press" onClick={function(){toggleSection("turns");}} style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:12,padding:"14px 16px",marginBottom:12,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"💬 원문 대화 · "+result.turns.length+"턴"}</div>
+                  <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"💬 원문 대화 "+result.turns.length+"턴"}</div>
                   <div style={{fontSize:14,color:C.muted}}>{"▼"}</div>
                 </div>
               )}
@@ -3752,7 +3752,7 @@
               {filterBeVerbs(result.key_verbs)?.length>0&&(
                 <div style={{background:C.surface,border:"1px solid "+C.accent+"30",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                   <div onClick={function(){toggleSection("verbs");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"📌 KEY VERBS · "+filterBeVerbs(result.key_verbs).length+"개"}</div>
+                    <div style={{fontSize:12,color:C.accent,letterSpacing:2,fontWeight:700}}>{"📌 핵심 동사 "+filterBeVerbs(result.key_verbs).length+"개"}</div>
                     <div style={{fontSize:14,color:C.muted}}>{expanded.verbs?"▲":"▼"}</div>
                   </div>
                   {expanded.verbs&&<div style={{padding:"0 16px 16px"}}>
@@ -3776,7 +3776,7 @@
               {result.key_nouns&&result.key_nouns.length>0&&(
                 <div style={{background:C.blueDim,border:"1px solid "+C.blue+"30",borderRadius:12,marginBottom:12,overflow:"hidden"}}>
                   <div onClick={function(){toggleSection("nouns");}} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.blue,letterSpacing:2,fontWeight:700}}>{"📝 KEY NOUNS · "+result.key_nouns.length+"개"}</div>
+                    <div style={{fontSize:12,color:C.blue,letterSpacing:2,fontWeight:700}}>{"📝 핵심 명사 "+result.key_nouns.length+"개"}</div>
                     <div style={{fontSize:14,color:C.muted}}>{expanded.nouns?"▲":"▼"}</div>
                   </div>
                   {expanded.nouns&&<div style={{padding:"0 16px 16px"}}>
@@ -4325,7 +4325,7 @@
                   {!isOpen?(
                     <div style={{marginTop:8}}>
                       <div style={{fontSize:13.5,color:C.text,fontWeight:700,marginBottom:3}}>{"🗣 이 단어로 영어 문장을 소리 내어 말해보세요"}</div>
-                      <div style={{fontSize:11.5,color:C.muted}}>{"입으로 먼저 말하고 · 탭해서 정답 확인"}</div>
+                      <div style={{fontSize:11.5,color:C.muted}}>{"먼저 입으로 말해보고, 탭해서 정답을 확인해요"}</div>
                     </div>
                   ):(
                     <div style={{marginTop:12}}>
@@ -4594,7 +4594,7 @@
             <div style={{height:9,background:C.bg,borderRadius:99,overflow:"hidden",marginBottom:7}}>
               <div style={{width:progress+"%",height:"100%",background:"linear-gradient(90deg,"+C.accent+","+C.blue+")",borderRadius:99,transition:"width 0.6s"}}/>
             </div>
-            <div style={{fontSize:12,color:C.muted}}>{xp.toLocaleString()}{" XP · 다음 레벨까지 "}{Math.max(0,lv.max-xp).toLocaleString()}{" XP"}</div>
+            <div style={{fontSize:12,color:C.muted}}>{xp.toLocaleString()}{" XP, 다음 레벨까지 "}{Math.max(0,lv.max-xp).toLocaleString()}{" XP"}</div>
           </div>
 
           {/* 통계 그리드 */}
@@ -5022,7 +5022,7 @@
             {props.flow ? (
               <button onClick={props.onNext} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"다음: 단어 학습 →"}</button>
             ) : (
-              <button onClick={props.onHome} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"오늘 완료 · 홈으로"}</button>
+              <button onClick={props.onHome} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer"}}>{"오늘 학습 끝! 홈으로"}</button>
             )}
           </div>
         );
@@ -5036,7 +5036,7 @@
           </div>
           {phase === "prompt" ? (
             <div>
-              <div style={{fontSize:12,letterSpacing:2,color:C.muted,fontWeight:700,margin:"6px 0 14px"}}>{"오늘의 상황 · "+(idx+1)+" / "+todays.length}</div>
+              <div style={{fontSize:12,letterSpacing:2,color:C.muted,fontWeight:700,margin:"6px 0 14px"}}>{"오늘의 상황 "+(idx+1)+" / "+todays.length}</div>
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:20,padding:22,boxShadow:"0 10px 26px -16px rgba(0,0,0,0.7)"}}>
                 <span style={{display:"inline-block",fontSize:11,fontWeight:800,color:C.accent,background:C.accentDim,padding:"4px 11px",borderRadius:99,marginBottom:14}}>{it.tag}</span>
                 <div style={{fontSize:21,fontWeight:800,lineHeight:1.45}}>{it.ko}</div>
@@ -5044,14 +5044,14 @@
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12,marginTop:22}}>
                 <button onClick={function(){ if(canRecognize){ startListening(it); } else { setPhase("reveal"); speakEnglish(it.en); } }} style={{width:96,height:96,borderRadius:"50%",border:"none",background:C.accent,color:"#08090d",fontSize:32,cursor:"pointer",boxShadow:"0 10px 34px -6px "+C.accent+"99"}}>{"🎤"}</button>
-                <div style={{fontSize:13,color:C.muted}}>{canRecognize?"탭하고 영어로 말하세요":"말했으면 탭 · 정답 확인"}</div>
-                {!canRecognize ? <div style={{fontSize:11.5,color:C.muted,textAlign:"center",lineHeight:1.5,maxWidth:270}}>{"이 기기에선 음성 채점이 안 돼요 · 앱에서 말하고 채점받기"}</div> : null}
-                <button onClick={function(){setPhase("reveal");speakEnglish(it.en);}} style={{background:"none",border:"none",color:C.muted,fontSize:12.5,textDecoration:"underline",cursor:"pointer"}}>{"모르겠어요 · 정답 보기"}</button>
+                <div style={{fontSize:13,color:C.muted}}>{canRecognize?"탭하고 영어로 말하세요":"말했으면 탭해서 정답 확인"}</div>
+                {!canRecognize ? <div style={{fontSize:11.5,color:C.muted,textAlign:"center",lineHeight:1.5,maxWidth:270}}>{"이 기기에선 음성 채점이 안 돼요. 앱에서 말하면 채점받을 수 있어요"}</div> : null}
+                <button onClick={function(){setPhase("reveal");speakEnglish(it.en);}} style={{background:"none",border:"none",color:C.muted,fontSize:12.5,textDecoration:"underline",cursor:"pointer"}}>{"모르겠어요, 정답 보기"}</button>
               </div>
             </div>
           ) : phase === "listening" ? (
             <div style={{textAlign:"center",padding:"8px 0"}}>
-              <div style={{fontSize:12,letterSpacing:2,color:C.accent,fontWeight:800,margin:"6px 0 18px"}}>{"● 듣는 중 · 영어로 말하세요"}</div>
+              <div style={{fontSize:12,letterSpacing:2,color:C.accent,fontWeight:800,margin:"6px 0 18px"}}>{"● 듣고 있어요, 영어로 말하세요"}</div>
               <div style={{width:110,height:110,borderRadius:"50%",background:C.accent,color:"#08090d",fontSize:40,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",boxShadow:"0 0 0 10px "+C.accent+"22, 0 0 44px -4px "+C.accent+"aa"}}>{"🎤"}</div>
               <div style={{minHeight:52,fontSize:18,fontWeight:700,lineHeight:1.4,color:interim?C.text:C.muted,margin:"0 auto 22px",maxWidth:320}}>{interim||"말하면 여기에 보여요…"}</div>
               <button onClick={function(){finishListening(it);}} style={{width:"100%",background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:16,fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 8px 20px -8px "+C.accent+"99"}}>{"■ 다 말했어요"}</button>
@@ -5091,7 +5091,7 @@
                 </div>
               ) : (
                 <div style={{marginBottom:16}}>
-                  {!props.aiAvailable ? <div style={{textAlign:"center",marginBottom:10}}><span style={{fontSize:11.5,color:C.muted,background:C.surface,border:"1px solid "+C.border,borderRadius:99,padding:"5px 12px"}}>{"🤖 AI 코치는 내일 다시 · 지금은 기본 채점이에요"}</span></div> : null}
+                  {!props.aiAvailable ? <div style={{textAlign:"center",marginBottom:10}}><span style={{fontSize:11.5,color:C.muted,background:C.surface,border:"1px solid "+C.border,borderRadius:99,padding:"5px 12px"}}>{"🤖 AI 코치는 내일 다시 만나요. 지금은 기본 채점이에요"}</span></div> : null}
                   <div style={{textAlign:"center",margin:"2px 0 12px"}}>
                     <div style={{fontSize:40,marginBottom:6}}>{result?result.emoji:"🎤"}</div>
                     <div style={{fontSize:17,fontWeight:800,lineHeight:1.4,color:result?result.tone:C.text}}>{result?result.verdict:""}</div>
@@ -5120,7 +5120,7 @@
               <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:16}}>{keyChips(it.en, it.key)}</div>
               <div style={{display:"flex",alignItems:"center",gap:10,background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:"12px 14px",marginBottom:12}}>
                 <span style={{fontSize:20}}>{"✅"}</span>
-                <div><div style={{fontSize:13,fontWeight:800}}>{"어려운 단어 0개"}</div><div style={{fontSize:11.5,color:C.muted}}>{"핵심: "}<b style={{color:C.accent}}>{it.key}</b>{" · 전부 아는 단어예요"}</div></div>
+                <div><div style={{fontSize:13,fontWeight:800}}>{"어려운 단어 0개"}</div><div style={{fontSize:11.5,color:C.muted}}>{"핵심: "}<b style={{color:C.accent}}>{it.key}</b>{", 전부 아는 단어예요"}</div></div>
               </div>
               <div style={{fontSize:12.5,color:C.muted,lineHeight:1.6,background:C.surface,borderLeft:"2px solid "+C.accent,borderRadius:"0 10px 10px 0",padding:"11px 14px",marginBottom:4}}>{it.why}</div>
               <div style={{display:"flex",gap:10,marginTop:18}}>
