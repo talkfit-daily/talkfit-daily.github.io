@@ -379,6 +379,30 @@
       } catch {}
     }
 
+    // 핵심 학습 데이터를 클라우드에 백업 (기기 바꿔도 유지). tk_state/xp_state 외에 빠져있던 것들.
+    var LEARNING_KEYS = ["my_encountered_verbs","attendance","learned_lesson_dates","weak_verbs","verb_history"];
+    function syncLearningToCloud(userId){
+      if(!userId) return;
+      LEARNING_KEYS.forEach(function(k){ var v=loadLocal(k); if(v!=null) saveCloud(userId,k,v); });
+    }
+    // 로컬·클라우드 학습 데이터를 union 병합 — 기기 바꿔도, 양쪽 다 있어도 손실 없이 합친다.
+    function mergeLearning(key, local, cloud){
+      if(cloud==null) return local; if(local==null) return cloud;
+      try {
+        if(key==="my_encountered_verbs"){
+          var map={}; [].concat(cloud||[],local||[]).forEach(function(v){ if(!v||!v.verb)return; var e=map[v.verb];
+            if(!e){ map[v.verb]=Object.assign({},v); }
+            else { e.count=Math.max(e.count||1,v.count||1); if((v.lastSeen||"")>(e.lastSeen||""))e.lastSeen=v.lastSeen; if(!e.meaning&&v.meaning)e.meaning=v.meaning; if(!e.example&&v.example)e.example=v.example; } });
+          return Object.keys(map).map(function(k){return map[k];});
+        }
+        if(key==="weak_verbs"){ var s={}; [].concat(cloud||[],local||[]).forEach(function(w){s[w]=1;}); return Object.keys(s); }
+        if(key==="verb_history"){ var seen={},out=[]; [].concat(cloud||[],local||[]).forEach(function(h){ if(!h||!h.date)return; if(!seen[h.date]){seen[h.date]=1;out.push(h);} }); return out; }
+        if(key==="learned_lesson_dates"){ var o=Object.assign({},cloud); Object.keys(local||{}).forEach(function(d){ var u={}; [].concat(o[d]||[],local[d]||[]).forEach(function(i){u[i]=1;}); o[d]=Object.keys(u).map(Number); }); return o; }
+        if(key==="attendance"){ var m=Object.assign({},cloud,local); m.totalDays=Math.max(cloud.totalDays||0,local.totalDays||0); m.longestStreak=Math.max(cloud.longestStreak||0,local.longestStreak||0); m.streak=Math.max(cloud.streak||0,local.streak||0); var dl={}; [].concat(cloud.daysLog||[],local.daysLog||[]).forEach(function(d){dl[d]=1;}); m.daysLog=Object.keys(dl).sort(); return m; }
+      } catch(e){}
+      return local;
+    }
+
     // ── 계정 완전 삭제 (App Store Guideline 5.1.1(v) 필수 요건) ─────
     // Firestore 사용자 데이터 + 리더보드 기록 + 로컬 데이터 + Firebase Auth 계정을 모두 제거.
     // 실패 시 throw — 호출부에서 사용자에게 알림.
@@ -513,9 +537,12 @@
       // 날짜가 바뀌었으면 오늘 플래그 초기화
       if (st.todayKey !== todayK) { st.todayDone = false; }
       if (st.todayDone) return { alreadyDone: true, streak: st.streak || 0 };
+      // 스트릭: 어제 완료했으면 +1, 아니면 1로 리셋 — attendance(축하 모달)와 동일 gap 로직으로 통일.
+      // (기존엔 무조건 +1이라 attendance.streak와 어긋나 헤더 1·홈 0 같은 불일치 발생)
+      var yesterdayK = (function(){var d=new Date();d.setHours(d.getHours()+9);d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);})();
+      st.streak = (st.todayKey === yesterdayK) ? (st.streak || 0) + 1 : 1;
       st.todayDone = true;
       st.todayKey = todayK;
-      st.streak = (st.streak || 0) + 1;
       saveLocal("tk_state", st);
       return { alreadyDone: false, streak: st.streak };
     }
@@ -2208,6 +2235,8 @@
           setArrangeSelected([]); setArrangeChecked(false);
         } else {
           setQuizDone(true);
+          // 서브스텝 저장 — 나갔다 와도 재출제 말고 롤플레이로 이어지게 (todayKey는 App 지역함수라 인라인 계산)
+          saveLocal("verb_quiz_done_"+(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})(), true);
           // 퍼펙트 보너스
           var perfectR = claimAccuracyBonus(correctCount, quizzes.length);
           if (perfectR) { showXpGain("✨ 퍼펙트 +"+perfectR.gained); if(onXP)onXP(perfectR); showConfetti(); }
@@ -5248,6 +5277,14 @@
             var localXp = loadLocal("xp_state");
             if (localXp) await saveCloud(user.uid, "xp_state", localXp);
           }
+          // 핵심 학습 데이터(여정·숙달·오답노트·연속) 병합 복원 — 기기 바꿔도 유지
+          for (var _li=0; _li<LEARNING_KEYS.length; _li++){
+            var _lk = LEARNING_KEYS[_li];
+            var _lc = await loadCloud(user.uid, _lk);
+            var _ll = loadLocal(_lk);
+            var _merged = mergeLearning(_lk, _ll, _lc);
+            if (_merged!=null){ saveLocal(_lk, _merged); saveCloud(user.uid, _lk, _merged); }
+          }
         })();
       }, [user]);
 
@@ -5304,7 +5341,11 @@
         var learnDone = !!loadLocal("verb_done_"+todayKey());
         var applyDone = !!loadLocal("apply_done_"+todayKey());
         if (!meDone) { setScreen("todayme"); setTab("home"); }
-        else if (!learnDone) { handleStart(); }
+        else if (!learnDone) {
+          // 퀴즈까지 끝냈으면(나갔다 와도) 재출제 말고 롤플레이로 이어준다(대표 피드백).
+          if (loadLocal("verb_quiz_done_"+todayKey())) { if(!lessons) setLessons(getTodayLesson()); setScreen("roleplay"); setTab("learn"); }
+          else { handleStart(); }
+        }
         else if (!applyDone) { setScreen("speak"); setTab("speak"); }
         else { setDailyFlow(false); setScreen("review"); setTab("review"); }
       };
@@ -5355,6 +5396,8 @@
         if (user) {
           var xpState = loadLocal("xp_state");
           if (xpState) saveCloud(user.uid, "xp_state", xpState);
+          // 핵심 학습 데이터도 클라우드 백업 — 기기 바꿔도 여정·숙달·오답노트·연속 유지(대표: '제대로 저장되는지').
+          syncLearningToCloud(user.uid);
           updateLeaderboard(user.uid, user.displayName);
         }
         // 단어 학습 끝 → 데일리 흐름이면 '적용(회화/유튜브)' 단계로 이어준다. 아니면 홈.
