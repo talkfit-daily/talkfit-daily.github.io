@@ -865,7 +865,8 @@
         }
       }
       var listenOpts = [listenEx.ex.korean].concat(uniqueWrong.sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
-      quizzes.push({type:"listening", audio_text:listenEx.ex.english, options:listenOpts, answer:listenEx.ex.korean, verb:listenEx.verb});
+      // 무음(지하철) 모드면 듣기 문제 제외 — 못 듣는 환경 대응(대표 피드백). 나머지는 전부 탭/읽기 문제.
+      if (load("subway_mode") !== true) quizzes.push({type:"listening", audio_text:listenEx.ex.english, options:listenOpts, answer:listenEx.ex.korean, verb:listenEx.verb});
 
       // Q4: meaning quiz for phrasal verb — 마지막 세트 사용(세트 2·3 동사도 반드시 출제되게, 커버리지 버그 수정)
       var p2 = lessons[lessons.length-1].phrasal;
@@ -1533,7 +1534,7 @@
     function getTodayLesson() {
       var myPool = load("my_lesson_pool") || [];
       var POOL = LESSON_POOL.concat(myPool);
-      var N_SETS = 3; // 하루 세트 수 (세트당 기본+구동사 2개) → 6동사 ≈ 15분
+      var N_SETS = 2; // 하루 세트 수 (세트당 기본+구동사 2개) → 4동사. 3개는 문제가 많게 느껴진다는 피드백 → 2개로 줄여 적은 단어를 더 깊게.
 
       var encountered = load("my_encountered_verbs") || [];
       var learnedDates = load("learned_lesson_dates") || {};
@@ -4583,7 +4584,7 @@
 
           {/* 모드 토글 */}
           <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10}}>{"학습 모드"}</div>
-          {toRow("🚇 지하철 모드","소리 안 나게, 말 안 해도 되는 문제로. 지하철·회의·도서관에서.",subway,function(){var n=!subway;setSubway(n);save("subway_mode",n);})}
+          {toRow("🚇 지하철 모드","말·듣기 없이 탭으로만 풀어요. 지하철·회의·도서관에서.",subway,function(){var n=!subway;setSubway(n);save("subway_mode",n);})}
           {toRow(sfxMuted?"🔇 효과음":"🔊 효과음","정답·레벨업 소리로 더 신나게",!sfxMuted,function(){var n=!sfxMuted;setSfxMuted(n);save("sfx_muted",n);if(n===false)SFX.correct();})}
 
           {/* 계정 · 설정 */}
