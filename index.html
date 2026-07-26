@@ -4339,6 +4339,61 @@
           <div style={{fontSize:11,color:C.muted,letterSpacing:3,marginBottom:8}}>HISTORY</div>
           <div style={{fontSize:22,fontWeight:800,marginBottom:20}}>나의 통계</div>
 
+          {/* 학습 여정 — 코스 진행 맵 (경쟁앱 벤치마크: 듀오링고식 '어디까지 왔나/뭐가 다음') */}
+          {(function(){
+            var pool = (typeof LESSON_POOL!=="undefined") ? LESSON_POOL : (window.LESSON_POOL_REF||[]);
+            var total = pool.length; if(!total) return null;
+            var ld = load("learned_lesson_dates")||{};
+            var studied = {}; Object.keys(ld).forEach(function(d){ (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
+            var doneCount = Object.keys(studied).length;
+            var nextIdx = -1; for(var i=0;i<total;i++){ if(!studied[i]){ nextIdx=i; break; } }
+            var THEMES=[{e:"☕",n:"일상 표현"},{e:"💬",n:"감정·관계"},{e:"💼",n:"일·성장"},{e:"✈️",n:"여행·경험"}];
+            var per=Math.ceil(total/THEMES.length);
+            var pct=Math.round(doneCount/total*100);
+            return (
+              <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:16,boxShadow:SH,padding:18,marginBottom:20}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
+                  <div style={{fontSize:14,fontWeight:800,color:C.text}}>{"🗺 내 학습 여정"}</div>
+                  <div style={{fontSize:12,color:C.accent,fontWeight:800}}>{doneCount}{" / "}{total}{" 세트"}</div>
+                </div>
+                <div style={{height:7,background:C.bg,borderRadius:99,overflow:"hidden",marginBottom:16}}>
+                  <div style={{width:pct+"%",height:"100%",background:C.accent,borderRadius:99,transition:"width 0.5s"}}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                  {THEMES.map(function(t,ui){
+                    var start=ui*per, end=Math.min(total,start+per); if(start>=total) return null;
+                    var idxs=[]; for(var k=start;k<end;k++) idxs.push(k);
+                    var uDone=idxs.filter(function(i){return studied[i];}).length;
+                    var uComplete=uDone===idxs.length;
+                    return (
+                      <div key={ui} style={{opacity:(start<=(nextIdx===-1?total:nextIdx+per)?1:0.55)}}>
+                        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
+                          <span style={{fontSize:15}}>{uComplete?"🏆":t.e}</span>
+                          <span style={{fontSize:13,fontWeight:700,color:C.text}}>{t.n}</span>
+                          <span style={{marginLeft:"auto",fontSize:11,color:uComplete?C.accent:C.muted,fontWeight:700}}>{uDone}{"/"}{idxs.length}</span>
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                          {idxs.map(function(i){
+                            var done=studied[i], isNext=(i===nextIdx);
+                            var bg=done?C.accent:(isNext?C.accent+"22":C.bg);
+                            var bd=done?C.accent:(isNext?C.accent:C.border);
+                            var vb=(pool[i]&&pool[i].basic&&pool[i].basic.verb)||"";
+                            return (
+                              <div key={i} title={vb} style={{width:30,height:30,borderRadius:"50%",background:bg,border:"2px solid "+bd,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,animation:isNext?"pulse1 1.6s infinite":"none",position:"relative"}}>
+                                <span style={{fontSize:11,fontWeight:800,color:done?"#08090d":(isNext?C.accent:C.muted)}}>{done?"✓":(isNext?"▶":i+1)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{fontSize:11,color:C.muted,marginTop:13,lineHeight:1.5}}>{nextIdx===-1?"모든 세트를 익혔어요! 복습으로 굳혀요 💪":"매일 학습하면 ▶ 다음 세트로 나아가요. 유닛을 다 채우면 🏆"}</div>
+              </div>
+            );
+          })()}
+
           {/* 말해보카식 성장 가시화 — '말할 수 있는 표현'이 숙달 등급으로 쌓이는 게 보이게 */}
           {encountered.length>0&&(function(){
             var m={n0:0,n1:0,n2:0,n3:0};
