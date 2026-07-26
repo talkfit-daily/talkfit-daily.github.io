@@ -1954,35 +1954,106 @@
           <div style={{fontSize:30,fontWeight:800,lineHeight:1.25,marginBottom:5,letterSpacing:-0.5}}>{greeting.t}</div>
           <div style={{fontSize:14.5,color:C.muted,marginBottom:22}}>{greeting.s}</div>
 
-          {/* ── 오늘의 학습 — 하나의 흐름(물흐르듯): 오늘의 나 → 단어 학습 → 복습 (v1.8.x) ────── */}
+          {/* ── 학습 경로(길) — 듀오링고식 홈: 열면 내 여정이 보이고 다음 노드를 눌러 오늘 학습 시작 (v2.0 A안) ────── */}
           {(function(){
+            var pool = (typeof LESSON_POOL!=="undefined") ? LESSON_POOL : (window.LESSON_POOL_REF||[]);
+            var total = pool.length; if(!total) return null;
+            var ld = load("learned_lesson_dates")||{};
+            var tKey = (function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+            // '완료(done)'는 오늘 이전에 학습한 세트만 — 오늘 세트는 완료 여부로 따로 판단
+            var studied = {}; Object.keys(ld).forEach(function(d){ if(d!==tKey) (ld[d]||[]).forEach(function(i){ if(i<total) studied[i]=true; }); });
+            var todayIdxs = (ld[tKey]||[]).filter(function(i){return i<total;});
             var meDone=!!props.todayMeDone, learnDone=!!props.verbDone, applyDone=!!props.applyDone;
-            var bothDone=meDone&&learnDone&&applyDone;
-            var steps=[{n:1,done:meDone,t:"오늘의 나 — 내 하루를 영어로 말하기",s:"진짜 상황 5개 · 약 5분"},
-                       {n:2,done:learnDone,t:"단어 학습 — 배우고 롤플레이·문장 쓰기",s:"오늘의 동사 4개 · 약 10분"},
-                       {n:3,done:applyDone,t:"적용 — 배운 표현을 내 말·유튜브에 써보기",s:"회화·유튜브로 실전 · 약 5분"}];
-            var doneCount=(meDone?1:0)+(learnDone?1:0)+(applyDone?1:0);
-            var btn=bothDone?"오늘 다 했어요 ✅ · 복습하기":(doneCount>0?"이어서 계속 →":"오늘 시작 →");
+            var stepDone=(meDone?1:0)+(learnDone?1:0)+(applyDone?1:0);
+            var todayDoneAll=meDone&&learnDone&&applyDone;
+            // 오늘 세트를 다 끝냈으면 완료로 포함
+            if(todayDoneAll) todayIdxs.forEach(function(i){studied[i]=true;});
+            var currentIdx = todayIdxs.length ? todayIdxs[0] : (function(){for(var i=0;i<total;i++){if(!studied[i])return i;}return -1;})();
+            var doneCount = Object.keys(studied).length;
+            var pct = Math.round(doneCount/total*100);
+            var THEMES=[{e:"☕",n:"일상 표현"},{e:"💬",n:"감정·관계"},{e:"💼",n:"일·성장"},{e:"✈️",n:"여행·경험"}];
+            var per=Math.ceil(total/THEMES.length);
+            var activeUnit=THEMES.length-1;
+            if(currentIdx!==-1) for(var u=0;u<THEMES.length;u++){ if(currentIdx>=u*per && currentIdx<Math.min(total,u*per+per)){activeUnit=u;break;} }
+            var zig=[0,46,66,46,0,-46,-66,-46];
+            var stepTag=todayDoneAll?"오늘 완료 🎉":(stepDone===0?"오늘의 학습 · 약 20분":"이어서 · "+stepDone+"/3 단계");
             return (
-              <div style={{background:C.surface,borderRadius:24,padding:"24px 22px",marginBottom:18,boxShadow:"0 10px 30px -14px rgba(17,24,39,0.12)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-                  <span style={{fontSize:13,fontWeight:900,color:C.accent,letterSpacing:0.5}}>{bothDone?"오늘의 학습 · 완료 🎉":"오늘의 학습"}</span>
-                  <span style={{fontSize:11,color:C.muted}}>{"약 20분"}</span>
+              <div style={{marginBottom:20}}>
+                {/* 전체 진행 바 */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
+                  <span style={{fontSize:12,fontWeight:800,color:C.text}}>{"내 학습 경로"}</span>
+                  <span style={{fontSize:12,fontWeight:800,color:C.accent}}>{doneCount}{" / "}{total}{" 세트"}</span>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:11,marginBottom:18}}>
-                  {steps.map(function(st){return(
-                    <div key={st.n} style={{display:"flex",alignItems:"center",gap:12,opacity:st.done?0.55:1}}>
-                      <div style={{width:26,height:26,borderRadius:99,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,background:st.done?C.accent:C.accent+"20",color:st.done?"#08090d":C.accent,border:"1px solid "+C.accent+(st.done?"":"40")}}>{st.done?"✓":st.n}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:14,fontWeight:700,color:C.text,textDecoration:st.done?"line-through":"none"}}>{st.t}</div>
-                        <div style={{fontSize:11.5,color:C.muted}}>{st.s}</div>
+                <div style={{height:8,background:C.surface,border:"1px solid "+C.border,borderRadius:99,overflow:"hidden",marginBottom:18}}>
+                  <div style={{width:pct+"%",height:"100%",background:C.accent,borderRadius:99,transition:"width 0.5s"}}/>
+                </div>
+
+                {THEMES.map(function(t,ui){
+                  var start=ui*per, end=Math.min(total,start+per); if(start>=total) return null;
+                  var idxs=[]; for(var k=start;k<end;k++) idxs.push(k);
+                  var uDone=idxs.filter(function(i){return studied[i];}).length;
+                  var uComplete=uDone===idxs.length;
+                  var isActive=(ui===activeUnit);
+                  var isFuture=(start>currentIdx && currentIdx!==-1 && !isActive);
+                  // 활성 유닛만 노드 경로를 펼치고, 나머지는 컴팩트 배너
+                  if(!isActive){
+                    return (
+                      <div key={ui} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",marginBottom:10,background:C.surface,border:"1px solid "+C.border,borderRadius:14,opacity:isFuture?0.5:1}}>
+                        <span style={{fontSize:18}}>{uComplete?"🏆":(isFuture?"🔒":t.e)}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>{t.n}</div>
+                          <div style={{fontSize:11,color:C.muted}}>{uComplete?"유닛 완료":isFuture?"곧 열려요":uDone+"/"+idxs.length+" 익힘"}</div>
+                        </div>
+                        <span style={{fontSize:11,fontWeight:800,color:uComplete?C.accent:C.muted}}>{uDone}{"/"}{idxs.length}</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={ui} style={{marginBottom:14}}>
+                      {/* 활성 유닛 배너 */}
+                      <div style={{display:"flex",alignItems:"center",gap:9,padding:"11px 15px",marginBottom:4,background:"linear-gradient(135deg,"+C.accent+"20,"+C.surface+")",border:"1px solid "+C.accent+"55",borderRadius:14}}>
+                        <span style={{fontSize:19}}>{t.e}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:11,fontWeight:800,color:C.accent,letterSpacing:0.5}}>{"지금 여기"}</div>
+                          <div style={{fontSize:14,fontWeight:800,color:C.text}}>{t.n}</div>
+                        </div>
+                        <span style={{fontSize:12,fontWeight:800,color:C.accent}}>{uDone}{"/"}{idxs.length}</span>
+                      </div>
+                      {/* 세로 winding 경로 */}
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:6}}>
+                        {idxs.map(function(i,ni){
+                          var done=studied[i], isCur=(i===currentIdx && !todayDoneAll);
+                          var off=zig[ni % zig.length];
+                          var vb=(pool[i]&&pool[i].basic&&pool[i].basic.verb)||"";
+                          if(isCur){
+                            return (
+                              <div key={i} onClick={props.onStartDaily} role="button" tabIndex={0}
+                                   onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onStartDaily();}}
+                                   style={{transform:"translateX("+off+"px)",display:"flex",flexDirection:"column",alignItems:"center",margin:"8px 0 12px",cursor:"pointer"}}>
+                                <div style={{fontSize:12,fontWeight:900,color:"#08090d",background:C.accent,padding:"6px 14px",borderRadius:12,marginBottom:8,boxShadow:"0 6px 16px -4px "+C.accent+"cc",whiteSpace:"nowrap"}}>{stepTag}{" ▶"}</div>
+                                <div style={{width:74,height:74,borderRadius:"50%",background:C.accent,border:"5px solid "+C.accent+"40",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 10px 26px -6px "+C.accent+"cc",animation:"pulse1 1.8s infinite"}}>
+                                  <span style={{fontSize:30}}>{"▶"}</span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={i} title={vb} style={{transform:"translateX("+off+"px)",width:done?44:38,height:done?44:38,borderRadius:"50%",background:done?C.accent:C.surface,border:"3px solid "+(done?C.accent+"66":C.border),display:"flex",alignItems:"center",justifyContent:"center",margin:"6px 0",boxShadow:done?"0 4px 10px -4px "+C.accent+"66":"none"}}>
+                              <span style={{fontSize:done?17:12,fontWeight:800,color:done?"#08090d":C.muted}}>{done?"✓":i+1}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  );})}
-                </div>
-                <div onClick={props.onStartDaily} role="button" tabIndex={0}
-                     onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onStartDaily();}}
-                     style={{background:bothDone?C.surface:C.accent,color:bothDone?C.accent:"#08090d",border:bothDone?"1px solid "+C.accent+"40":"none",borderRadius:14,padding:"15px 0",textAlign:"center",fontSize:16,fontWeight:800,cursor:"pointer",boxShadow:bothDone?"none":"0 8px 20px -6px "+C.accent+"88"}}>{btn}</div>
+                  );
+                })}
+
+                {/* 완주 시 안내 / 오늘 완료 시 복습 유도 */}
+                {currentIdx===-1 ? (
+                  <div onClick={props.onStartDaily} role="button" tabIndex={0} style={{marginTop:6,padding:"15px 0",textAlign:"center",background:C.surface,border:"1px solid "+C.accent+"55",borderRadius:14,fontSize:14,fontWeight:800,color:C.accent,cursor:"pointer"}}>{"모든 세트 완주! 🏆 복습으로 굳히기 →"}</div>
+                ) : todayDoneAll ? (
+                  <div onClick={props.onSpeak} role="button" tabIndex={0} style={{marginTop:2,padding:"14px 0",textAlign:"center",background:C.surface,border:"1px solid "+C.accent+"55",borderRadius:14,fontSize:13.5,fontWeight:800,color:C.accent,cursor:"pointer"}}>{"오늘 학습 완료 🎉 · 회화로 더 연습 →"}</div>
+                ) : null}
               </div>
             );
           })()}
