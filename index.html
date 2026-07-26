@@ -300,7 +300,8 @@
         if(ctx && ctx.state === "suspended"){ try{ ctx.resume(); }catch(e){} }
         return ctx;
       }
-      function muted(){ return load("sfx_muted") === true; }
+      // 효과음 끔 or 매너 모드(무음 환경)면 소리 안 냄 — 매너 모드는 '무음'이므로 효과음도 함께 꺼진다.
+      function muted(){ return load("sfx_muted") === true || load("subway_mode") === true; }
       function tone(freq, start, dur, type, gain){
         var c = ac(); if(!c) return;
         var o = c.createOscillator(), g = c.createGain();
