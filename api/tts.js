@@ -44,7 +44,11 @@ export default async function handler(req, res) {
     );
     const data = await r.json();
     const audioPart = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (!audioPart || !audioPart.data) return res.status(502).json({ error: "TTS 생성 실패", upstreamStatus: r.status, upstreamError: (data && data.error) ? { code: data.error.code, status: data.error.status, message: (data.error.message||"").slice(0,300) } : null });
+    if (!audioPart || !audioPart.data) {
+      // 429(할당량) 등 업스트림 실패 → 클라이언트가 기기 음성으로 폴백. 상태만 알려 조용히 처리.
+      const code = (data && data.error && data.error.code) || r.status;
+      return res.status(code === 429 ? 429 : 502).json({ error: code === 429 ? "quota" : "TTS 생성 실패" });
+    }
 
     // PCM L16 24kHz → WAV로 변환
     const pcmBuffer = Buffer.from(audioPart.data, "base64");

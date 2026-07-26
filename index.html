@@ -764,14 +764,30 @@
         resetBtn();
       }).catch(function(e){ if(e.name!=="AbortError") fallbackSpeak(clean); resetBtn(); });
     }
+    // 브라우저 음성 중 '가장 자연스러운' en-US 음성을 고른다. (API 할당량 소진 시 폴백이 로봇처럼 들리던 문제)
+    // iOS: Samantha/Siri, Chrome: Google US English, Edge: Microsoft Aria/Jenny 등 프리미엄 음성 우선.
+    function pickBestVoice() {
+      if (!window.speechSynthesis) return null;
+      var vs = window.speechSynthesis.getVoices() || [];
+      var en = vs.filter(function(v){ return /en[-_]?US/i.test(v.lang); });
+      if (!en.length) en = vs.filter(function(v){ return /^en/i.test(v.lang); });
+      if (!en.length) return null;
+      var pref = ["Samantha","Aaron","Nicky","Google US English","Ava","Allison","Susan","Microsoft Aria","Microsoft Jenny","Zoe","Evan"];
+      for (var i=0;i<pref.length;i++){ var m=en.find(function(v){return v.name.indexOf(pref[i])!==-1;}); if(m) return m; }
+      var enh = en.find(function(v){ return /premium|enhanced|neural|natural|siri/i.test(v.name); }); if(enh) return enh;
+      return en[0] || null;
+    }
     function fallbackSpeak(text) {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.lang = "en-US";
-      u.rate = 0.9;
+      u.rate = 0.92;
+      var v = pickBestVoice(); if (v) u.voice = v;
       window.speechSynthesis.speak(u);
     }
+    // 음성 목록은 비동기 로드 — 미리 데워둔다(첫 폴백에서 좋은 음성이 잡히도록).
+    if (window.speechSynthesis) { try { window.speechSynthesis.onvoiceschanged = function(){ window.speechSynthesis.getVoices(); }; window.speechSynthesis.getVoices(); } catch(e){} }
 
     // ── TTS 프리페치 ───────────────────────────────────────────────
     // 와이프 피드백: 🔊 누를 때 API 호출하면 느림 → 화면 뜰 때 미리 받아 ttsCache에 넣어두면
@@ -5115,13 +5131,14 @@
       // 레슨이 로드되면 그 안의 영어(동사·예문·혼동어)를 미리 TTS 캐시에 받아둔다 → 🔊 탭 즉시 재생(와이프 피드백).
       useEffect(function(){
         if (!lessons) return;
+        // 무료 TTS 할당량 절약 — 동사 + 첫 예문만 미리 받는다(혼동어·추가 예문은 탭 시 온디맨드).
+        // (레슨당 ~20개 프리페치가 할당량을 태워 자연 음성이 429로 막히던 문제)
         var texts = [];
         lessons.forEach(function(l){
           [l && l.basic, l && l.phrasal].forEach(function(it){
             if (!it) return;
             if (it.verb) texts.push(it.verb);
-            (it.examples||[]).forEach(function(ex){ if (ex && ex.english) texts.push(ex.english); });
-            if (it.confuse_with){ if(it.confuse_with.example_this) texts.push(it.confuse_with.example_this); if(it.confuse_with.example_other) texts.push(it.confuse_with.example_other); }
+            if (it.examples && it.examples[0] && it.examples[0].english) texts.push(it.examples[0].english);
           });
         });
         prefetchTTS(texts);
