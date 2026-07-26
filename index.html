@@ -330,8 +330,10 @@
       document.addEventListener("pointerdown", function(e){
         if(!unlocked){ SFX.unlock(); unlocked = true; }
         var el = e.target;
-        for(var i=0;i<4 && el;i++){
-          if(el.tagName==="BUTTON" || (el.classList && el.classList.contains("tf-press")) || (el.getAttribute && el.getAttribute("role")==="button")){ SFX.tap(); break; }
+        // 버튼이거나 cursor:pointer인 요소(=클릭 가능한 div 포함)를 누르면 탭 소리.
+        for(var i=0;i<4 && el && el.nodeType===1;i++){
+          if(el.tagName==="BUTTON" || (el.getAttribute && el.getAttribute("role")==="button")){ SFX.tap(); return; }
+          try { if(getComputedStyle(el).cursor==="pointer"){ SFX.tap(); return; } } catch(e2){}
           el = el.parentElement;
         }
       }, {passive:true});
