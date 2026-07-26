@@ -1966,7 +1966,18 @@
 
       return (
         <div style={{padding:"18px 18px 44px"}}>
-          <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:18,letterSpacing:-0.2}}>{greeting.t}<span style={{color:C.muted,fontWeight:600}}>{"  "+greeting.s}</span></div>
+          <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:13,letterSpacing:-0.2}}>{greeting.t}<span style={{color:C.muted,fontWeight:600}}>{"  "+greeting.s}</span></div>
+
+          {/* 히어로 — 거꾸로 영어 (우리만의 시그니처·성장엔진) */}
+          <div onClick={props.onReverse} role="button" tabIndex={0} onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onReverse&&props.onReverse();}}
+               style={{display:"flex",alignItems:"center",gap:11,background:"linear-gradient(135deg,"+C.accent+"26,"+C.accent+"09)",border:"1px solid "+C.accent+"55",borderRadius:16,padding:"13px 15px",marginBottom:20,cursor:"pointer",boxShadow:"0 8px 22px -13px "+C.accent}}>
+            <span style={{fontSize:24}}>{"🔄"}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14.5,fontWeight:900,color:C.text}}>{"거꾸로 영어"}</div>
+              <div style={{fontSize:11.5,color:C.muted}}>{"하고 싶은 말 → 원어민의 쉬운 영어로"}</div>
+            </div>
+            <span style={{fontSize:18,color:C.accent,fontWeight:900}}>{"→"}</span>
+          </div>
 
           {/* ── 학습 경로(길) — 듀오링고식 홈: 열면 내 여정이 보이고 다음 노드를 눌러 오늘 학습 시작 (v2.0 A안) ────── */}
           {(function(){
@@ -5137,6 +5148,98 @@
       );
     }
 
+    // ── 거꾸로 영어 (히어로·성장엔진) — 내 말을 원어민의 '더 쉬운' 영어로 되돌려주고, 공유 카드로 퍼뜨린다 ──
+    function ReverseScreen(props) {
+      var _i=useState(""); var input=_i[0], setInput=_i[1];
+      var _l=useState(false); var loading=_l[0], setLoading=_l[1];
+      var _r=useState(null); var result=_r[0], setResult=_r[1];
+      var _e=useState(""); var err=_e[0], setErr=_e[1];
+      var _sv=useState(false); var saved=_sv[0], setSaved=_sv[1];
+      var _sh=useState(""); var shareMsg=_sh[0], setShareMsg=_sh[1];
+      var EX=["회의를 다음으로 미루고 싶어요","이거 내가 처리할게","그 얘기 꺼내기 좀 그래","나 지금 좀 바빠서 나중에 연락할게"];
+      var run=async function(){
+        var t=input.trim(); if(!t){ return; }
+        setErr(""); setResult(null); setSaved(false); setShareMsg(""); setLoading(true);
+        try{
+          var sys='You are TalkFit\'s "거꾸로 영어" coach. Korean learners over-complicate English; native Americans use SIMPLE common verbs (get/take/put/go/come/make/keep/look/help out...). Given the user input (Korean they want to say, OR awkward/textbook English), give the SIMPLEST natural American English a native actually says in daily life, and show the contrast. Keep "native" short and truly conversational. Return ONLY valid JSON, no markdown, no extra text: {"ko":"사용자가 하려던 말을 자연스러운 한국어로","hard":"교과서식으로 어렵게 말한 영어 버전(과한 단어/직역). 사용자가 이미 영어로 어렵게 썼으면 그걸 그대로, 아니면 한국인이 흔히 하는 어려운 직역","native":"원어민이 실제로 쓰는 가장 쉬운 표현","verb":"핵심 쉬운 동사/표현(짧게)","why":"왜 이게 더 자연스러운지 한국어 한 문장"}';
+          var raw=await callClaude(sys, t);
+          var j=raw; var fm=raw.match(/```(?:json)?\s*([\s\S]*?)```/); if(fm){ j=fm[1]; } else { var s=raw.indexOf("{"), e=raw.lastIndexOf("}"); if(s!==-1&&e!==-1){ j=raw.slice(s,e+1); } }
+          var o=JSON.parse(j.trim());
+          setResult(o);
+          try{ SFX && SFX.complete && SFX.complete(); }catch(x){}
+        }catch(e){ setErr("변환에 실패했어요. 잠시 후 다시 해주세요."); }
+        setLoading(false);
+      };
+      var share=function(ev){
+        if(!result){ return; }
+        var txt='"'+(result.ko||input)+'"\n\n❌ '+(result.hard||"")+'\n✅ '+(result.native||"")+'\n\n— TalkFit · 내 말을 원어민의 쉬운 영어로\nhttps://talkfit-daily-github-io.vercel.app';
+        try{
+          if(navigator.share){ navigator.share({title:"거꾸로 영어",text:txt}).catch(function(){}); }
+          else { navigator.clipboard.writeText(txt); setShareMsg("복사됐어요 ✓ 어디든 붙여넣기 하세요"); setTimeout(function(){setShareMsg("");},2200); }
+        }catch(e){}
+      };
+      var saveToDict=function(){
+        if(!result||saved){ return; }
+        var all=load("my_encountered_verbs")||[];
+        var v=(result.verb||result.native||"").trim();
+        if(v){ var ex=all.filter(function(x){return x&&x.verb&&x.verb.toLowerCase()===v.toLowerCase();})[0];
+          if(ex){ ex.count=(ex.count||1)+1; } else { all.push({verb:v, meaning:(result.ko||""), count:1, source:"reverse", native:result.native}); }
+          save("my_encountered_verbs", all);
+        }
+        setSaved(true); try{ SFX && SFX.correct && SFX.correct(); }catch(x){}
+      };
+      return (
+        <div style={{padding:"18px 18px 44px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:4}}>
+            <span style={{fontSize:24}}>{"🔄"}</span>
+            <div>
+              <div style={{fontSize:20,fontWeight:900,letterSpacing:-0.3}}>{"거꾸로 영어"}</div>
+              <div style={{fontSize:12.5,color:C.muted}}>{"어렵게 말하려던 걸, 원어민의 더 쉬운 말로"}</div>
+            </div>
+          </div>
+          <textarea value={input} onChange={function(e){setInput(e.target.value);}} rows={3}
+            placeholder={"하고 싶은 말을 한국어로, 또는 어렵게 쓴 영어로.\n예) 회의를 다음으로 미루고 싶어요"}
+            style={{width:"100%",boxSizing:"border-box",background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:14,color:C.text,fontSize:15,lineHeight:1.6,resize:"none",outline:"none",fontFamily:"inherit",marginTop:14}}/>
+          {!result&&!loading?(
+            <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:10}}>
+              {EX.map(function(x,i){ return <button key={i} onClick={function(){setInput(x);}} style={{background:C.surface,border:"1px solid "+C.border,color:C.muted,borderRadius:99,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>{x}</button>; })}
+            </div>
+          ):null}
+          <button onClick={run} disabled={loading||!input.trim()} style={{width:"100%",marginTop:14,background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:15,fontSize:15,fontWeight:900,cursor:"pointer",opacity:(loading||!input.trim())?0.5:1,boxShadow:"0 8px 20px -8px "+C.accent}}>{loading?"바꾸는 중…":"원어민은 어떻게 말할까? →"}</button>
+          {err?<div style={{marginTop:14,fontSize:13,color:C.red,textAlign:"center"}}>{err}</div>:null}
+          {result?(
+            <div style={{marginTop:20}}>
+              <div style={{background:"linear-gradient(160deg,"+C.surface+","+C.bg+")",border:"1px solid "+C.accent+"44",borderRadius:20,padding:"20px 18px",boxShadow:"0 16px 40px -22px "+C.accent}}>
+                <div style={{fontSize:12,fontWeight:800,color:C.muted,letterSpacing:0.5,marginBottom:13}}>{"“"+(result.ko||input)+"”"}</div>
+                {result.hard?(
+                  <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:8,opacity:0.7}}>
+                    <span style={{fontSize:13,flexShrink:0}}>{"❌"}</span>
+                    <span style={{fontSize:15,color:C.muted,textDecoration:"line-through",textDecorationColor:C.red+"99",lineHeight:1.4}}>{result.hard}</span>
+                  </div>
+                ):null}
+                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                  <span style={{fontSize:15,flexShrink:0}}>{"✅"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:22,fontWeight:900,color:C.text,lineHeight:1.35}}>{result.native}</div>
+                    <button onClick={function(){ try{ speakEnglish(result.native); }catch(e){} }} style={{marginTop:8,background:"none",border:"1px solid "+C.border,borderRadius:99,padding:"5px 13px",color:C.accent,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{"🔊 들어보기"}</button>
+                  </div>
+                </div>
+                {result.verb?(<div style={{marginTop:15,display:"inline-flex",alignItems:"center",gap:7,background:C.accentDim,border:"1px solid "+C.accent+"40",borderRadius:11,padding:"7px 13px"}}><span style={{fontSize:11,color:C.muted,fontWeight:700}}>{"핵심"}</span><span style={{fontSize:14.5,fontWeight:900,color:C.accent}}>{result.verb}</span></div>):null}
+                {result.why?(<div style={{marginTop:12,fontSize:12.5,color:C.muted,lineHeight:1.6}}>{"💡 "+result.why}</div>):null}
+                <div style={{marginTop:15,paddingTop:11,borderTop:"1px solid "+C.border,fontSize:10,color:C.muted,opacity:0.65,textAlign:"right",letterSpacing:1.5,fontWeight:800}}>{"TalkFit · 거꾸로 영어"}</div>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:14}}>
+                <button onClick={share} style={{flex:1,background:C.accent,color:"#08090d",border:"none",borderRadius:13,padding:13,fontSize:14,fontWeight:900,cursor:"pointer"}}>{"📤 공유하기"}</button>
+                <button onClick={saveToDict} style={{flex:1,background:C.surface,border:"1px solid "+C.accent+"55",color:C.accent,borderRadius:13,padding:13,fontSize:14,fontWeight:800,cursor:"pointer"}}>{saved?"저장됨 ✓":"📚 내 말 사전에"}</button>
+              </div>
+              {shareMsg?<div style={{marginTop:10,fontSize:12,color:C.accent,textAlign:"center",fontWeight:700}}>{shareMsg}</div>:<div style={{marginTop:10,fontSize:11.5,color:C.muted,textAlign:"center"}}>{"카드를 캡처해서 올려도 좋아요 — 친구들이 신기해할 거예요"}</div>}
+              <button onClick={function(){setInput("");setResult(null);setSaved(false);}} style={{width:"100%",marginTop:16,background:"none",border:"none",color:C.muted,fontSize:13,textDecoration:"underline",cursor:"pointer"}}>{"다른 말도 바꿔보기"}</button>
+            </div>
+          ):null}
+        </div>
+      );
+    }
+
     function App() {
       var _s1=useState("home"); var tab=_s1[0]; var setTab=_s1[1];
       var _s2=useState("home"); var screen=_s2[0]; var setScreen=_s2[1];
@@ -5532,7 +5635,7 @@
               )}
               <span style={{color:C.accent}}>{"TalkFit"}</span>
             </div>
-            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak"||screen==="roleplay"||screen==="chat"||screen==="settings"||screen==="todayme")&&(
+            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak"||screen==="roleplay"||screen==="chat"||screen==="settings"||screen==="todayme"||screen==="reverse")&&(
               <button onClick={function(){setScreen("home");setTab("home");}} style={{background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
                 {React.createElement("svg",{width:14,height:14,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2.5,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("polyline",{points:"15 18 9 12 15 6"}))}
                 {"홈"}
@@ -5566,7 +5669,8 @@
           </div>
 
           <div data-scroller style={{flex:1,overflowY:"auto",paddingBottom:120}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} verbDone={!!loadLocal("verb_done_"+todayKey())} applyDone={!!loadLocal("apply_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} verbDone={!!loadLocal("verb_done_"+todayKey())} applyDone={!!loadLocal("apply_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} onReverse={function(){setScreen("reverse");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
+            {screen==="reverse"&&<ReverseScreen/>}
             {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} flow={dailyFlow} onNext={function(){ if(!loadLocal("verb_done_"+todayKey())){ handleStart(); } else { setDailyFlow(false); setScreen("home"); setTab("home"); } }} streak={streak} aiAvailable={aiAvailable}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
             {screen==="roleplay"&&<RoleplayScreen lessons={lessons} onNext={function(){setScreen("practice");}}/>}
