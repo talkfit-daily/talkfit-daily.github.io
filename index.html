@@ -35,8 +35,13 @@
   </style>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{overflow-x:hidden;max-width:100%;}
     body{background:#f3f5f8;color:#111827;font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;overscroll-behavior-y:contain;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;letter-spacing:-0.01em;}
     input,textarea,button{font-family:inherit;}
+    /* flex 행에서 input이 기본 min-width:auto라 안 줄어들어 옆 버튼을 화면 밖으로 밀어내던 문제 방지(자막 가져오기 버튼 잘림). */
+    [data-app-root] input,[data-app-root] textarea{min-width:0;max-width:100%;}
+    /* 앱 컨테이너 밖으로 가로 스크롤/삐져나옴 방지 안전망 (내부 가로 스크롤 칩 행은 각자 overflow로 정상 동작). */
+    [data-app-root]{overflow-x:hidden;}
     a{color:inherit;}
     textarea::placeholder{color:#2a2f45;}
     @keyframes pulse1{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.8);opacity:0}}
