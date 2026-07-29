@@ -917,8 +917,9 @@
         }
       }
       var listenOpts = [listenEx.ex.korean].concat(uniqueWrong.sort(function(){return Math.random()-0.5;}).slice(0,3)).sort(function(){return Math.random()-0.5;});
-      // 무음(지하철) 모드면 듣기 문제 제외 — 못 듣는 환경 대응(대표 피드백). 나머지는 전부 탭/읽기 문제.
-      if (load("subway_mode") !== true) quizzes.push({type:"listening", audio_text:listenEx.ex.english, options:listenOpts, answer:listenEx.ex.korean, verb:listenEx.verb});
+      // 듣기 문제는 매너 모드에서도 유지한다 — 요즘 이어폰이 있으니 듣기는 살린다(대표 피드백).
+      // 매너 모드는 '말 안 시키는 모드'라 말하기 문제만 타이핑으로 바뀐다.
+      quizzes.push({type:"listening", audio_text:listenEx.ex.english, options:listenOpts, answer:listenEx.ex.korean, verb:listenEx.verb});
 
       // Q4: meaning quiz for phrasal verb — 마지막 세트 사용(세트 2·3 동사도 반드시 출제되게, 커버리지 버그 수정)
       var p2 = lessons[lessons.length-1].phrasal;
@@ -2358,7 +2359,7 @@
               {/* v1.8.x 슬롯 변주: 예문을 '읽기'로 끝내지 않고 '구조를 소유'하게 — 같은 패턴에 내 상황을 넣어 생산 */}
               <div style={{background:color+"10",border:"1px solid "+color+"30",borderRadius:12,padding:16,marginTop:4}}>
                 <div style={{fontSize:12,fontWeight:800,color:color,marginBottom:6}}>{"🗣 이제 당신 차례"}</div>
-                <div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{"위 문장들처럼 "}<b style={{color:color}}>{"\""+current.verb+"\""}</b>{"를 넣어, 단어만 바꿔 당신의 상황을 영어로 소리 내어 말해보세요. 외우는 게 아니라 '구조'를 갖는 거예요."}</div>
+                <div style={{fontSize:14,color:C.text,lineHeight:1.6}}>{"위 문장들처럼 "}<b style={{color:color}}>{"\""+current.verb+"\""}</b>{"를 넣어, 단어만 바꿔 당신의 상황을 영어로 "}{load("subway_mode")===true?"써보세요":"소리 내어 말해보세요"}{". 외우는 게 아니라 '구조'를 갖는 거예요."}</div>
               </div>
             </div>
           )}
@@ -4645,7 +4646,7 @@
 
           {/* 모드 토글 */}
           <div style={{fontSize:11,color:C.muted,letterSpacing:2,marginBottom:10}}>{"학습 모드"}</div>
-          {toRow("🔇 매너 모드","소리 없이 — 말·듣기 문제 빼고 탭으로만. 지하철·회의·도서관에서.",subway,function(){var n=!subway;setSubway(n);save("subway_mode",n);})}
+          {toRow("🤫 매너 모드","말하기 문제를 타이핑으로 — 지하철·회의·도서관에서 소리 내지 않고. 듣기는 이어폰으로 그대로예요.",subway,function(){var n=!subway;setSubway(n);save("subway_mode",n);})}
           {toRow(sfxMuted?"🔇 효과음":"🔊 효과음","정답·레벨업 소리로 더 신나게",!sfxMuted,function(){var n=!sfxMuted;setSfxMuted(n);save("sfx_muted",n);if(n===false)SFX.correct();})}
 
           {/* 계정 · 설정 */}
@@ -4934,6 +4935,10 @@
       var listenerRef = useRef(null);
       var _af = useState(null), aiFb = _af[0], setAiFb = _af[1];
       var _al = useState(false), aiLoading = _al[0], setAiLoading = _al[1];
+      var _tp = useState(""), typed = _tp[0], setTyped = _tp[1];
+      // 매너 모드 = '말 안 시키는 모드'. 조용한 곳에서 소리 내어 말 못 하니 말하기 문제를 타이핑으로.
+      // 듣기(이어폰)는 그대로 살린다(대표 피드백). subway_mode 키 유지.
+      var mannerMode = load("subway_mode") === true;
       var nativeSR = (typeof window!=="undefined" && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) || null;
       var webSR = (typeof window!=="undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition)) || null;
       var canRecognize = (IS_NATIVE && nativeSR) ? true : ((!IS_NATIVE && webSR) ? true : false);
@@ -5043,7 +5048,7 @@
       }
       function cancelListening(){ stopRecognizer(); saidRef.current=""; setInterim(""); setAiFb(null); setAiLoading(false); setPhase("prompt"); }
       function advance(){
-        stopRecognizer(); saidRef.current=""; setInterim(""); setResult(null); setAiFb(null); setAiLoading(false);
+        stopRecognizer(); saidRef.current=""; setInterim(""); setResult(null); setAiFb(null); setAiLoading(false); setTyped("");
         if (idx+1 >= todays.length) { var s = (props.onComplete && props.onComplete()); setFinalStreak(typeof s==="number"?s:(props.streak||0)); setPhase("done"); }
         else { setIdx(idx+1); setPhase("prompt"); }
       }
@@ -5086,14 +5091,22 @@
                     <span style={{fontSize:16,fontWeight:900,color:C.accent}}>{it.key}</span>
                   </div>
                 ) : null}
-                <div style={{marginTop:18,textAlign:"center",fontSize:13.5,color:C.muted,fontWeight:600}}>{canRecognize?"🎤 영어로 말하면 ":"🎤 먼저 "}<b style={{color:C.text}}>{canRecognize?"채점해드려요":"영어로 직접"}</b>{canRecognize?"":" 말해보세요"}</div>
+                <div style={{marginTop:18,textAlign:"center",fontSize:13.5,color:C.muted,fontWeight:600}}>{mannerMode?"⌨️ 영어로 ":canRecognize?"🎤 영어로 말하면 ":"🎤 먼저 "}<b style={{color:C.text}}>{mannerMode?"써보면 채점해드려요":canRecognize?"채점해드려요":"영어로 직접"}</b>{(mannerMode||canRecognize)?"":" 말해보세요"}</div>
               </div>
+              {mannerMode ? (
+                <div style={{marginTop:22}}>
+                  <textarea value={typed} onChange={function(e){setTyped(e.target.value);}} placeholder="영어로 써보세요…" rows={2} style={{width:"100%",background:C.surface,border:"1px solid "+(typed.trim()?C.accent+"60":C.border),borderRadius:12,padding:"12px 14px",color:C.text,fontSize:15,outline:"none",fontFamily:"inherit",resize:"none",boxSizing:"border-box"}}/>
+                  <button disabled={!typed.trim()} onClick={function(){ saidRef.current=typed.trim(); finishListening(it); }} style={{width:"100%",marginTop:10,background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:15,fontSize:15,fontWeight:800,cursor:"pointer",opacity:typed.trim()?1:0.5}}>{"채점하기"}</button>
+                  <button onClick={function(){ saidRef.current=""; finishListening(it); }} style={{width:"100%",marginTop:8,background:"none",border:"none",color:C.muted,fontSize:12.5,textDecoration:"underline",cursor:"pointer"}}>{"모르겠어요, 정답 보기"}</button>
+                </div>
+              ) : (
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12,marginTop:22}}>
                 <button onClick={function(){ if(canRecognize){ startListening(it); } else { setPhase("reveal"); speakEnglish(it.en); } }} style={{width:96,height:96,borderRadius:"50%",border:"none",background:C.accent,color:"#08090d",fontSize:32,cursor:"pointer",boxShadow:"0 10px 34px -6px "+C.accent+"99"}}>{"🎤"}</button>
                 <div style={{fontSize:13,color:C.muted}}>{canRecognize?"탭하고 영어로 말하세요":"말했으면 탭해서 정답 확인"}</div>
                 {!canRecognize ? <div style={{fontSize:11.5,color:C.muted,textAlign:"center",lineHeight:1.5,maxWidth:270}}>{"이 기기에선 음성 채점이 안 돼요. 앱에서 말하면 채점받을 수 있어요"}</div> : null}
                 <button onClick={function(){setPhase("reveal");speakEnglish(it.en);}} style={{background:"none",border:"none",color:C.muted,fontSize:12.5,textDecoration:"underline",cursor:"pointer"}}>{"모르겠어요, 정답 보기"}</button>
               </div>
+              )}
             </div>
           ) : phase === "listening" ? (
             <div style={{textAlign:"center",padding:"8px 0"}}>
@@ -5106,7 +5119,7 @@
           ) : phase === "feedback" ? (
             <div>
               <div style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,padding:"12px 14px",marginBottom:14}}>
-                <div style={{fontSize:11,fontWeight:800,letterSpacing:1,color:C.muted,marginBottom:6}}>{"🗣️ 내가 말한 것"}</div>
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:1,color:C.muted,marginBottom:6}}>{mannerMode?"⌨️ 내가 쓴 것":"🗣️ 내가 말한 것"}</div>
                 <div style={{fontSize:15,fontWeight:600,lineHeight:1.5,color:(result&&result.said)?C.text:C.muted}}>{(result&&result.said)?result.said:"(안 들렸어요)"}</div>
               </div>
               {aiLoading ? (
@@ -5171,7 +5184,7 @@
               <div style={{fontSize:12.5,color:C.muted,lineHeight:1.6,background:C.surface,borderLeft:"2px solid "+C.accent,borderRadius:"0 10px 10px 0",padding:"11px 14px",marginBottom:4}}>{it.why}</div>
               <div style={{display:"flex",gap:10,marginTop:18}}>
                 <button onClick={function(){speakEnglish(it.en);}} style={{flex:"0 0 auto",background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:14,padding:"15px 20px",fontSize:15,cursor:"pointer"}}>{"🔊"}</button>
-                <button onClick={function(){ if (idx+1 >= todays.length) { var s = (props.onComplete && props.onComplete()); setFinalStreak(typeof s==="number"?s:(props.streak||0)); setPhase("done"); } else { setIdx(idx+1); setPhase("prompt"); } }} style={{flex:1,background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:15,fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 8px 20px -8px "+C.accent+"99"}}>{idx+1>=todays.length?"따라 말하고 완료 →":"따라 말했어요 →"}</button>
+                <button onClick={function(){ setTyped(""); if (idx+1 >= todays.length) { var s = (props.onComplete && props.onComplete()); setFinalStreak(typeof s==="number"?s:(props.streak||0)); setPhase("done"); } else { setIdx(idx+1); setPhase("prompt"); } }} style={{flex:1,background:C.accent,color:"#08090d",border:"none",borderRadius:14,padding:15,fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 8px 20px -8px "+C.accent+"99"}}>{mannerMode?(idx+1>=todays.length?"확인하고 완료 →":"확인했어요 →"):(idx+1>=todays.length?"따라 말하고 완료 →":"따라 말했어요 →")}</button>
               </div>
             </div>
           )}
