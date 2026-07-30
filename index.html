@@ -2123,8 +2123,13 @@
                                 );
                               }
                               var sz=done?56:48;
+                              var canReview=done && typeof props.onReviewSet==="function";
                               return (
-                                <div key={i} title={vb} style={{position:"relative",zIndex:1,transform:"translateX("+off+"px)",width:sz,height:sz,borderRadius:"50%",background:done?C.accent:C.surface,border:done?"none":"2.5px solid "+C.border,display:"flex",alignItems:"center",justifyContent:"center",margin:"10px 0",boxShadow:done?"0 5px 0 rgba(0,0,0,0.16), 0 8px 16px -6px "+C.accent+"88":"0 4px 0 "+C.border}}>
+                                <div key={i} title={canReview?(vb+" 복습"):vb}
+                                     onClick={canReview?function(){props.onReviewSet(i);}:undefined}
+                                     role={canReview?"button":undefined} tabIndex={canReview?0:undefined}
+                                     onKeyDown={canReview?function(e){if(e.key==="Enter"||e.key===" ")props.onReviewSet(i);}:undefined}
+                                     style={{position:"relative",zIndex:1,transform:"translateX("+off+"px)",width:sz,height:sz,borderRadius:"50%",background:done?C.accent:C.surface,border:done?"none":"2.5px solid "+C.border,display:"flex",alignItems:"center",justifyContent:"center",margin:"10px 0",boxShadow:done?"0 5px 0 rgba(0,0,0,0.16), 0 8px 16px -6px "+C.accent+"88":"0 4px 0 "+C.border,cursor:canReview?"pointer":"default"}}>
                                   <span style={{fontSize:done?24:15,fontWeight:900,color:done?"#08090d":C.muted}}>{done?"✓":i+1}</span>
                                 </div>
                               );
@@ -5808,6 +5813,11 @@
               var sets = idxs.map(function(i){return pool[i];}).filter(Boolean);
               if(!sets.length) return;
               setReviewSets(sets); setScreen("reviewLesson");
+            }} onReviewSet={function(idx){
+              var pool = LESSON_POOL.concat(load("my_lesson_pool")||[]);
+              var s = pool[idx];
+              if(!s) return;
+              setReviewSets([s]); setScreen("reviewLesson");
             }}/>}
             {screen==="reverse"&&<ReverseScreen/>}
             {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} flow={dailyFlow} onNext={function(){ if(!loadLocal("verb_done_"+todayKey())){ handleStart(); } else { setDailyFlow(false); setScreen("home"); setTab("home"); } }} streak={streak} aiAvailable={aiAvailable}/>}
