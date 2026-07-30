@@ -2155,6 +2155,38 @@
             );
           })()}
 
+          {/* ── 이전 학습 다시 보기 (홈에서 바로 복습) ────── */}
+          {(function(){
+            if(typeof props.onReviewLesson!=="function") return null;
+            var base=(typeof LESSON_POOL!=="undefined")?LESSON_POOL:(window.LESSON_POOL_REF||[]);
+            var pool=base.concat(load("my_lesson_pool")||[]);
+            var ld=load("learned_lesson_dates")||{};
+            var done=(load("attendance")||{}).daysLog||[];
+            var tKey=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
+            var dates=Object.keys(ld).filter(function(d){return d!==tKey && done.indexOf(d)!==-1 && (ld[d]||[]).some(function(i){return pool[i];});}).sort().reverse().slice(0,8);
+            if(!dates.length) return null;
+            return (
+              <div style={{marginTop:24}}>
+                <div style={{fontSize:12,fontWeight:800,color:C.text,marginBottom:10}}>{"📖 이전 학습 다시 보기"}</div>
+                <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:4}}>
+                  {dates.map(function(d,di){
+                    var verbs=(ld[d]||[]).map(function(i){return pool[i];}).filter(Boolean).reduce(function(a,s){ if(s.basic)a.push(s.basic.verb); if(s.phrasal)a.push(s.phrasal.verb); return a; },[]).slice(0,4);
+                    return (
+                      <div key={di} onClick={function(){props.onReviewLesson(d);}} role="button" tabIndex={0}
+                           onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onReviewLesson(d);}}
+                           style={{flex:"0 0 auto",minWidth:132,background:C.surface,border:"1px solid "+C.border,borderRadius:14,boxShadow:SH,padding:"12px 14px",cursor:"pointer"}}>
+                        <div style={{fontSize:10.5,color:C.muted,marginBottom:6}}>{d.slice(5)}</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                          {verbs.map(function(v,vi){return <span key={vi} style={{fontSize:12.5,fontWeight:800,color:vi%2===0?C.yellow:C.accent}}>{v}</span>;})}
+                        </div>
+                        <div style={{fontSize:10.5,color:C.accent,fontWeight:800,marginTop:8}}>{"다시 학습 →"}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
         </div>
       );
@@ -5770,7 +5802,13 @@
           </div>
 
           <div data-scroller style={{flex:1,overflowY:"auto",overscrollBehavior:"contain",background:C.bg,paddingBottom:"calc(120px + env(safe-area-inset-bottom))"}}>
-            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} isGuest={isGuest} onSignup={function(){setIsGuest(false);saveLocal("is_guest",false);}} verbDone={!!loadLocal("verb_done_"+todayKey())} applyDone={!!loadLocal("apply_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} onReverse={function(){setScreen("reverse");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null}/>}
+            {screen==="home"&&<HomeScreen streak={streak} todayDone={todayDone} lessons={lessons} onStart={handleStart} onStartDaily={startDaily} isGuest={isGuest} onSignup={function(){setIsGuest(false);saveLocal("is_guest",false);}} verbDone={!!loadLocal("verb_done_"+todayKey())} applyDone={!!loadLocal("apply_done_"+todayKey())} onSpeak={function(){setScreen("speak");setTab("speak");}} onChat={function(){setScreen("chat");}} onTodayMe={function(){setScreen("todayme");}} onReverse={function(){setScreen("reverse");}} todayMeDone={!!loadLocal("todayme_done_"+todayKey())} lbData={lbData} userId={user?user.uid:null} onReviewLesson={function(date){
+              var pool = LESSON_POOL.concat(load("my_lesson_pool")||[]);
+              var idxs = (load("learned_lesson_dates")||{})[date]||[];
+              var sets = idxs.map(function(i){return pool[i];}).filter(Boolean);
+              if(!sets.length) return;
+              setReviewSets(sets); setScreen("reviewLesson");
+            }}/>}
             {screen==="reverse"&&<ReverseScreen/>}
             {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} flow={dailyFlow} onNext={function(){ if(!loadLocal("verb_done_"+todayKey())){ handleStart(); } else { setDailyFlow(false); setScreen("home"); setTab("home"); } }} streak={streak} aiAvailable={aiAvailable}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
