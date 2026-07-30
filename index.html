@@ -2160,35 +2160,26 @@
             );
           })()}
 
-          {/* ── 이전 학습 다시 보기 (홈에서 바로 복습) ────── */}
+          {/* ── 배운 표현 다시 보기 — 전체 복습 라이브러리로 (눈에 띄는 진입 카드) ────── */}
           {(function(){
-            if(typeof props.onReviewLesson!=="function") return null;
+            if(typeof props.onOpenReviewAll!=="function") return null;
             var base=(typeof LESSON_POOL!=="undefined")?LESSON_POOL:(window.LESSON_POOL_REF||[]);
             var pool=base.concat(load("my_lesson_pool")||[]);
             var ld=load("learned_lesson_dates")||{};
             var done=(load("attendance")||{}).daysLog||[];
-            var tKey=(function(){var d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10);})();
-            var dates=Object.keys(ld).filter(function(d){return d!==tKey && done.indexOf(d)!==-1 && (ld[d]||[]).some(function(i){return pool[i];});}).sort().reverse().slice(0,8);
-            if(!dates.length) return null;
+            var seen={}; Object.keys(ld).forEach(function(d){ if(done.indexOf(d)!==-1)(ld[d]||[]).forEach(function(i){ if(i<pool.length) seen[i]=1; }); });
+            var n=Object.keys(seen).length;
+            if(!n) return null;
             return (
-              <div style={{marginTop:24}}>
-                <div style={{fontSize:12,fontWeight:800,color:C.text,marginBottom:10}}>{"📖 이전 학습 다시 보기"}</div>
-                <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:4}}>
-                  {dates.map(function(d,di){
-                    var verbs=(ld[d]||[]).map(function(i){return pool[i];}).filter(Boolean).reduce(function(a,s){ if(s.basic)a.push(s.basic.verb); if(s.phrasal)a.push(s.phrasal.verb); return a; },[]).slice(0,4);
-                    return (
-                      <div key={di} onClick={function(){props.onReviewLesson(d);}} role="button" tabIndex={0}
-                           onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onReviewLesson(d);}}
-                           style={{flex:"0 0 auto",minWidth:132,background:C.surface,border:"1px solid "+C.border,borderRadius:14,boxShadow:SH,padding:"12px 14px",cursor:"pointer"}}>
-                        <div style={{fontSize:10.5,color:C.muted,marginBottom:6}}>{d.slice(5)}</div>
-                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                          {verbs.map(function(v,vi){return <span key={vi} style={{fontSize:12.5,fontWeight:800,color:vi%2===0?C.yellow:C.accent}}>{v}</span>;})}
-                        </div>
-                        <div style={{fontSize:10.5,color:C.accent,fontWeight:800,marginTop:8}}>{"다시 학습 →"}</div>
-                      </div>
-                    );
-                  })}
+              <div onClick={props.onOpenReviewAll} role="button" tabIndex={0}
+                   onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onOpenReviewAll();}}
+                   style={{marginTop:24,display:"flex",alignItems:"center",gap:13,background:"linear-gradient(135deg,"+C.yellow+"22,"+C.yellow+"09)",border:"1px solid "+C.yellow+"55",borderRadius:16,padding:"15px 16px",cursor:"pointer",boxShadow:"0 8px 22px -13px "+C.yellow}}>
+                <span style={{fontSize:26}}>{"📚"}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14.5,fontWeight:900,color:C.text}}>{"배운 표현 다시 보기"}</div>
+                  <div style={{fontSize:11.5,color:C.muted}}>{"지금까지 "+n+"세트 · 눌러서 언제든 복습"}</div>
                 </div>
+                <span style={{fontSize:18,color:C.yellow,fontWeight:900}}>{"→"}</span>
               </div>
             );
           })()}
@@ -4637,6 +4628,70 @@
       );
     }
 
+    // ── 복습 라이브러리 — 지금까지 배운 표현 전체(유닛별), 눌러서 복습 ─────────────
+    function ReviewLibraryScreen(props){
+      var base=(typeof LESSON_POOL!=="undefined")?LESSON_POOL:(window.LESSON_POOL_REF||[]);
+      var myPool=load("my_lesson_pool")||[];
+      var pool=base.concat(myPool);
+      var total=pool.length, baseN=base.length;
+      var ld=load("learned_lesson_dates")||{};
+      var daysLog=(load("attendance")||{}).daysLog||[];
+      var seen={}; Object.keys(ld).forEach(function(d){ if(daysLog.indexOf(d)!==-1)(ld[d]||[]).forEach(function(i){ if(i<total) seen[i]=1; }); });
+      var learnedCount=Object.keys(seen).length;
+      var UNIT_SIZE=4;
+      var UNM=[{e:"☕",n:"첫 마디"},{e:"💬",n:"일상 대화"},{e:"🙂",n:"감정 표현"},{e:"🤝",n:"사람·관계"},{e:"💼",n:"일·직장"},{e:"🛒",n:"생활·쇼핑"},{e:"✈️",n:"여행"},{e:"🎬",n:"취미·문화"},{e:"🔥",n:"자연스럽게"},{e:"🏅",n:"고급 표현"}];
+      var THEMES=[]; for(var ti=0; ti*UNIT_SIZE<baseN; ti++){ var nm=UNM[ti%UNM.length]; THEMES.push({e:nm.e,n:nm.n,s:ti*UNIT_SIZE,en:Math.min(baseN,(ti+1)*UNIT_SIZE)}); }
+      if(myPool.length) THEMES.push({e:"⭐",n:"내가 만든 표현",s:baseN,en:total});
+      return (
+        <div style={{padding:"22px 18px 44px"}}>
+          <div style={{fontSize:22,fontWeight:900,color:C.text,letterSpacing:-0.5}}>{"배운 표현 도서관"}</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:6,marginBottom:22}}>{learnedCount>0?("지금까지 "+learnedCount+"세트를 익혔어요. 아무거나 눌러 다시 복습해요 📚"):"아직 배운 표현이 없어요. 오늘 학습부터 시작해요!"}</div>
+          {THEMES.map(function(unit,ui){
+            var sets=[]; for(var i=unit.s;i<unit.en;i++) sets.push({i:i,set:pool[i],learned:!!seen[i]});
+            var uLearned=sets.filter(function(s){return s.learned;}).length;
+            if(uLearned===0) return null; // 배운 게 하나도 없는 유닛은 숨김
+            return (
+              <div key={ui} style={{marginBottom:26}}>
+                <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:12}}>
+                  <span style={{fontSize:20}}>{unit.e}</span>
+                  <span style={{fontSize:15,fontWeight:900,color:C.text}}>{unit.n}</span>
+                  <span style={{fontSize:11,fontWeight:800,color:C.accent,background:C.accent+"18",padding:"3px 9px",borderRadius:99}}>{uLearned+" / "+sets.length}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  {sets.map(function(s,si){
+                    if(!s.set) return null;
+                    var bv=(s.set.basic&&s.set.basic.verb)||"", pv=(s.set.phrasal&&s.set.phrasal.verb)||"";
+                    if(!s.learned){
+                      return (
+                        <div key={si} style={{background:C.surface,border:"1px dashed "+C.border,borderRadius:14,padding:"13px 14px",opacity:0.55,display:"flex",flexDirection:"column",gap:7}}>
+                          <span style={{fontSize:15}}>{"🔒"}</span>
+                          <div style={{fontSize:11,color:C.muted,fontWeight:700}}>{"아직 안 배움"}</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={si} onClick={function(){props.onReviewSet&&props.onReviewSet(s.i);}} role="button" tabIndex={0}
+                           onKeyDown={function(e){if(e.key==="Enter"||e.key===" ")props.onReviewSet&&props.onReviewSet(s.i);}}
+                           style={{background:C.surface,border:"1px solid "+C.border,borderRadius:14,boxShadow:SH,padding:"13px 14px",cursor:"pointer",display:"flex",flexDirection:"column",gap:8,transition:"transform 0.12s"}}>
+                        <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                          <span style={{fontSize:16,fontWeight:900,color:C.yellow}}>{bv}</span>
+                          {pv&&<span style={{fontSize:14,fontWeight:800,color:C.accent}}>{pv}</span>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:2}}>
+                          <span style={{fontSize:10.5,color:C.muted,fontWeight:700}}>{"복습"}</span>
+                          <span style={{fontSize:12,fontWeight:900,color:C.accent}}>{"다시 학습 →"}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
     // ── PROFILE (나 탭) — 마이정보 + 레벨 (듀오링고식 프로필) ─────────────
     function ProfileScreen(props){
       var user=props.user, streak=props.streak, onSettings=props.onSettings, isPremium=props.isPremium, onUpgrade=props.onUpgrade, onLogin=props.onLogin, isGuest=props.isGuest;
@@ -5773,7 +5828,7 @@
               )}
               <span style={{color:C.accent}}>{"TalkFit"}</span>
             </div>
-            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak"||screen==="roleplay"||screen==="chat"||screen==="settings"||screen==="todayme"||screen==="reverse"||screen==="reviewLesson")&&(
+            {(screen==="learn"||screen==="practice"||screen==="admin"||screen==="speak"||screen==="roleplay"||screen==="chat"||screen==="settings"||screen==="todayme"||screen==="reverse"||screen==="reviewLesson"||screen==="reviewAll")&&(
               <button onClick={function(){setScreen("home");setTab("home");}} style={{background:C.surface,border:"1px solid "+C.border,color:C.text,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
                 {React.createElement("svg",{width:14,height:14,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2.5,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("polyline",{points:"15 18 9 12 15 6"}))}
                 {"홈"}
@@ -5814,6 +5869,12 @@
               if(!sets.length) return;
               setReviewSets(sets); setScreen("reviewLesson");
             }} onReviewSet={function(idx){
+              var pool = LESSON_POOL.concat(load("my_lesson_pool")||[]);
+              var s = pool[idx];
+              if(!s) return;
+              setReviewSets([s]); setScreen("reviewLesson");
+            }} onOpenReviewAll={function(){setScreen("reviewAll");}}/>}
+            {screen==="reviewAll"&&<ReviewLibraryScreen onReviewSet={function(idx){
               var pool = LESSON_POOL.concat(load("my_lesson_pool")||[]);
               var s = pool[idx];
               if(!s) return;
