@@ -4647,7 +4647,9 @@
           <div style={{fontSize:22,fontWeight:900,color:C.text,letterSpacing:-0.5}}>{"배운 표현 도서관"}</div>
           <div style={{fontSize:13,color:C.muted,marginTop:6,marginBottom:22}}>{learnedCount>0?("지금까지 "+learnedCount+"세트를 익혔어요. 아무거나 눌러 다시 복습해요 📚"):"아직 배운 표현이 없어요. 오늘 학습부터 시작해요!"}</div>
           {THEMES.map(function(unit,ui){
-            var sets=[]; for(var i=unit.s;i<unit.en;i++) sets.push({i:i,set:pool[i],learned:!!seen[i]});
+            // 학습 진도는 순차(앞에서부터 learnedCount개)다. 홈 경로와 동일하게 i<learnedCount로 판정.
+            // (seen[i]를 그대로 쓰면 일일 선택이 뒤쪽 유닛 세트를 흩뿌려 기록해 '안 배운 미래 유닛'이 복습 켜지는 버그)
+            var sets=[]; for(var i=unit.s;i<unit.en;i++) sets.push({i:i,set:pool[i],learned:(i<learnedCount)});
             var uLearned=sets.filter(function(s){return s.learned;}).length;
             if(uLearned===0) return null; // 배운 게 하나도 없는 유닛은 숨김
             return (
