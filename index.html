@@ -3038,6 +3038,58 @@
     }
 
     // ── SPEAK (내 대화 녹음 → AI 분석) ────────────────────────────
+    /**
+     * "지금 말할 수 있어요?" — 학습 들어가기 전에 하루 한 번 묻는다.
+     *
+     * 매너 모드는 프로필 탭 안쪽 토글로만 있어서, 그런 게 있는 줄 아무도 몰랐다(대표 지적).
+     * 기능이 있어도 발견되지 않으면 없는 것과 같다. 그래서 필요한 순간에 먼저 묻는다 —
+     * 듀오링고가 말하기 문제 앞에서 "지금 말 못 해요"를 항상 보여주는 것과 같은 이유.
+     *
+     * 매일 묻는 이유: 말할 수 있는 환경인지는 매일 다르다(오늘은 지하철, 내일은 집).
+     * 한 번 정해두고 마는 설정이 아니라 그날의 상황이다.
+     */
+    function MannerAskSheet(props) {
+      var C = props.C;
+      var pick = function(manner) {
+        save("subway_mode", manner);
+        saveLocal("manner_asked_" + props.dayKey, true);
+        try { SFX.tap(); } catch (e) {}
+        props.onDone();
+      };
+      var opt = function(emoji, title, desc, manner, primary) {
+        return (
+          <div onClick={function(){pick(manner);}}
+            style={{background:primary?C.accent:C.surface,border:"1px solid "+(primary?C.accent:C.border),
+                    borderRadius:16,padding:"18px 18px",marginBottom:10,cursor:"pointer",
+                    boxShadow:primary?"0 8px 24px -10px "+C.accent+"aa":SH,display:"flex",alignItems:"center",gap:13}}>
+            <span style={{fontSize:26,flex:"0 0 auto"}}>{emoji}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15.5,fontWeight:800,color:primary?"#08090d":C.text}}>{title}</div>
+              <div style={{fontSize:12,color:primary?"rgba(8,9,13,0.7)":C.muted,marginTop:2,lineHeight:1.45}}>{desc}</div>
+            </div>
+          </div>
+        );
+      };
+      return (
+        <div style={{position:"fixed",inset:0,background:"rgba(8,9,13,0.55)",zIndex:320,display:"flex",
+                     alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(6px)",animation:"fadeIn 0.22s"}}>
+          <div style={{background:C.bg,borderRadius:"22px 22px 0 0",padding:"26px 20px 30px",width:"100%",
+                       maxWidth:520,boxShadow:"0 -12px 40px rgba(0,0,0,0.25)"}}>
+            <div style={{width:38,height:4,borderRadius:99,background:C.border,margin:"0 auto 18px"}}/>
+            <div style={{fontSize:21,fontWeight:900,color:C.text,marginBottom:6}}>{"지금 소리 내어 말할 수 있어요?"}</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:20}}>
+              {"입으로 말해야 실력이 붙어요. 그런데 지금 그럴 수 없는 곳이라면, 타이핑으로 대신할게요."}
+            </div>
+            {opt("🗣","네, 말할 수 있어요","소리 내어 말하고 발음까지 채점받아요",false,true)}
+            {opt("🤫","지금은 어려워요","지하철·회의·도서관 — 말하기를 타이핑으로 바꿔요. 듣기는 이어폰으로 그대로",true,false)}
+            <div style={{fontSize:11.5,color:C.muted,textAlign:"center",marginTop:14,lineHeight:1.5}}>
+              {"'나' 탭 > 학습 모드에서 언제든 바꿀 수 있어요"}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function SpeakScreen(props) {
       var history=props.history, setHistory=props.setHistory, onHome=props.onHome;
       var supported = typeof window!=="undefined"&&("webkitSpeechRecognition" in window||"SpeechRecognition" in window);
@@ -5049,7 +5101,7 @@
       var _tp = useState(""), typed = _tp[0], setTyped = _tp[1];
       // 매너 모드 = '말 안 시키는 모드'. 조용한 곳에서 소리 내어 말 못 하니 말하기 문제를 타이핑으로.
       // 듣기(이어폰)는 그대로 살린다(대표 피드백). subway_mode 키 유지.
-      var mannerMode = load("subway_mode") === true;
+      var _mm = useState(load("subway_mode") === true); var mannerMode = _mm[0]; var setMannerMode = _mm[1];
       var nativeSR = (typeof window!=="undefined" && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) || null;
       var webSR = (typeof window!=="undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition)) || null;
       var canRecognize = (IS_NATIVE && nativeSR) ? true : ((!IS_NATIVE && webSR) ? true : false);
@@ -5203,6 +5255,12 @@
                   </div>
                 ) : null}
                 <div style={{marginTop:18,textAlign:"center",fontSize:13.5,color:C.muted,fontWeight:600}}>{mannerMode?"⌨️ 영어로 ":canRecognize?"🎤 영어로 말하면 ":"🎤 먼저 "}<b style={{color:C.text}}>{mannerMode?"써보면 채점해드려요":canRecognize?"채점해드려요":"영어로 직접"}</b>{(mannerMode||canRecognize)?"":" 말해보세요"}</div>
+                {/* 듀오링고가 말하기 문제마다 "Can't speak now"를 띄워두는 자리와 같은 역할.
+                    상황은 문제 도중에도 바뀐다 — 갑자기 사람이 들어오면 그 자리에서 끌 수 있어야 한다. */}
+                <div onClick={function(){ var n=!mannerMode; setMannerMode(n); save("subway_mode",n); try{SFX.tap();}catch(e){} }}
+                  style={{marginTop:10,textAlign:"center",fontSize:12,color:C.muted,fontWeight:700,cursor:"pointer",textDecoration:"underline",textUnderlineOffset:3}}>
+                  {mannerMode?"🗣 지금은 말할 수 있어요":"🤫 지금은 말 못 해요"}
+                </div>
               </div>
               {mannerMode ? (
                 <div style={{marginTop:22}}>
@@ -5619,6 +5677,8 @@
         });
       };
 
+      var _am = useState(false); var askManner = _am[0]; var setAskManner = _am[1];
+
       var handleStart = function() {
         track("lesson_start");
         if (!lessons) setLessons(getTodayLesson());
@@ -5627,11 +5687,18 @@
 
       // v1.8.x 물흐르듯: 홈의 단일 "오늘 시작" — 아직 안 한 단계로 바로 데려간다.
       // 오늘의 나 → 단어 학습 → (둘 다 끝났으면) 복습. 유저가 "뭐부터 하지"를 고를 필요 없음.
+      // 오늘 아직 안 물어봤으면, 학습에 들어가기 전에 "지금 말할 수 있어요?"부터 묻는다.
+      // 답하고 나면 원래 가려던 곳으로 그대로 이어진다(_startDailyInner).
       var startDaily = function() {
         // 게스트가 맛보기 한도를 다 쓰면 → 학습을 시작하는 대신 회원가입 화면으로 유도.
         if (isGuest && _learnedSetCount() >= GUEST_SET_LIMIT) {
           setIsGuest(false); saveLocal("is_guest", false); return;
         }
+        if (!loadLocal("manner_asked_" + todayKey())) { setAskManner(true); return; }
+        _startDailyInner();
+      };
+
+      var _startDailyInner = function() {
         setDailyFlow(true);
         var meDone = !!loadLocal("todayme_done_"+todayKey());
         var learnDone = !!loadLocal("verb_done_"+todayKey());
@@ -5882,6 +5949,7 @@
               if(!s) return;
               setReviewSets([s]); setScreen("reviewLesson");
             }}/>}
+            {askManner&&<MannerAskSheet C={C} dayKey={todayKey()} onDone={function(){setAskManner(false);_startDailyInner();}}/>}
             {screen==="reverse"&&<ReverseScreen/>}
             {screen==="todayme"&&<TodayMeScreen onHome={function(){setScreen("home");setTab("home");}} onComplete={handleTodayMeComplete} flow={dailyFlow} onNext={function(){ if(!loadLocal("verb_done_"+todayKey())){ handleStart(); } else { setDailyFlow(false); setScreen("home"); setTab("home"); } }} streak={streak} aiAvailable={aiAvailable}/>}
             {screen==="learn"&&<LearnScreen lessons={lessons} loading={loading} onNext={function(){setScreen("roleplay");}} aiAvailable={aiAvailable}/>}
